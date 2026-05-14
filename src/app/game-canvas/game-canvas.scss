@@ -26,9 +26,9 @@
   border: none;
   margin: 0;
   padding: 0;
-  background: rgba(10, 8, 14, 0.26);
-  backdrop-filter: blur(1px);
-  cursor: pointer;
+  background: rgba(10, 8, 14, 0.14);
+  backdrop-filter: blur(0.5px);
+  pointer-events: none;
   animation: backdrop-fade 220ms ease-out;
 
   &:focus-visible {
@@ -43,6 +43,6 @@
   }
   to {
     opacity: 1;
-    backdrop-filter: blur(1px);
+    backdrop-filter: blur(0.5px);
   }
 }

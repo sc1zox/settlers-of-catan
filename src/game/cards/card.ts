@@ -142,6 +142,10 @@ export class Card {
     if (this.mode === 'rest') this.recomputeRestTarget();
   }
 
+  isHovered(): boolean {
+    return this.hovered;
+  }
+
   /**
    * Engine call while the card is focused: report the desired pose in this
    * card's parent-local space. Card lerps toward it.
@@ -188,7 +192,7 @@ export class Card {
       if (focused) {
         m.emissive = new Color(0xffffff);
         m.emissiveMap = m.map;
-        m.emissiveIntensity = 0.7;
+        m.emissiveIntensity = 0.95;
       } else {
         m.emissive = new Color(0x000000);
         m.emissiveMap = null;

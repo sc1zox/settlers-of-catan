@@ -1,11 +1,4 @@
-import {
-  BoxGeometry,
-  Color,
-  ConeGeometry,
-  Group,
-  Mesh,
-  MeshStandardMaterial,
-} from 'three';
+import { BoxGeometry, Color, ConeGeometry, Group, Mesh, MeshStandardMaterial } from 'three';
 
 export interface PlayerFigureMaterials {
   /** Main coloured material for walls / road bodies. */

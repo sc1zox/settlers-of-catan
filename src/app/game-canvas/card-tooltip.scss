@@ -1,0 +1,43 @@
+:host {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.tooltip {
+  position: absolute;
+  min-width: 10.5rem;
+  max-width: 16rem;
+  padding: 0.5rem 0.65rem 0.55rem;
+  border-radius: 8px;
+  color: #fdf8ef;
+  border: 1px solid rgba(228, 186, 112, 0.62);
+  background: rgba(26, 20, 13, 0.9);
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.4),
+    0 0 20px rgba(228, 186, 112, 0.14);
+  backdrop-filter: blur(3px);
+  font-family:
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  transform: translate3d(0, 0, 0);
+
+  .title {
+    margin-bottom: 0.2rem;
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(253, 248, 239, 0.72);
+    font-weight: 600;
+  }
+
+  .detail {
+    font-size: 1.03rem;
+    line-height: 1.2;
+    font-weight: 700;
+  }
+}

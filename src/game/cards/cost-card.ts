@@ -1,5 +1,6 @@
-import { BoxGeometry, Material, Mesh, MeshStandardMaterial } from 'three';
-import { makeCostCardTexture } from './textures';
+import { MeshStandardMaterial } from 'three';
+import { Card } from './card';
+import { makeCostCardBackTexture, makeCostCardTexture } from './textures';
 
 export interface CostCardOptions {
   /** Long horizontal side (X). */
@@ -11,23 +12,33 @@ export interface CostCardOptions {
 }
 
 export interface CostCardResult {
-  readonly mesh: Mesh;
+  readonly card: Card;
   readonly materials: readonly MeshStandardMaterial[];
 }
 
-/** Face-up reference card that lists the building costs. */
+/**
+ * Reference card listing the building costs. Built as a regular `Card` so it
+ * shares the focus-on-click behaviour with the resource and dev hands. The
+ * card rests face-up — set its base quaternion to a 180° X-axis flip in the
+ * caller so the cost listing is visible from above on the table.
+ */
 export function createCostCard(options: CostCardOptions): CostCardResult {
-  const tex = makeCostCardTexture();
-  const faceMat = new MeshStandardMaterial({ map: tex, flatShading: true, roughness: 0.85 });
-  const backMat = new MeshStandardMaterial({ color: 0x8a6c40, flatShading: true });
+  const faceTex = makeCostCardTexture();
+  const backTex = makeCostCardBackTexture();
+  const faceMat = new MeshStandardMaterial({ map: faceTex, roughness: 0.85, flatShading: true });
+  const backMat = new MeshStandardMaterial({ map: backTex, roughness: 0.85, flatShading: true });
   const edgeMat = new MeshStandardMaterial({ color: 0x6b4a26, flatShading: true });
-  // Material order: +X, -X, +Y, -Y, +Z, -Z — face-up means face texture on +Y.
-  const mats: Material[] = [edgeMat, edgeMat, faceMat, backMat, edgeMat, edgeMat];
-  const mesh = new Mesh(
-    new BoxGeometry(options.width, options.thickness, options.depth),
-    mats,
-  );
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  return { mesh, materials: [faceMat, backMat, edgeMat] };
+
+  // Card constructor uses `height` for local X (short axis) and `width` for
+  // local Z (long axis). The cost card is landscape — its X is the long side.
+  const card = new Card({
+    width: options.depth,
+    height: options.width,
+    thickness: options.thickness,
+    backMaterial: backMat,
+    faceMaterial: faceMat,
+    edgeMaterial: edgeMat,
+  });
+
+  return { card, materials: [faceMat, backMat, edgeMat] };
 }

@@ -1,9 +1,20 @@
 import { Camera, Object3D, Raycaster, Vector2 } from 'three';
 import { Card } from '../cards/card';
+import { DEV_LABEL_DE, RESOURCE_LABEL_DE } from '../cards/textures';
+import { Die } from '../dice/die';
+import { CardHoverGroup } from '../shared/card-hover';
 import { Harbor } from '../world/harbors';
 import { Tile } from '../tiles/tile';
 
-export type HoverTarget = { kind: 'harbor'; harbor: Harbor } | { kind: 'chip'; tile: Tile };
+export interface CardHoverTooltip {
+  readonly title: string;
+  readonly detail: string;
+}
+
+export type HoverTarget =
+  | { kind: 'harbor'; harbor: Harbor }
+  | { kind: 'chip'; tile: Tile }
+  | { kind: 'card'; card: Card; tooltip: CardHoverTooltip };
 
 export interface HoverState {
   readonly target: HoverTarget;
@@ -12,11 +23,14 @@ export interface HoverState {
 }
 
 export type HoverHandler = (state: HoverState | null) => void;
+export type CardClickHandler = (card: Card) => void;
+export type DieClickHandler = (die: Die) => void;
 
 /**
  * Tracks mouse position and raycasts each frame to detect what the cursor is
- * over. Two kinds of targets are supported: harbors (group userData) and
- * number-chip sprites (sprite userData).
+ * over. Three target families are supported via `userData['kind']`:
+ *  - 'harbor' / 'chip' for hover (tooltip)
+ *  - 'card' / 'die'   for click  (focus / roll)
  */
 export class HoverSystem {
   private readonly raycaster = new Raycaster();
@@ -25,6 +39,8 @@ export class HoverSystem {
   private screenX = 0;
   private screenY = 0;
   private handler: HoverHandler | null = null;
+  private cardClickHandler: CardClickHandler | null = null;
+  private dieClickHandler: DieClickHandler | null = null;
   private lastState: HoverState | null = null;
   private currentTile: Tile | null = null;
 
@@ -40,6 +56,14 @@ export class HoverSystem {
 
   setHandler(handler: HoverHandler | null): void {
     this.handler = handler;
+  }
+
+  setCardClickHandler(handler: CardClickHandler | null): void {
+    this.cardClickHandler = handler;
+  }
+
+  setDieClickHandler(handler: DieClickHandler | null): void {
+    this.dieClickHandler = handler;
   }
 
   update(): void {
@@ -74,6 +98,25 @@ export class HoverSystem {
         });
         return;
       }
+      if (kind === 'card' || kind === 'die') {
+        this.setHoveredTile(null);
+        if (kind === 'die') {
+          this.emit(null);
+          return;
+        }
+        const card = obj.userData['card'] as Card;
+        const tooltip = this.buildCardTooltip(card);
+        if (!tooltip) {
+          this.emit(null);
+          return;
+        }
+        this.emit({
+          target: { kind: 'card', card, tooltip },
+          screenX: this.screenX,
+          screenY: this.screenY,
+        });
+        return;
+      }
     }
     this.setHoveredTile(null);
     this.emit(null);
@@ -103,8 +146,11 @@ export class HoverSystem {
       (state.target.kind === 'harbor'
         ? this.lastState.target.kind === 'harbor' &&
           this.lastState.target.harbor === state.target.harbor
-        : this.lastState.target.kind === 'chip' &&
-          this.lastState.target.tile === (state.target as { tile: Tile }).tile) &&
+        : state.target.kind === 'chip'
+          ? this.lastState.target.kind === 'chip' &&
+            this.lastState.target.tile === state.target.tile
+          : this.lastState.target.kind === 'card' &&
+            this.lastState.target.card === state.target.card) &&
       Math.abs((this.lastState.screenX ?? 0) - state.screenX) < 1 &&
       Math.abs((this.lastState.screenY ?? 0) - state.screenY) < 1
     ) {
@@ -138,13 +184,37 @@ export class HoverSystem {
     for (const hit of hits) {
       const obj = walkToKind(hit.object);
       if (!obj) continue;
-      if (obj.userData['kind'] === 'card') {
+      const kind = obj.userData['kind'];
+      if (kind === 'card') {
         const card = obj.userData['card'] as Card;
-        card.toggle();
+        this.cardClickHandler?.(card);
+        return;
+      }
+      if (kind === 'die') {
+        const die = obj.userData['die'] as Die;
+        this.dieClickHandler?.(die);
         return;
       }
     }
   };
+
+  private buildCardTooltip(card: Card): CardHoverTooltip | null {
+    const info = card.getHoverInfo();
+    if (!info) return null;
+    if (info.group === CardHoverGroup.Resource && info.resourceKind) {
+      return {
+        title: 'Rohstoffkarte',
+        detail: RESOURCE_LABEL_DE[info.resourceKind],
+      };
+    }
+    if (info.group === CardHoverGroup.Development && info.devKind) {
+      return {
+        title: 'Entwicklungskarte',
+        detail: DEV_LABEL_DE[info.devKind],
+      };
+    }
+    return null;
+  }
 }
 
 function walkToKind(obj: Object3D): Object3D | null {

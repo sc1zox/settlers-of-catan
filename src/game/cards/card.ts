@@ -1,17 +1,15 @@
 import {
   BoxGeometry,
+  Color,
   Material,
   Mesh,
   MeshStandardMaterial,
   Quaternion,
   Vector3,
 } from 'three';
+import { CardHoverInfo } from '../shared/card-hover';
 
-const FLIP_DURATION_S = 0.45;
-const LIFT_Y = 1.2;
-const TILT_X_REVEAL = -0.35; // small tilt toward the player so the face reads better
-
-export type CardState = 'down' | 'flipping_up' | 'up' | 'flipping_down';
+export type CardMode = 'rest' | 'focused';
 
 export interface CardOptions {
   /** Long side of the card (mapped to local Z). */
@@ -23,38 +21,44 @@ export interface CardOptions {
   readonly backMaterial: MeshStandardMaterial;
   readonly faceMaterial: MeshStandardMaterial;
   readonly edgeMaterial: MeshStandardMaterial;
+  readonly hoverInfo?: CardHoverInfo;
 }
 
+export interface CardLocalSize {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}
+
+/** How far the card lifts upward when hovered in rest mode. */
+const HOVER_LIFT = 0.42;
+
 /**
- * A 3-D card lying flat on the table. Face-down by default; click to lift it up
- * and rotate so the face shows. Click again to put it back.
+ * A 3-D card lying flat on the table. Click to focus: the engine drives the
+ * card's pose each frame so it (and its group siblings) float in front of the
+ * camera, face-on and large enough to read. Hovering an unfocused card lifts
+ * it slightly so overlapping siblings are revealable.
  */
 export class Card {
   readonly mesh: Mesh;
-  private state: CardState = 'down';
-  private animT = 0;
   private readonly basePos = new Vector3();
   private readonly baseQuat = new Quaternion();
-  private readonly upPos = new Vector3();
-  private readonly upQuat = new Quaternion();
-  private readonly startPos = new Vector3();
-  private readonly startQuat = new Quaternion();
-  /** Quaternion rotating 180° around local X — flips the card face-up. */
-  private static readonly FLIP_X = new Quaternion().setFromAxisAngle(
-    new Vector3(1, 0, 0),
-    Math.PI,
-  );
-  /** Small recovery tilt so the face leans toward the camera when revealed. */
-  private static readonly TILT = new Quaternion().setFromAxisAngle(
-    new Vector3(1, 0, 0),
-    TILT_X_REVEAL,
-  );
+  private mode: CardMode = 'rest';
+  private hovered = false;
+  private readonly liveTargetPos = new Vector3();
+  private readonly liveTargetQuat = new Quaternion();
+  private readonly allMaterials: MeshStandardMaterial[];
+  private readonly texturedMaterials: MeshStandardMaterial[];
+  private readonly originalDepthTest: boolean;
+  private readonly originalDepthWrite: boolean;
+  private readonly localSize: CardLocalSize;
+  private readonly hoverInfo: CardHoverInfo | null;
+  private groupKey: string | null = null;
 
   constructor(options: CardOptions) {
     const { width, height, thickness, backMaterial, faceMaterial, edgeMaterial } = options;
-    // BoxGeometry material order: +X, -X, +Y, -Y, +Z, -Z. With the card lying
-    // flat on the table the back is on +Y (visible from above when face-down)
-    // and the face on -Y (revealed after a 180° flip around X).
+    // BoxGeometry material order: +X, -X, +Y, -Y, +Z, -Z. The face lives on -Y;
+    // in focus mode the engine rotates the card so -Y points at the camera.
     const mats: Material[] = [
       edgeMaterial,
       edgeMaterial,
@@ -68,6 +72,13 @@ export class Card {
     this.mesh.receiveShadow = true;
     this.mesh.userData['kind'] = 'card';
     this.mesh.userData['card'] = this;
+
+    this.allMaterials = [backMaterial, faceMaterial, edgeMaterial];
+    this.texturedMaterials = [backMaterial, faceMaterial];
+    this.originalDepthTest = backMaterial.depthTest;
+    this.originalDepthWrite = backMaterial.depthWrite;
+    this.localSize = { x: height, y: thickness, z: width };
+    this.hoverInfo = options.hoverInfo ?? null;
   }
 
   /** Set the card's resting pose. Call before adding it to the scene. */
@@ -76,38 +87,76 @@ export class Card {
     this.baseQuat.copy(quaternion);
     this.mesh.position.copy(position);
     this.mesh.quaternion.copy(quaternion);
+    this.recomputeRestTarget();
+  }
 
-    this.upPos.copy(position);
-    this.upPos.y += LIFT_Y;
+  /**
+   * Cards that share the same group key focus together: clicking one fans
+   * them all out in front of the camera. `null` means "lonely" — only this
+   * card focuses on its own click.
+   */
+  setGroupKey(key: string | null): void {
+    this.groupKey = key;
+  }
 
-    // base * flip * tilt — flip first, then tilt slightly back toward player.
-    this.upQuat.copy(quaternion).multiply(Card.FLIP_X).multiply(Card.TILT);
+  getGroupKey(): string | null {
+    return this.groupKey;
+  }
+
+  /** Local geometry size: x (short, screen-horizontal in focus), z (long, screen-vertical). */
+  getLocalSize(): CardLocalSize {
+    return this.localSize;
   }
 
   toggle(): void {
-    if (this.state === 'down' || this.state === 'flipping_down') {
-      this.beginTransition('flipping_up');
+    this.setMode(this.mode === 'rest' ? 'focused' : 'rest');
+  }
+
+  setMode(mode: CardMode): void {
+    if (this.mode === mode) return;
+    this.mode = mode;
+    if (mode === 'rest') {
+      this.recomputeRestTarget();
+      this.applyOverlayVisuals(false);
     } else {
-      this.beginTransition('flipping_down');
+      this.applyOverlayVisuals(true);
     }
   }
 
-  /** True when the card is up or on its way up. */
-  isRevealed(): boolean {
-    return this.state === 'up' || this.state === 'flipping_up';
+  isFocused(): boolean {
+    return this.mode === 'focused';
+  }
+
+  getHoverInfo(): CardHoverInfo | null {
+    return this.hoverInfo;
+  }
+
+  /**
+   * Hover state — only meaningful in rest mode (focus mode ignores it). When
+   * hovered, the card's resting target lifts upward in world Y so overlapping
+   * siblings reveal what's underneath.
+   */
+  setHovered(hovered: boolean): void {
+    if (this.hovered === hovered) return;
+    this.hovered = hovered;
+    if (this.mode === 'rest') this.recomputeRestTarget();
+  }
+
+  /**
+   * Engine call while the card is focused: report the desired pose in this
+   * card's parent-local space. Card lerps toward it.
+   */
+  setLiveTarget(position: Vector3, quaternion: Quaternion): void {
+    this.liveTargetPos.copy(position);
+    this.liveTargetQuat.copy(quaternion);
   }
 
   update(dt: number): void {
-    if (this.state !== 'flipping_up' && this.state !== 'flipping_down') return;
-    this.animT = Math.min(1, this.animT + dt / FLIP_DURATION_S);
-    const e = easeInOut(this.animT);
-    const targetPos = this.state === 'flipping_up' ? this.upPos : this.basePos;
-    const targetQuat = this.state === 'flipping_up' ? this.upQuat : this.baseQuat;
-    this.mesh.position.lerpVectors(this.startPos, targetPos, e);
-    this.mesh.quaternion.slerpQuaternions(this.startQuat, targetQuat, e);
-    if (this.animT >= 1) {
-      this.state = this.state === 'flipping_up' ? 'up' : 'down';
-    }
+    // Critically-damped lerp toward the live target — works for both the
+    // returning-to-rest case and the engine-driven focused case.
+    const a = 1 - Math.exp(-dt * 9);
+    this.mesh.position.lerp(this.liveTargetPos, a);
+    this.mesh.quaternion.slerp(this.liveTargetQuat, a);
   }
 
   dispose(): void {
@@ -115,14 +164,37 @@ export class Card {
     // Materials are shared per player area and disposed there.
   }
 
-  private beginTransition(next: 'flipping_up' | 'flipping_down'): void {
-    this.state = next;
-    this.animT = 0;
-    this.startPos.copy(this.mesh.position);
-    this.startQuat.copy(this.mesh.quaternion);
+  private recomputeRestTarget(): void {
+    this.liveTargetPos.copy(this.basePos);
+    if (this.hovered) this.liveTargetPos.y += HOVER_LIFT;
+    this.liveTargetQuat.copy(this.baseQuat);
   }
-}
 
-function easeInOut(t: number): number {
-  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  /**
+   * Focused cards must render on top of every other 3-D element so they read
+   * cleanly even while travelling across the disc, tiles or table. The
+   * emissive boost ensures they're bright regardless of sun direction —
+   * otherwise the camera-facing side would be lit only by ambient + hemi.
+   */
+  private applyOverlayVisuals(focused: boolean): void {
+    this.mesh.castShadow = !focused;
+    this.mesh.renderOrder = focused ? 999 : 0;
+    for (const m of this.allMaterials) {
+      m.depthTest = focused ? false : this.originalDepthTest;
+      m.depthWrite = focused ? false : this.originalDepthWrite;
+      m.needsUpdate = true;
+    }
+    for (const m of this.texturedMaterials) {
+      if (focused) {
+        m.emissive = new Color(0xffffff);
+        m.emissiveMap = m.map;
+        m.emissiveIntensity = 0.7;
+      } else {
+        m.emissive = new Color(0x000000);
+        m.emissiveMap = null;
+        m.emissiveIntensity = 0;
+      }
+      m.needsUpdate = true;
+    }
+  }
 }

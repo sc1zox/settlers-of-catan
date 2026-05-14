@@ -9,6 +9,7 @@ import {
   makeResourceBackTexture,
   makeResourceFaceTexture,
 } from '../cards/textures';
+import { CardHoverGroup } from '../shared/card-hover';
 import { PlayerColor, PLAYER_NAME_DE } from './colors';
 import {
   createFigureMaterials,
@@ -75,19 +76,28 @@ export class PlayerArea {
     this.layoutCities(arsenalZ + 0.1, tableY);
 
     // === COST CARD (face-up, left side of outer row) ===
-    const cost = createCostCard({ width: 2.6, thickness: 0.05, depth: 1.65 });
-    cost.mesh.position.set(-6.2, tableY + 0.026, cardRowZ);
-    // Tiny tilt for hand-placed feel.
-    cost.mesh.rotation.y = -0.04;
-    this.group.add(cost.mesh);
+    const costThickness = 0.04;
+    const cost = createCostCard({ width: 1.95, thickness: costThickness, depth: 1.25 });
     this.ownedMaterials.push(...cost.materials);
+    cost.card.setGroupKey(`cost-${options.seat}`);
+    const costPos = new Vector3(-6.2, tableY + costThickness / 2 + 0.005, cardRowZ);
+    // baseQuat = 180° around X flips the card's -Y face up so the cost listing
+    // is visible on the table; small Y jitter for hand-placed feel.
+    const costQuat = new Quaternion()
+      .setFromAxisAngle(new Vector3(1, 0, 0), Math.PI)
+      .multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), -0.04));
+    cost.card.setBasePose(costPos, costQuat);
+    this.group.add(cost.card.mesh);
 
-    // === HAND: resource cards then dev cards, face-down ===
-    const cards: Card[] = [];
+    // === HAND: cost reference + resource cards + dev cards ===
+    const cards: Card[] = [cost.card];
+    const resourceGroupKey = `res-${options.seat}`;
+    const devGroupKey = `dev-${options.seat}`;
     const handStartX = -2.4;
     for (let i = 0; i < options.resourceHand.length; i++) {
       const kind = options.resourceHand[i];
       const card = this.buildResourceCard(kind);
+      card.setGroupKey(resourceGroupKey);
       const x = handStartX + i * (CARD_SHORT + HAND_GAP);
       this.placeCard(card, x, cardRowZ, tableY);
       this.group.add(card.mesh);
@@ -97,6 +107,7 @@ export class PlayerArea {
     for (let i = 0; i < options.devHand.length; i++) {
       const kind = options.devHand[i];
       const card = this.buildDevCard(kind);
+      card.setGroupKey(devGroupKey);
       const x = devStartX + i * (CARD_SHORT + HAND_GAP);
       this.placeCard(card, x, cardRowZ, tableY);
       this.group.add(card.mesh);
@@ -125,11 +136,7 @@ export class PlayerArea {
     for (let row = 0; row < 3; row++) {
       for (let col = 0; col < 5; col++) {
         const road = makeRoad(this.figureMats);
-        road.position.set(
-          startX + col * colStep,
-          tableY + 0.005,
-          centreZ + (row - 1) * rowStep,
-        );
+        road.position.set(startX + col * colStep, tableY + 0.005, centreZ + (row - 1) * rowStep);
         road.rotation.y = (row * 5 + col) * 0.13 - 0.3;
         this.group.add(road);
       }
@@ -172,6 +179,10 @@ export class PlayerArea {
       backMaterial: backMat,
       faceMaterial: faceMat,
       edgeMaterial: edgeMat,
+      hoverInfo: {
+        group: CardHoverGroup.Resource,
+        resourceKind: kind,
+      },
     });
   }
 
@@ -189,13 +200,17 @@ export class PlayerArea {
       backMaterial: backMat,
       faceMaterial: faceMat,
       edgeMaterial: edgeMat,
+      hoverInfo: {
+        group: CardHoverGroup.Development,
+        devKind: kind,
+      },
     });
   }
 
   private placeCard(card: Card, x: number, z: number, tableY: number): void {
     const pos = new Vector3(x, tableY + CARD_THICKNESS / 2 + 0.005, z);
     // Tiny yaw jitter so hand cards don't look like a printed sheet.
-    const yaw = ((Math.sin(x * 7.13) * 0.5 + 0.5) - 0.5) * 0.06;
+    const yaw = (Math.sin(x * 7.13) * 0.5 + 0.5 - 0.5) * 0.06;
     const q = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), yaw);
     card.setBasePose(pos, q);
   }

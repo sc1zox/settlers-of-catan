@@ -11,11 +11,11 @@ export function addLighting(scene: Scene): void {
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.near = 0.5;
-  sun.shadow.camera.far = 90;
-  sun.shadow.camera.left = -24;
-  sun.shadow.camera.right = 24;
-  sun.shadow.camera.top = 24;
-  sun.shadow.camera.bottom = -24;
+  sun.shadow.camera.far = 110;
+  sun.shadow.camera.left = -28;
+  sun.shadow.camera.right = 28;
+  sun.shadow.camera.top = 28;
+  sun.shadow.camera.bottom = -28;
   sun.shadow.bias = -0.0005;
   scene.add(sun);
 

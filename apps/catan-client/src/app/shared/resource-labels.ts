@@ -1,6 +1,7 @@
 import { ResourceType } from '@catan/api-interfaces';
+import { EnumTranslate } from '../../game/i18n/enum-translate.helper';
+import { TranslateInstantFn } from '../../shared/i18n/translate-instant-fn';
 
-/** Fixed display order for resource rows / pickers across the in-game UI. */
 export const RESOURCE_TYPE_ORDER: readonly ResourceType[] = [
   ResourceType.Wood,
   ResourceType.Brick,
@@ -9,11 +10,6 @@ export const RESOURCE_TYPE_ORDER: readonly ResourceType[] = [
   ResourceType.Ore,
 ];
 
-/** German labels for wire resource types — UI strings throughout the client are German. */
-export const RESOURCE_TYPE_LABEL_DE: Readonly<Record<ResourceType, string>> = {
-  [ResourceType.Wood]: 'Holz',
-  [ResourceType.Brick]: 'Lehm',
-  [ResourceType.Wheat]: 'Getreide',
-  [ResourceType.Wool]: 'Wolle',
-  [ResourceType.Ore]: 'Erz',
-};
+export function resourceTypeLabel(instant: TranslateInstantFn, type: ResourceType): string {
+  return EnumTranslate.translateResourceType(instant, type);
+}

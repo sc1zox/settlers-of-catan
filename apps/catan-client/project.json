@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/nx/schemas/project-schema.json",
   "name": "catan-client",
+  "tags": ["scope:client", "type:app"],
   "projectType": "application",
   "generators": {
     "@schematics/angular:component": {
@@ -17,7 +18,14 @@
         "index": "apps/catan-client/src/index.html",
         "tsConfig": "apps/catan-client/tsconfig.app.json",
         "inlineStyleLanguage": "scss",
-        "assets": [],
+        "polyfills": [],
+        "assets": [
+          {
+            "glob": "**/*",
+            "input": "apps/catan-client/src/assets",
+            "output": "/assets"
+          }
+        ],
         "styles": ["apps/catan-client/src/styles.scss"],
         "outputPath": "dist/apps/catan-client"
       },

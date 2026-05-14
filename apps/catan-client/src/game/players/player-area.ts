@@ -10,7 +10,7 @@ import {
   makeResourceFaceTexture,
 } from '../cards/textures';
 import { CardHoverGroup } from '../shared/card-hover';
-import { PlayerColor, PLAYER_NAME_DE } from './colors';
+import { PlayerColor, playerColorLabel } from './colors';
 import {
   createFigureMaterials,
   disposeFigureMaterials,
@@ -81,7 +81,7 @@ export class PlayerArea {
     this.info = {
       seat: options.seat,
       color: options.color,
-      name: PLAYER_NAME_DE[options.color],
+      name: playerColorLabel(options.color),
     };
 
     // Seat 0 sits at world +Z, then seats go clockwise around the table.

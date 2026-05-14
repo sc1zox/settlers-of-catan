@@ -1,0 +1,223 @@
+{
+  "reject": {
+    "wrongPhase": "Diese Aktion passt nicht zur aktuellen Spielphase (z. B. wuerfeln nur in der Wuerfelphase, bauen nur nach dem Wurf).",
+    "notYourTurn": "Du bist nicht am Zug — warte, bis du in der HUD als aktiver Sitz angezeigt wirst.",
+    "insufficientResources": "Dir fehlen Rohstoffe auf der Hand: Die Aktion kostet mehr, als du gerade hast (Siedlung, Stadt, Strasse, Entwicklungskarte oder Spielerhandel).",
+    "illegalPlacement": "Ungueltiger Bauplatz: nur markierte Geisterpositionen, kein Bebauen auf fremde Gueter oder ausserhalb der erlaubten Liste.",
+    "invalidPayload": "Die Aktion konnte serverseitig nicht verarbeitet werden (ungueltige Daten). Bitte Seite neu laden und erneut versuchen.",
+    "lobbyFull": "Die Lobby ist voll — es sind keine freien Sitze mehr.",
+    "unknownLobby": "Unbekannte Lobby-ID — pruefe die Schreibweise oder tritt einer anderen Lobby bei.",
+    "playerNotInLobby": "Du bist in dieser Lobby nicht (mehr) eingeloggt — Lobby erneut beitreten.",
+    "unknownTrade": "Dieses Handelsangebot gibt es nicht mehr (abgelaufen oder schon entschieden).",
+    "tradeNotOpen": "Auf dieses Angebot kann nicht reagiert werden — es ist nicht mehr offen.",
+    "noDevCardAvailable": "Im Stapel liegen keine Entwicklungskarten mehr.",
+    "devCardNotOwned": "Du hast diese Entwicklungskarte nicht (oder sie wurde schon gespielt).",
+    "invalidBankTrade": "Bank- oder Hafenhandel ungueltig: pruefe Verhaeltnis (3:1, 2:1 am Hafen) und ob du genug gleiche Karten abgibst.",
+    "victimRequired": "Raeuber: Waehle ein Opfer mit mindestens einer Karte auf dem angrenzenden Knoten — oder bestaetige „Kein Opfer“, falls niemand passt.",
+    "gameFinished": "Das Spiel ist beendet — keine Spielaktionen mehr moeglich."
+  },
+  "shell": {
+    "gameStarted": "Spiel gestartet.",
+    "nameTooShort": "Bitte gib einen Namen mit mindestens 2 Zeichen ein.",
+    "lobbyIdTooShort": "Bitte gib eine gueltige Lobby-ID ein.",
+    "backToSignIn": "Bitte gib deinen Namen ein.",
+    "backToJoinLobby": "Waehle eine Lobby-ID und tritt erneut bei.",
+    "nameTooShortRun": "Bitte gib einen Namen mit mindestens 2 Zeichen ein.",
+    "sessionStartFailed": "Session konnte nicht gestartet werden.",
+    "welcomeNamed": "Willkommen {{userName}}! Session ist aktiv.",
+    "sessionMissing": "Session nicht vorhanden. Bitte erneut anmelden.",
+    "lobbyIdTooShortRun": "Bitte gib eine gueltige Lobby-ID ein.",
+    "joinConnecting": "Verbinde mit Lobby \"{{lobbyId}}\" ...",
+    "joinSuccess": "Lobby \"{{lobbyId}}\" erfolgreich beigetreten.",
+    "joinFailed": "Verbindung zur Lobby \"{{lobbyId}}\" ist fehlgeschlagen.",
+    "appTitle": "Catan Online",
+    "appSubtitle": "Session-basiert anmelden, Lobby beitreten und gemeinsam starten.",
+    "labelDisplayName": "Dein Name",
+    "validationDisplayName": "Name muss mindestens 2 Zeichen haben.",
+    "buttonStartSession": "Session starten",
+    "sessionPill": "Session: {{displayName}}",
+    "labelLobbyId": "Lobby-ID",
+    "validationLobbyId": "Lobby-ID muss mindestens 2 Zeichen haben.",
+    "buttonChangeName": "Name aendern",
+    "buttonJoining": "Verbinde...",
+    "buttonJoinGame": "Spiel beitreten",
+    "metaLobby": "Lobby",
+    "metaActiveSeat": "Aktiver Sitz",
+    "metaPhase": "Phase",
+    "statusConnecting": "Verbinde...",
+    "badgeSelf": "Du",
+    "badgeOnline": "Online",
+    "badgeOffline": "Offline",
+    "buttonStartGame": "Spiel starten",
+    "buttonOtherLobby": "Andere Lobby",
+    "buttonEndSession": "Session beenden",
+    "hudLobby": "Lobby",
+    "hudActiveSeat": "Aktiver Sitz",
+    "hudPhase": "Phase",
+    "hudLongestRoad": "Laengste Strasse",
+    "hudLargestArmy": "Groesste Rittermacht",
+    "hudWinner": "Sieger",
+    "hudDiscardPrompt": "Bitte Karten zum Abwerfen auswaehlen.",
+    "hudSpectateWait": "Zuschauen — {{name}} ist am Zug.",
+    "buttonRollDice": "Wuerfeln",
+    "buttonTrade": "Handel",
+    "buttonFinishTrade": "Handel beenden",
+    "buttonBuyDevCard": "Karte kaufen",
+    "buttonEndTurn": "Zug beenden",
+    "hintBuildSpot": "Bauplatz auf dem Brett anklicken — Klick ins Leere bricht ab.",
+    "hintRobber": "Raeuber: ein Feld anklicken.",
+    "hintBuildFromArsenal": "Bauen: Figur im eigenen Lager anklicken.",
+    "buttonOtherLobbyHud": "Andere Lobby",
+    "buttonEndSessionHud": "Session beenden",
+    "genericPlayer": "Spieler"
+  },
+  "seat": {
+    "north": "Nord",
+    "east": "Ost",
+    "south": "Sued",
+    "west": "West"
+  },
+  "phase": {
+    "lobbyWaiting": "Lobby",
+    "setupForward": "Aufbau 1",
+    "setupBackward": "Aufbau 2",
+    "rolling": "Wuerfeln",
+    "robberDiscard": "Raeuber: Abwerfen",
+    "robberMove": "Raeuber versetzen",
+    "trading": "Handel",
+    "building": "Bauen",
+    "endTurn": "Rundenende",
+    "finished": "Spielende"
+  },
+  "lobby": {
+    "waitingForPlayer": "Wartet auf Spieler"
+  },
+  "resource": {
+    "wood": "Holz",
+    "brick": "Lehm",
+    "wheat": "Getreide",
+    "wool": "Wolle",
+    "ore": "Erz"
+  },
+  "announcer": {
+    "lobbyWaiting": "Die Lobby wartet auf den Spielstart.",
+    "setupForwardSelf": "Du bist dran — setze im ersten Aufbau deine Siedlung oder deine Strasse auf dem Brett.",
+    "setupForwardOther": "{{activeName}} ist dran — muss im ersten Aufbau eine Siedlung oder Strasse setzen.",
+    "setupBackwardSelf": "Du bist dran — setze im zweiten Aufbau deine Siedlung oder deine Strasse.",
+    "setupBackwardOther": "{{activeName}} ist dran — zweiter Aufbau: Siedlung oder Strasse setzen.",
+    "rollingSelf": "Du bist dran — wuerfel mit dem Button „Wuerfeln“ oder indem du die Wuerfel auf dem Tisch anklickst.",
+    "rollingOther": "{{activeName}} ist dran und muss jetzt wuerfeln.",
+    "robberDiscardNamed": "Die 7 wurde gewuerfelt. {{namesList}} muessen jetzt Karten abwerfen.",
+    "robberDiscardGeneric": "Die 7 wurde gewuerfelt — betroffene Spieler muessen Karten abwerfen.",
+    "robberMoveSelf": "Du bist dran — versetze den Raeuber auf ein anderes Landfeld.",
+    "robberMoveOther": "{{activeName}} versetzt den Raeuber.",
+    "tradingWithRollSelf": "Du hast {{diceSum}} gewuerfelt — handeln, „Handel beenden“ druecken, dann bauen oder den Zug beenden.",
+    "tradingWithRollOther": "{{activeName}} hat {{diceSum}} gewuerfelt und ist in der Handelsphase.",
+    "tradingSelf": "Du bist in der Handelsphase — mitspielern handeln oder zum Bauen wechseln.",
+    "tradingOther": "{{activeName}} handelt; du kannst Angebote annehmen oder ablehnen.",
+    "buildingSelf": "Du bist dran — bauen (Figur im Lager anklicken) oder den Zug mit „Zug beenden“ abschliessen.",
+    "buildingOther": "{{activeName}} baut oder beendet den Zug.",
+    "finishedWithWinner": "Spiel beendet! Sieger: {{winnerName}}.",
+    "finished": "Spiel beendet.",
+    "endTurnSelf": "Zug beendet — der naechste Spieler ist dran.",
+    "endTurnOther": "Rundenwechsel — {{activeName}} ist jetzt am Zug.",
+    "defaultSelf": "Du bist dran — nutze die Aktionen in der HUD.",
+    "defaultOther": "{{activeName}} ist dran."
+  },
+  "hover": {
+    "resourceCardTitle": "Rohstoffkarte",
+    "devCardTitle": "Entwicklungskarte"
+  },
+  "cardTex": {
+    "resourceWood": "Holz",
+    "resourceBrick": "Lehm",
+    "resourceWool": "Wolle",
+    "resourceGrain": "Getreide",
+    "resourceOre": "Erz",
+    "devKnight": "Ritter",
+    "devRoad": "Strassenbau",
+    "devPlenty": "Erfindung",
+    "devMonopoly": "Monopol",
+    "devVp": "Siegpunkt"
+  },
+  "playerColor": {
+    "red": "Rot",
+    "blue": "Blau",
+    "white": "Weiß",
+    "orange": "Orange"
+  },
+  "tile": {
+    "forest": "Holz",
+    "fields": "Getreide",
+    "pasture": "Wolle",
+    "hills": "Lehm",
+    "mountains": "Erz",
+    "desert": "Wüste",
+    "water": "Wasser"
+  },
+  "harbor": {
+    "title": "Hafen",
+    "detailGeneric": "Tausche 3 gleiche Rohstoffe gegen 1 anderen.",
+    "detailTwoForOne": "Tausche 2 {{resourceLabel}} gegen 1 anderen Rohstoff."
+  },
+  "dice": {
+    "resultLabel": "Würfelergebnis",
+    "tapHint": "Klick zum Schließen — blendet nach 3 Sekunden auch automatisch aus"
+  },
+  "robberVictim": {
+    "title": "Wen bestehlen?",
+    "none": "Kein Opfer"
+  },
+  "trade": {
+    "closeBackdropAria": "Handel schließen",
+    "title": "Handel",
+    "tabBank": "Bank / Hafen",
+    "tabPlayers": "Mitspieler",
+    "incomingTitle": "Eingehendes Angebot",
+    "accept": "Annehmen",
+    "reject": "Ablehnen",
+    "give": "Gebe",
+    "amount": "Menge",
+    "take": "Nehme",
+    "bankExecute": "Bankhandel ausführen",
+    "to": "An",
+    "youGive": "Du gibst",
+    "youWant": "Du willst",
+    "sendOffer": "Angebot senden",
+    "dismiss": "Schließen"
+  },
+  "devCard": {
+    "closeBackdropAria": "Modal schließen",
+    "title": "Entwicklungskarte spielen",
+    "knight": "Ritter",
+    "monopoly": "Monopol",
+    "plenty": "Erfindung",
+    "roadBuilding": "Straßenbau",
+    "whichResource": "Welcher Rohstoff?",
+    "playMonopoly": "Monopol spielen",
+    "firstCard": "Erste Karte",
+    "secondCard": "Zweite Karte",
+    "playPlenty": "Erfindung spielen",
+    "dismiss": "Schließen"
+  },
+  "discard": {
+    "title": "Räuber: Karten abwerfen",
+    "hint": "Du musst {{required}} Karten abwerfen — ausgewählt: {{selected}}",
+    "submit": "Abwerfen bestätigen"
+  },
+  "buildConfirm": {
+    "yes": "Ja",
+    "no": "Nein",
+    "settlement": "Siedlung hier bauen?",
+    "road": "Strasse hier bauen?",
+    "city": "Zur Stadt ausbauen?"
+  },
+  "spectator": {
+    "titleOn": "Freie Kamera aus (Spielklicks wieder aktiv)",
+    "titleOff": "Freie Kamera: Tisch mit der Maus drehen und zoomen, keine Spielaktionen per Klick",
+    "ariaToggle": "Freie Kamera umschalten"
+  },
+  "gameCanvas": {
+    "closeCardAria": "Karte schließen"
+  }
+}

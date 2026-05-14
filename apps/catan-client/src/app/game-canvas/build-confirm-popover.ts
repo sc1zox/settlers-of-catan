@@ -1,21 +1,20 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
+import { marker } from '@colsen1991/ngx-translate-extract-marker';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { BuildKind } from '@catan/api-interfaces';
+import { EnumTranslate } from '../../game/i18n/enum-translate.helper';
 
 export interface BuildConfirmModel {
   readonly kind: BuildKind;
   readonly id: string;
-  /** Screen position of the clicked ghost figure. */
   readonly x: number;
   readonly y: number;
 }
 
-/**
- * "Hier bauen? Ja / Nein" popover anchored at the clicked ghost build-spot.
- * Driven by a signal model on the lobby shell; emits the user's decision.
- */
 @Component({
   selector: 'app-build-confirm-popover',
   standalone: true,
+  imports: [TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @let m = model();
@@ -23,8 +22,12 @@ export interface BuildConfirmModel {
       <div class="popover" [style.left.px]="m.x" [style.top.px]="m.y">
         <p class="title">{{ titleFor(m.kind) }}</p>
         <div class="row">
-          <button type="button" class="yes" (click)="confirm.emit()">Ja</button>
-          <button type="button" class="no" (click)="dismiss.emit()">Nein</button>
+          <button type="button" class="yes" (click)="confirm.emit()">
+            {{ 'buildConfirm.yes' | translate }}
+          </button>
+          <button type="button" class="no" (click)="dismiss.emit()">
+            {{ 'buildConfirm.no' | translate }}
+          </button>
         </div>
       </div>
     }
@@ -93,13 +96,15 @@ export interface BuildConfirmModel {
   ],
 })
 export class BuildConfirmPopoverComponent {
+  private readonly translate = inject(TranslateService);
   readonly model = input<BuildConfirmModel | null>(null);
   readonly confirm = output<void>();
   readonly dismiss = output<void>();
 
   protected titleFor(kind: BuildKind): string {
-    if (kind === BuildKind.Settlement) return 'Siedlung hier bauen?';
-    if (kind === BuildKind.Road) return 'Straße hier bauen?';
-    return 'Zur Stadt ausbauen?';
+    return EnumTranslate.translateBuildKindConfirm(
+      (key, params) => this.translate.instant(marker(key), params),
+      kind,
+    );
   }
 }

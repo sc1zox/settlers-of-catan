@@ -2,13 +2,17 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  inject,
   input,
   linkedSignal,
   output,
   signal,
 } from '@angular/core';
+import { marker } from '@colsen1991/ngx-translate-extract-marker';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { PlayerSeat, ResourceType, type TradeOfferDto } from '@catan/api-interfaces';
-import { RESOURCE_TYPE_LABEL_DE, RESOURCE_TYPE_ORDER } from '../shared/resource-labels';
+import { TranslateInstantFn } from '../../shared/i18n/translate-instant-fn';
+import { RESOURCE_TYPE_ORDER, resourceTypeLabel } from '../shared/resource-labels';
 
 export interface TradePartner {
   readonly seat: PlayerSeat;
@@ -37,6 +41,7 @@ type TradeView = 'bank' | 'player';
 @Component({
   selector: 'app-trade-panel',
   standalone: true,
+  imports: [TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (open()) {
@@ -44,22 +49,18 @@ type TradeView = 'bank' | 'player';
         <button
           type="button"
           class="backdrop"
-          aria-label="Handel schließen"
+          [attr.aria-label]="'trade.closeBackdropAria' | translate"
           (click)="closed.emit()"
         ></button>
         <div class="modal">
           <header>
-            <h3>Handel</h3>
+            <h3>{{ 'trade.title' | translate }}</h3>
             <div class="tabs">
               <button type="button" [class.active]="view() === 'bank'" (click)="view.set('bank')">
-                Bank / Hafen
+                {{ 'trade.tabBank' | translate }}
               </button>
-              <button
-                type="button"
-                [class.active]="view() === 'player'"
-                (click)="view.set('player')"
-              >
-                Mitspieler
+              <button type="button" [class.active]="view() === 'player'" (click)="view.set('player')">
+                {{ 'trade.tabPlayers' | translate }}
               </button>
             </div>
           </header>
@@ -67,13 +68,13 @@ type TradeView = 'bank' | 'player';
           @let incoming = pendingTrade();
           @if (incoming && incoming.toSeat === selfSeat()) {
             <div class="incoming">
-              <p>Eingehendes Angebot</p>
+              <p>{{ 'trade.incomingTitle' | translate }}</p>
               <div class="incoming-actions">
                 <button type="button" class="accept" (click)="accept.emit(incoming.id)">
-                  Annehmen
+                  {{ 'trade.accept' | translate }}
                 </button>
                 <button type="button" class="reject" (click)="reject.emit(incoming.id)">
-                  Ablehnen
+                  {{ 'trade.reject' | translate }}
                 </button>
               </div>
             </div>
@@ -83,7 +84,7 @@ type TradeView = 'bank' | 'player';
             @case ('bank') {
               <div class="bank">
                 <div class="field">
-                  <span>Gebe</span>
+                  <span>{{ 'trade.give' | translate }}</span>
                   <div class="picker">
                     @for (resource of order; track resource) {
                       <button
@@ -97,7 +98,7 @@ type TradeView = 'bank' | 'player';
                   </div>
                 </div>
                 <div class="field">
-                  <span>Menge</span>
+                  <span>{{ 'trade.amount' | translate }}</span>
                   <div class="stepper">
                     <button type="button" (click)="bankAmount.set(max(2, bankAmount() - 1))">
                       −
@@ -107,7 +108,7 @@ type TradeView = 'bank' | 'player';
                   </div>
                 </div>
                 <div class="field">
-                  <span>Nehme</span>
+                  <span>{{ 'trade.take' | translate }}</span>
                   <div class="picker">
                     @for (resource of order; track resource) {
                       <button
@@ -132,14 +133,14 @@ type TradeView = 'bank' | 'player';
                     })
                   "
                 >
-                  Bankhandel ausführen
+                  {{ 'trade.bankExecute' | translate }}
                 </button>
               </div>
             }
             @case ('player') {
               <div class="player">
                 <div class="field">
-                  <span>An</span>
+                  <span>{{ 'trade.to' | translate }}</span>
                   <div class="picker">
                     @for (partner of partners(); track partner.seat) {
                       <button
@@ -154,7 +155,7 @@ type TradeView = 'bank' | 'player';
                 </div>
                 <div class="trade-grid">
                   <div class="col">
-                    <p>Du gibst</p>
+                    <p>{{ 'trade.youGive' | translate }}</p>
                     @for (resource of order; track resource) {
                       <div class="grid-row">
                         <span class="label">{{ label(resource) }}</span>
@@ -167,7 +168,7 @@ type TradeView = 'bank' | 'player';
                     }
                   </div>
                   <div class="col">
-                    <p>Du willst</p>
+                    <p>{{ 'trade.youWant' | translate }}</p>
                     @for (resource of order; track resource) {
                       <div class="grid-row">
                         <span class="label">{{ label(resource) }}</span>
@@ -186,13 +187,15 @@ type TradeView = 'bank' | 'player';
                   [disabled]="targetSeat() === null"
                   (click)="emitPropose()"
                 >
-                  Angebot senden
+                  {{ 'trade.sendOffer' | translate }}
                 </button>
               </div>
             }
           }
 
-          <button type="button" class="dismiss" (click)="closed.emit()">Schließen</button>
+          <button type="button" class="dismiss" (click)="closed.emit()">
+            {{ 'trade.dismiss' | translate }}
+          </button>
         </div>
       </div>
     }
@@ -370,6 +373,10 @@ type TradeView = 'bank' | 'player';
   ],
 })
 export class TradePanelComponent {
+    private readonly translate = inject(TranslateService);
+  private readonly instant: TranslateInstantFn = (key, params) =>
+    this.translate.instant(marker(key), params);
+
   readonly open = input<boolean>(false);
   readonly selfSeat = input<PlayerSeat | null>(null);
   readonly partnerList = input<readonly TradePartner[]>([]);
@@ -407,7 +414,7 @@ export class TradePanelComponent {
   });
 
   protected label(resource: ResourceType): string {
-    return RESOURCE_TYPE_LABEL_DE[resource];
+    return resourceTypeLabel(this.instant, resource);
   }
 
   protected max(a: number, b: number): number {

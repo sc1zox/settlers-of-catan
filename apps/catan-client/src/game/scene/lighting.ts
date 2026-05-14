@@ -36,11 +36,11 @@ export function addLighting(scene: Scene, renderer: WebGLRenderer): void {
   pmrem.dispose();
 
   // Soft sky/ground hemisphere fill — lifts the low-poly shadow sides.
-  const hemi = new HemisphereLight(0xcfe6ff, 0x55703f, 0.75);
+  const hemi = new HemisphereLight(0xe6e2d4, 0x55703f, 0.75);
   scene.add(hemi);
 
   // Warm key sun shining onto the table, with soft contact shadows.
-  const sun = new DirectionalLight(0xfff1cf, 1.6);
+  const sun = new DirectionalLight(0xffd58c, 2.6);
   sun.position.copy(SUN_POSITION);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -54,6 +54,6 @@ export function addLighting(scene: Scene, renderer: WebGLRenderer): void {
   sun.shadow.radius = 4;
   scene.add(sun);
 
-  // Gentle ambient floor so unlit faces never crush to pure black.
-  scene.add(new AmbientLight(0xffffff, 0.2));
+  // Gentle warm ambient floor so unlit faces never crush to pure black.
+  scene.add(new AmbientLight(0xffe9c8, 0.2));
 }

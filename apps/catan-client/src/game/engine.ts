@@ -32,7 +32,9 @@ import { DiceResultHandler, DiceTray } from './dice/dice-tray';
 import { HoverHandler, HoverSystem } from './interaction/hover';
 import { PLAYER_SEAT_ORDER, PlayerColor } from './players/colors';
 import { PlayerArea } from './players/player-area';
+import { CloudField } from './scene/clouds';
 import { addLighting } from './scene/lighting';
+import { SunShafts } from './scene/sun-shafts';
 import { createCamera, createControls } from './scene/camera';
 import { Table } from './table/table';
 import { Tile } from './tiles/tile';
@@ -132,6 +134,8 @@ export class GameEngine {
   private readonly world: World;
   private readonly harbors: HarborSystem;
   private readonly table: Table;
+  private readonly sunShafts: SunShafts;
+  private readonly clouds: CloudField;
   private readonly players: readonly PlayerArea[];
   private readonly diceTray: DiceTray;
   private readonly buildings: BoardBuildings;
@@ -164,6 +168,7 @@ export class GameEngine {
   private devCardClickHandler: (() => void) | null = null;
   /** Fired when the player clicks a physical die — Angular forwards it to the server. */
   private diceRollRequestHandler: (() => void) | null = null;
+  private diceRollClickEnabled = false;
   private spectatorCameraActive = false;
   private orbitLimitsBackup: {
     minDistance: number;
@@ -187,15 +192,16 @@ export class GameEngine {
   private readonly fan2D = new Vector2();
   private readonly worldCardQuat = new Quaternion();
   private readonly fanRollQuat = new Quaternion();
+  private readonly orbitClampDelta = new Vector3();
 
   constructor(container: HTMLElement, options: EngineOptions = {}) {
     this.container = container;
 
     this.scene = new Scene();
-    // Soft daylight backdrop — a slate-blue sky instead of a near-black void
-    // is the single biggest lift against "the scene is too dark".
-    this.scene.background = new Color(0x6b7f9e);
-    this.scene.fog = new Fog(0x6b7f9e, 70, 200);
+    // Warm hazy daylight backdrop — a lit sky instead of a near-black void is
+    // the single biggest lift against "the scene is too dark".
+    this.scene.background = new Color(0xb89a78);
+    this.scene.fog = new Fog(0xb89a78, 70, 200);
 
     const { clientWidth, clientHeight } = container;
     const aspect = clientWidth / Math.max(clientHeight, 1);
@@ -211,6 +217,14 @@ export class GameEngine {
     this.controls = createControls(this.camera, this.renderer.domElement);
 
     addLighting(this.scene, this.renderer);
+
+    // Warm light shafts streaming down onto the table.
+    this.sunShafts = new SunShafts();
+    this.scene.add(this.sunShafts.group);
+
+    // Bushy low-poly clouds drifting at a moderate altitude around the board.
+    this.clouds = new CloudField();
+    this.scene.add(this.clouds.group);
 
     // Tabletop the disc hovers over.
     const discRadius = HEX_SIZE * 6.4;
@@ -255,7 +269,12 @@ export class GameEngine {
       this.collectHoverables(),
     );
     this.hover.setCardClickHandler((card) => this.handleCardClick(card));
-    this.hover.setDieClickHandler((_die) => this.diceRollRequestHandler?.());
+    this.hover.setDieClickHandler((_die) => {
+      if (!this.diceRollClickEnabled) {
+        return;
+      }
+      this.diceRollRequestHandler?.();
+    });
     this.hover.setBackgroundClickHandler(() => {
       if (this.focusedGroup.length > 0) this.clearFocusedCard();
       // Build mode is owned by Angular — only notify, let it drive the clear.
@@ -314,6 +333,10 @@ export class GameEngine {
     this.diceRollRequestHandler = handler;
   }
 
+  public setDiceRollClickEnabled(enabled: boolean): void {
+    this.diceRollClickEnabled = enabled;
+  }
+
   /** Tumble the dice towards the server-authoritative roll. */
   rollDiceTo(a: number, b: number): void {
     this.diceTray.rollTo(a, b);
@@ -362,7 +385,9 @@ export class GameEngine {
       this.controls.maxDistance = SPECTATOR_ORBIT_MAX_DISTANCE;
       this.controls.minPolarAngle = SPECTATOR_ORBIT_MIN_POLAR;
       this.controls.maxPolarAngle = SPECTATOR_ORBIT_MAX_POLAR;
-      this.hover.setPointerPickEnabled(false);
+      this.spectatorCameraActive = true;
+      this.hover.setExploreReadOnly(true);
+      this.hover.setHoverables(this.collectHoverables());
     } else {
       if (this.orbitLimitsBackup !== null) {
         this.controls.minDistance = this.orbitLimitsBackup.minDistance;
@@ -371,9 +396,10 @@ export class GameEngine {
         this.controls.maxPolarAngle = this.orbitLimitsBackup.maxPolarAngle;
         this.orbitLimitsBackup = null;
       }
-      this.hover.setPointerPickEnabled(true);
+      this.spectatorCameraActive = false;
+      this.hover.setExploreReadOnly(false);
+      this.hover.setHoverables(this.collectHoverables());
     }
-    this.spectatorCameraActive = active;
   }
 
   /**
@@ -436,6 +462,8 @@ export class GameEngine {
     this.board.dispose();
     this.world.dispose();
     this.table.dispose();
+    this.sunShafts.dispose();
+    this.clouds.dispose();
     this.diceTray.dispose();
     this.buildings.dispose();
     this.buildPreview.dispose();
@@ -503,6 +531,27 @@ export class GameEngine {
     this.controls.update();
   }
 
+  /**
+   * Right-click panning is allowed, but the orbit target must stay near the
+   * board: zoom distance is measured from the target, so a target panned far
+   * away makes the board permanently unreachable. Clamp the target to a small
+   * box around the origin each frame and shift the camera by the same
+   * correction so the view stops smoothly at the boundary instead of jumping.
+   */
+  private clampOrbitTarget(): void {
+    const ORBIT_TARGET_XZ = 9;
+    const ORBIT_TARGET_Y_MIN = -2;
+    const ORBIT_TARGET_Y_MAX = 8;
+    const target = this.controls.target;
+    const x = Math.min(ORBIT_TARGET_XZ, Math.max(-ORBIT_TARGET_XZ, target.x));
+    const y = Math.min(ORBIT_TARGET_Y_MAX, Math.max(ORBIT_TARGET_Y_MIN, target.y));
+    const z = Math.min(ORBIT_TARGET_XZ, Math.max(-ORBIT_TARGET_XZ, target.z));
+    if (x === target.x && y === target.y && z === target.z) return;
+    this.orbitClampDelta.set(x - target.x, y - target.y, z - target.z);
+    target.set(x, y, z);
+    this.camera.position.add(this.orbitClampDelta);
+  }
+
   private rebuildBoard(seed: number): void {
     this.scene.remove(this.board.group);
     this.board.dispose();
@@ -518,10 +567,19 @@ export class GameEngine {
     }
     for (const harbor of this.harbors.harbors) hoverables.push(harbor.pickMesh);
     for (const player of this.players) {
+      if (this.spectatorCameraActive) {
+        if (this.selfSeat === null || player.info.seat !== this.selfSeat) {
+          continue;
+        }
+      }
       for (const card of player.cards) hoverables.push(card.mesh);
     }
-    for (const die of this.diceTray.dice) hoverables.push(die.mesh);
-    for (const figure of this.buildPreview.hoverables()) hoverables.push(figure);
+    if (!this.spectatorCameraActive) {
+      for (const die of this.diceTray.dice) hoverables.push(die.mesh);
+    }
+    if (!this.spectatorCameraActive) {
+      for (const figure of this.buildPreview.hoverables()) hoverables.push(figure);
+    }
     if (this.selfSeat !== null) {
       const selfArea = this.players[this.selfSeat];
       if (selfArea) {
@@ -713,10 +771,13 @@ export class GameEngine {
     const t = this.clock.elapsedTime;
     this.board.update(dt, t);
     this.world.update(dt, t);
+    this.sunShafts.update(dt, t);
+    this.clouds.update(dt, t);
     this.diceTray.update(dt);
     this.buildings.update(dt);
     this.buildPreview.update(dt);
     this.controls.update();
+    this.clampOrbitTarget();
     this.updateFocusedCards();
     for (const player of this.players) player.update(dt);
     this.hover.update();

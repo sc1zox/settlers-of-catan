@@ -3,6 +3,12 @@ export enum ClientStorageKey {
   PlayerSessionId = 'catan.playerSessionId',
   AccessToken = 'catan.accessToken',
   RefreshToken = 'catan.refreshToken',
+  UiLocale = 'catan.uiLocale',
+}
+
+export enum UiLocale {
+  De = 'de',
+  En = 'en',
 }
 
 export enum KnownLobbyId {

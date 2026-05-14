@@ -10,7 +10,7 @@ Run from the repo root. The workspace is Nx 21; scripts in `package.json` wrap `
 - `npm run build` — Nx `run-many -t build` over `catan-client,catan-api`.
 - `npm run watch` — incremental dev build of the client only.
 - `npm test` — Vitest via Angular's `@angular/build:unit-test` (jsdom env). Only the client has tests today. To filter: `npx nx test catan-client --test-name-pattern="App"`.
-- `npm run lint` — ESLint across all four projects (`catan-client`, `catan-api`, `shared-game-field`, `api-interfaces`).
+- `npm run lint` — ESLint across all four projects (`catan-client`, `catan-api`, `shared-game-field`, `api-interfaces`); `@nx/enforce-module-boundaries` enforces tags from each `project.json` (Nx 21.6 expects **ESLint 9.x**, not 10 — the `@nx/eslint` executor uses `eslint/use-at-your-own-risk`, which breaks on ESLint 10). Scripts set `NX_WORKSPACE_DATA_DIRECTORY=node_modules/.cache/nx-workspace-data` so the project graph lock lives under `node_modules` (writable); if `.nx/` was ever created as root, fix ownership with `sudo chown -R "$(whoami)" .nx` or remove it. Prefer `npm run lint` over raw `npx eslint …` on the whole repo so Nx supplies the project graph to module-boundary rules.
 - `npm run format` / `format:check` — Prettier across `apps/**` and `libs/**`.
 - `docker compose up` — brings up `api` (port 3000) and `web` (port 4200) containers; both mount the repo and invoke `nx serve` inside. `NX_DAEMON=false` and `CHOKIDAR_USEPOLLING=1` are required for the watcher to work over the bind mount.
 
@@ -45,14 +45,14 @@ Every successful response is wrapped by `ApiStandardHttpInterceptor` into `{ dat
 
 ### Game state
 
-`GameModule` (`game/game.module.ts`) wires together one Nest module per game concern. The in-memory `Map<lobbyId, LobbyRuntime>` lives in `LobbyService`, *not* `GameService` — there is no persistence yet. The pieces:
+`GameModule` (`game/game.module.ts`) aggregates feature modules under `game/<feature>/` (gateway, core facade, lobby, match-flow, turn, economy, build, robber, trade, demo-bot, validation, utils) — same idea as Angular feature folders. The in-memory `Map<lobbyId, LobbyRuntime>` lives in `LobbyService`, *not* `GameService` — there is no persistence yet. The pieces:
 
-- `LobbyRuntime` (`game/lobby-runtime.ts`) — per-lobby state: players, seats, settlements, roads, robber position, dev deck, FSM. Each lobby has its own RNG seed; tile placements come from `makeStandardLandPlacements(seed)` in the shared `game-field` lib.
-- `TurnStateMachine` (`game/turn-state-machine.ts`) — single-method-per-transition FSM over `GamePhase`. *All* phase changes go through this class; ad-hoc `lobby.fsm.setPhase(...)` calls in handlers bypass the assertions and should be avoided.
-- `createBoardTopology(tiles)` (`game/board-topology.ts`) — derives vertex/edge IDs from cube coordinates; the resulting IDs are the contract for `BuildSettlement` / `BuildRoad` payloads and are echoed back to the client in `LobbyFullStatePayload.{vertexIds,edgeIds}`. Edge IDs are formatted `"<vertexA>|<vertexB>"` (the client splits on `|`).
-- `scoring.util.ts` (longest road / largest army / VP totals), `robber.util.ts`, `harbor-rate.util.ts` — pure functions invoked by the services below.
+- `LobbyRuntime` (`game/lobby/lobby-runtime.ts`) — per-lobby state: players, seats, settlements, roads, robber position, dev deck, FSM. Each lobby has its own RNG seed; tile placements come from `makeStandardLandPlacements(seed)` in the shared `game-field` lib.
+- `TurnStateMachine` (`game/turn/turn-state-machine.ts`) — single-method-per-transition FSM over `GamePhase`. *All* phase changes go through this class; ad-hoc `lobby.fsm.setPhase(...)` calls in handlers bypass the assertions and should be avoided.
+- `createBoardTopology(tiles)` (`libs/shared/game-field/src/lib/board-topology.ts`) — derives vertex/edge IDs from cube coordinates; the resulting IDs are the contract for `BuildSettlement` / `BuildRoad` payloads and are echoed back to the client in `LobbyFullStatePayload.{vertexIds,edgeIds}`. Edge IDs are formatted `"<vertexA>|<vertexB>"` (the client splits on `|`).
+- `scoring.util.ts`, `robber.util.ts`, `harbor-rate.util.ts` under `game/utils/` — pure functions invoked by the services below.
 
-**Service decomposition.** `GameService` is a *thin facade*: each public method resolves the lobby, asserts it's open, delegates to a feature service, then broadcasts `FullState`. The actual rules live in feature services, each with its own `*.module.ts` that `GameModule` imports:
+**Service decomposition.** `GameService` (`game/core/game.service.ts`) is a *thin facade*: each public method resolves the lobby, asserts it's open, delegates to a feature service, then broadcasts `FullState`. The actual rules live in feature services, each with its own `*.module.ts` that `GameModule` imports:
 
 - `LobbyService` — owns the lobby `Map`; join/disconnect/reconnect grace, seat assignment, `toFullState` (including the per-viewer `legal*Ids` arrays), `broadcastFullState`, `requireLobby` / `assertLobbyOpen`.
 - `MatchFlowService` — `startLobby`, `rollDice`, `finishTrading`, `endTurn` — the phase-to-phase progression of a match.
@@ -68,14 +68,14 @@ When adding a server action, extend the matching feature service (or add a new m
 
 ### Socket.IO gateway
 
-`GameGateway` (`game/game.gateway.ts`) lives on namespace `/game` (`SocketGatewayNamespace.Game`). Auth happens in `handleConnection`:
+`GameGateway` (`game/gateway/game.gateway.ts`) lives on namespace `/game` (`SocketGatewayNamespace.Game`). Auth happens in `handleConnection`:
 
 1. Read `handshake.auth.accessToken` (preferred) — verify JWT via `PlayerSessionJwtService` → `sessionId`.
 2. Fallback: `Authorization: Bearer` header on the handshake.
 3. Legacy fallback: `handshake.auth.sessionToken` as a raw UUID.
 4. None of those? Disconnect.
 
-The resolved `sessionId` becomes the player's stable identity (`LobbyPlayerSlot.sessionToken`) and is mapped to the current `socket.id` in `SocketConnectionRegistry`. Disconnects start a grace timer in `LobbyRuntime`; reconnecting with the same sessionId re-binds without losing the seat.
+The resolved `sessionId` becomes the player's stable identity (`LobbyPlayerSlot.sessionToken`) and is mapped to the current `socket.id` in `SocketConnectionRegistry` (`game/gateway/socket-connection.registry.ts`). Disconnects start a grace timer in `LobbyRuntime`; reconnecting with the same sessionId re-binds without losing the seat.
 
 Client→server events are `GameSocketClientEvent.*`, server→client are `GameSocketServerEvent.*` (both in `libs/api-interfaces/src/lib/socket-events.ts`). After any state-changing handler, the gateway broadcasts `GameSocketServerEvent.FullState` to all sockets in `formatSocketIoLobbyRoomId(lobbyId)` — the client treats `FullState` as the source of truth; `GameDelta` is informational only.
 
@@ -89,11 +89,11 @@ Angular 21 standalone components, **zoneless change detection** (`provideZoneles
 
 ### HTTP & socket plumbing
 
-`app.config.ts` registers three interceptors in order: `sessionBearerInterceptor` (attaches `Authorization: Bearer <accessToken>`), `apiEnvelopeInterceptor` (unwraps `{data,requestId}`), `sessionHttpErrorInterceptor` (catches 401 and refreshes). `PlayerSessionService` owns access/refresh tokens, persisted under `ClientStorageKey.AccessToken` / `RefreshToken` in localStorage.
+`app.config.ts` registers `provideAppInitializer(() => inject(AppInitService).initialize())` so `AppInitService` (`app/core/bootstrap/`) runs before the root view renders (currently: cold-start `PlayerSessionService.ensureReady()`). It registers three interceptors in order (under `app/core/http/`): `sessionBearerInterceptor` (attaches `Authorization: Bearer <accessToken>`), `apiEnvelopeInterceptor` (unwraps `{data,requestId}`), `sessionHttpErrorInterceptor` (catches 401 and refreshes). `PlayerSessionService` (`app/core/session/`) owns access/refresh tokens, persisted under `ClientStorageKey.AccessToken` / `RefreshToken` in localStorage.
 
-`GameSocketService` (`app/game-socket.service.ts`) is the only socket.io-client and exposes RxJS subjects (`fullState$`, `tradeUpdated$`, etc.). `GameStateResource` (`app/game/game-state.resource.ts`) wraps these in `rxResource<LobbyFullStatePayload | undefined, ...>` so components consume the lobby as a signal-shaped resource. When the lobby changes shape, every `computed(...)` in `LobbyShellComponent` re-derives — do not mutate payloads in place.
+`GameSocketService` (`app/core/socket/game-socket.service.ts`) is the only socket.io-client and exposes RxJS subjects (`fullState$`, `tradeUpdated$`, etc.). `GameStateResource` (`app/core/game/game-state.resource.ts`) wraps these in `rxResource<LobbyFullStatePayload | undefined, ...>` so components consume the lobby as a signal-shaped resource. When the lobby changes shape, every `computed(...)` that reads `GameStateResource` re-derives — do not mutate payloads in place.
 
-`LobbyShellComponent` (`app/lobby-shell.component.ts`) is the entry UI: sign-in → join lobby → in-game. The component owns all reactive forms and an enormous block of `computed<boolean>` capability flags (`canBuildSettlement`, `canRollDice`, …). When adding a new player action, follow the same pattern: define a `can…` signal that combines `lobbyUiState()`, `selfSeat()`, and the phase, and a corresponding handler that delegates to `GameStateResource`. It also hosts the interactive DOM overlays driven by signals — `BuildConfirmPopoverComponent`, `DiscardModalComponent`, `DevCardModalComponent`, `TradePanelComponent`, `RobberVictimPopoverComponent` (all under `app/game-canvas/`). `app.ts` is intentionally tiny (`<app-lobby-shell />`).
+`LobbyShellComponent` (`app/lobby-shell.component.ts`) is the entry UI: sign-in → join lobby → in-game. It owns reactive forms, the `LobbyUiStep` navigation signal, 3D interaction state (build mode, trade/dev overlays), and delegates to `GameStateResource` for socket actions. **`LobbyShellGameUiService`** (`app/features/lobby-game-ui/`, provided only on `LobbyShellComponent`) holds derived lobby/game UI: mapped `LobbyUiState`, `can…` capability flags, discard/trade models, announcer text, and HUD lock/passive-wait flags. Pure helpers sit alongside (`lobby-ui.mapper.ts`, `turn-announcer-text.ts`, `in-game-hud-state.ts`, `resource-card-totals.ts`, `lobby-shell-phase-sync.ts`). **`LobbyShellPhaseSyncService`** applies `planLobbyShellPhaseSync` from an `effect` on the shell so `LobbyWaiting` vs running match toggles between the lobby panel and in-game HUD. **`LobbyShellRobberFlowService`** (`app/features/robber-victim-flow/`) owns knight-after-dev-card placement, pending hex coords, victim popover model, and `moveRobber` / `playKnight` dispatch; candidate seats are built in `robber-victim-candidates.ts`. The shell calls `attachUiStep(this.uiStep)` in its constructor so the view-model respects pre-game vs in-game. When adding a new player action, add a `can…` on the game UI service (if it is pure state) and a thin handler on the shell that calls `GameStateResource`. Interactive DOM overlays — `BuildConfirmPopoverComponent`, `DiscardModalComponent`, `DevCardModalComponent`, `TradePanelComponent`, `RobberVictimPopoverComponent` (all under `app/game-canvas/`). `app.ts` is intentionally tiny (`<app-lobby-shell />`).
 
 New per-feature client code goes under `app/features/<feature>/` (e.g. `features/spectator-camera/` — a root `SpectatorCameraService` signal plus a toggle component; `GameCanvasComponent` mirrors its `mode()` into `engine.setSpectatorCameraMode()` via an `effect`).
 
@@ -131,7 +131,7 @@ There are two parallel hex coordinate systems — keep them straight:
 
 - **Shared axial grid** — `libs/shared/game-field/src/lib/hex-layout.ts` defines pointy-top **axial** `(q, r)` on the x/z plane, `axialToWorldXZ`, `hexRing`, `hexDisc`, plus the internal `RING_WALK_DIRECTIONS` ordering used to walk a ring. `HEX_SIZE = 2.4` is the canonical hex radius. The client thinly re-exports these from `apps/catan-client/src/game/board/hex.ts` (which adds an `axialToWorld → Vector3` wrapper for Three.js).
 - **Harbor placement** — `apps/catan-client/src/game/world/harbors.ts` defines its own `NEIGHBOR_DIRS` ordering for orienting harbor docks. That ordering is *not* the same as the shared `RING_WALK_DIRECTIONS` — don't conflate them.
-- **Server topology** — `apps/catan-api/src/app/game/board-topology.ts` converts axial to **doubled cube coordinates** (`x2,y2,z2`) to compute vertex/edge identity. Vertex IDs are strings keyed on the doubled-cube coordinate; edges are `"<vertexA>|<vertexB>"` with a deterministic ordering.
+- **Server topology** — `libs/shared/game-field/src/lib/board-topology.ts` converts axial to **doubled cube coordinates** (`x2,y2,z2`) to compute vertex/edge identity. Vertex IDs are strings keyed on the doubled-cube coordinate; edges are `"<vertexA>|<vertexB>"` with a deterministic ordering.
 
 Three Y-axis constants in the client are load-bearing:
 - `TILE_HEIGHT = 1.0` — slab top

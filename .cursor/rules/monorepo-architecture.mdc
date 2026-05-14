@@ -1,0 +1,42 @@
+---
+description: Modularität, Nx-libs, Feature-Struktur, Angular- und Nest-Patterns
+globs: apps/**/*.ts,libs/**/*.ts
+alwaysApply: false
+---
+
+# Architektur und Wartbarkeit (Nx-Monorepo)
+
+## Grundprinzipien
+
+- **Separation of concerns**: Kleine, klar benannte Einheiten mit einer Verantwortung; Abhängigkeiten nach innen zu Domänen-/Schnittstellen-Schichten, nicht umgekehrt.
+- **Kapselung**: Öffentliche API pro Modul/Feature begrenzen; Implementierungsdetails nicht über Ordnergrenzen hinweg verstreuen.
+
+## Typen und geteilte Domäne (`libs/`)
+
+- **Alles, was Client und Server teilen oder was die Wire-Schnittstelle betrifft** (Enums, DTOs, Socket-Events, Fehlercodes, Konstanten über die Leitung): ausschließlich in den **vorgesehenen Nx-Libs** (`@catan/api-interfaces`, `@catan/shared-game-field` o. Ä.) – **keine Duplikate** in `apps/`.
+- Neue **path aliases** nur in `tsconfig.base.json` ergänzen, wenn eine neue Lib dazukommt.
+- Neue **Nx-Library**: in `project.json` die Tags setzen, die in `eslint.config.js` (`@nx/enforce-module-boundaries`) vorgesehen sind, sonst greifen keine klaren Grenzen.
+
+## Nx-Projekt-Tags und Modulgrenzen
+
+- Jede App/Lib trägt in `project.json` **Tags**; ESLint-Regel `@nx/enforce-module-boundaries` in `eslint.config.js` leitet daraus erlaubte Abhängigkeiten ab.
+- **`catan-client`**: `scope:client`, `type:app` — darf nur Workspace-Libs mit `scope:shared` oder `layer:domain` importieren.
+- **`catan-api`**: `scope:api`, `type:app` — wie Client.
+- **`api-interfaces`**: `scope:shared`, `type:interfaces`, `layer:contracts` — darf nur `layer:domain` (aktuell `@catan/shared-game-field`).
+- **`shared-game-field`**: `layer:domain`, `type:util` — darf keine Contracts-Lib importieren; nur eigene Schicht / keine weiteren Workspace-Libs.
+
+## Frontend (`apps/catan-client`)
+
+- **Feature-basiert**: Neue fachliche UI/Logik unter `src/app/features/<feature-name>/` (Komponenten, Services). **Domänen-Helfer** (Mapper, reine Funktionen, kleine Tokens), die nicht `libs/` gehören, unter `src/app/shared/helper/<domäne>/` (z. B. `lobby-game-ui`, `http`, `shell-feedback`) – nicht unter `features/…/helper/`.
+- **App-weite Kernlogik** (Session, HTTP-Interceptor, Socket, `rxResource`-Anbindung, **Kaltstart** über `AppInitService` + `provideAppInitializer`): unter `apps/catan-client/src/app/core/` (`core/http`, `core/session`, `core/socket`, `core/game`, `core/bootstrap`, …) – nicht in Feature-Ordnern vermischen, wenn es mehrere Features betrifft. **HTTP-Hilfen** (Observable-Abort, `HttpContextToken`) liegen unter `shared/helper/http/` und werden von `core/http` importiert.
+- **Wiederverwendung im Client**: unter `src/app/shared/` (Typen in `shared/types/`, **domänenbezogene Helfer** in `shared/helper/<domäne>/`, kleine UI-Bausteine ohne Feature-Domäne).
+- **Doppelte Logik vermeiden**: wiederkehrende Transformationen/Formatierung → **Pipes**; HTTP querschnittlich → **Interceptor**; Zugriffsschutz → **Functional Guards**; Vorab-Daten für Routen → **Resolver** (oder Resolver-äquivalente Patterns), statt Copy-Paste in Komponenten.
+
+## Backend (`apps/catan-api`)
+
+- **Neue Funktionalität**: als **NestJS-Modul** mit klarer Grenze (Controller/Service/Domain), in `GameModule` o. Ä. einbinden – keine „God“-Klassen.
+- **Nest-Bausteine nutzen**: wo sinnvoll **Decorators**, **Pipes** (Validierung/Transformation), **Guards**, **Interceptors** (Querschnitt wie Logging, Envelope) statt manueller Wiederholung in jedem Handler.
+
+## Qualität
+
+- Vor Extraktion in Lib oder Shared: **zweimal gleiche Logik** ist ein Signal für Generalisierung – dann passendes Angular-/Nest-Konzept wählen, statt die dritte Kopie anzulegen.

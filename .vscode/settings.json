@@ -1,0 +1,6 @@
+{
+  "eslint.env": {
+    "NX_DAEMON": "false",
+    "NX_WORKSPACE_DATA_DIRECTORY": "node_modules/.cache/nx-workspace-data"
+  }
+}

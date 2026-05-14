@@ -2,12 +2,16 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  inject,
   input,
   linkedSignal,
   output,
 } from '@angular/core';
+import { marker } from '@colsen1991/ngx-translate-extract-marker';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { ResourceType } from '@catan/api-interfaces';
-import { RESOURCE_TYPE_LABEL_DE, RESOURCE_TYPE_ORDER } from '../shared/resource-labels';
+import { TranslateInstantFn } from '../../shared/i18n/translate-instant-fn';
+import { RESOURCE_TYPE_ORDER, resourceTypeLabel } from '../shared/resource-labels';
 
 export interface DiscardModalModel {
   /** Number of cards the player must discard (floor of hand size). */
@@ -23,17 +27,15 @@ export interface DiscardModalModel {
 @Component({
   selector: 'app-discard-modal',
   standalone: true,
+  imports: [TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @let m = model();
     @if (m) {
       <div class="backdrop">
         <div class="modal">
-          <h3>Räuber: Karten abwerfen</h3>
-          <p class="hint">
-            Du musst <strong>{{ m.required }}</strong> Karten abwerfen —
-            ausgewählt: <strong>{{ total() }}</strong>
-          </p>
+          <h3>{{ 'discard.title' | translate }}</h3>
+          <p class="hint">{{ 'discard.hint' | translate: { required: m.required, selected: total() } }}</p>
           <ul class="rows">
             @for (resource of order; track resource) {
               <li>
@@ -61,7 +63,7 @@ export interface DiscardModalModel {
             [disabled]="total() !== m.required"
             (click)="confirmed.emit(selected())"
           >
-            Abwerfen bestätigen
+            {{ 'discard.submit' | translate }}
           </button>
         </div>
       </div>
@@ -165,6 +167,10 @@ export interface DiscardModalModel {
   ],
 })
 export class DiscardModalComponent {
+    private readonly translate = inject(TranslateService);
+  private readonly instant: TranslateInstantFn = (key, params) =>
+    this.translate.instant(marker(key), params);
+
   readonly model = input<DiscardModalModel | null>(null);
   readonly confirmed = output<Readonly<Record<ResourceType, number>>>();
 
@@ -189,7 +195,7 @@ export class DiscardModalComponent {
   });
 
   protected label(resource: ResourceType): string {
-    return RESOURCE_TYPE_LABEL_DE[resource];
+    return resourceTypeLabel(this.instant, resource);
   }
 
   protected count(resource: ResourceType): number {

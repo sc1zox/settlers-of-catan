@@ -1,16 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { marker } from '@colsen1991/ngx-translate-extract-marker';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { EnumTranslate } from '../../game/i18n/enum-translate.helper';
 import { HarborInfo, HarborKind } from '../../game/world/harbors';
-import { TileType } from '@catan/shared-game-field';
-
-const RESOURCE_LABEL_DE: Record<TileType, string> = {
-  [TileType.Forest]: 'Holz',
-  [TileType.Fields]: 'Getreide',
-  [TileType.Pasture]: 'Wolle',
-  [TileType.Hills]: 'Lehm',
-  [TileType.Mountains]: 'Erz',
-  [TileType.Desert]: 'Wüste',
-  [TileType.Water]: 'Wasser',
-};
 
 export interface HarborTooltipModel {
   readonly harbor: HarborInfo;
@@ -21,13 +13,14 @@ export interface HarborTooltipModel {
 @Component({
   selector: 'app-harbor-tooltip',
   standalone: true,
+  imports: [TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @let m = model();
     @if (m) {
       <div class="tooltip" [style.left.px]="m.x + 14" [style.top.px]="m.y + 14">
         <div class="ratio">{{ m.harbor.ratioFrom }} : {{ m.harbor.ratioTo }}</div>
-        <div class="title">Hafen</div>
+        <div class="title">{{ 'harbor.title' | translate }}</div>
         <div class="detail">{{ detail() }}</div>
       </div>
     }
@@ -35,17 +28,24 @@ export interface HarborTooltipModel {
   styleUrl: './harbor-tooltip.scss',
 })
 export class HarborTooltipComponent {
+  private readonly translate = inject(TranslateService);
   readonly model = input<HarborTooltipModel | null>(null);
 
   readonly detail = computed(() => {
     const m = this.model();
-    if (!m) return '';
+    if (!m) {
+      return '';
+    }
     if (m.harbor.kind === HarborKind.Generic) {
-      return 'Tausche 3 gleiche Rohstoffe gegen 1 anderen.';
+      return this.translate.instant(marker('harbor.detailGeneric'));
     }
     const resource = m.harbor.resource;
-    if (!resource) return '';
-    const label = RESOURCE_LABEL_DE[resource];
-    return `Tausche 2 ${label} gegen 1 anderen Rohstoff.`;
+    if (!resource) {
+      return '';
+    }
+    const label = this.translate.instant(marker(EnumTranslate.tileKey(resource)));
+    return this.translate.instant(marker('harbor.detailTwoForOne'), {
+      resourceLabel: label,
+    });
   });
 }

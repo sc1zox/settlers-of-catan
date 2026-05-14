@@ -1,16 +1,12 @@
-export enum PlayerColor {
-  Red = 0xc8392c,
-  Blue = 0x2a72c8,
-  White = 0xeae6e0,
-  Orange = 0xe8902c,
-}
+import { EnumTranslate } from '../i18n/enum-translate.helper';
+import { gt } from '../i18n-bridge';
+import { PlayerColor } from './player-color.enum';
 
-export const PLAYER_NAME_DE: Record<PlayerColor, string> = {
-  [PlayerColor.Red]: 'Rot',
-  [PlayerColor.Blue]: 'Blau',
-  [PlayerColor.White]: 'Weiß',
-  [PlayerColor.Orange]: 'Orange',
-};
+export { PlayerColor } from './player-color.enum';
+
+export function playerColorLabel(color: PlayerColor): string {
+  return EnumTranslate.translatePlayerColor(gt, color);
+}
 
 export const PLAYER_SEAT_ORDER: readonly PlayerColor[] = Object.freeze([
   PlayerColor.Red,

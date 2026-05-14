@@ -1,4 +1,6 @@
 import { CanvasTexture, SRGBColorSpace } from 'three';
+import { marker } from '@colsen1991/ngx-translate-extract-marker';
+import { gt } from '../i18n-bridge';
 
 export enum ResourceKind {
   Wood = 'wood',
@@ -8,13 +10,27 @@ export enum ResourceKind {
   Ore = 'ore',
 }
 
-export const RESOURCE_LABEL_DE: Record<ResourceKind, string> = {
-  [ResourceKind.Wood]: 'Holz',
-  [ResourceKind.Brick]: 'Lehm',
-  [ResourceKind.Wool]: 'Wolle',
-  [ResourceKind.Grain]: 'Getreide',
-  [ResourceKind.Ore]: 'Erz',
-};
+export function resourceKindLabel(kind: ResourceKind): string {
+  let key: string;
+  switch (kind) {
+    case ResourceKind.Wood:
+      key = 'cardTex.resourceWood';
+      break;
+    case ResourceKind.Brick:
+      key = 'cardTex.resourceBrick';
+      break;
+    case ResourceKind.Wool:
+      key = 'cardTex.resourceWool';
+      break;
+    case ResourceKind.Grain:
+      key = 'cardTex.resourceGrain';
+      break;
+    case ResourceKind.Ore:
+      key = 'cardTex.resourceOre';
+      break;
+  }
+  return gt(marker(key));
+}
 
 interface Palette {
   readonly accent: string;
@@ -38,13 +54,27 @@ export enum DevKind {
   VictoryPoint = 'vp',
 }
 
-export const DEV_LABEL_DE: Record<DevKind, string> = {
-  [DevKind.Knight]: 'Ritter',
-  [DevKind.RoadBuilding]: 'Straßenbau',
-  [DevKind.YearOfPlenty]: 'Erfindung',
-  [DevKind.Monopoly]: 'Monopol',
-  [DevKind.VictoryPoint]: 'Siegpunkt',
-};
+export function devKindLabel(kind: DevKind): string {
+  let key: string;
+  switch (kind) {
+    case DevKind.Knight:
+      key = 'cardTex.devKnight';
+      break;
+    case DevKind.RoadBuilding:
+      key = 'cardTex.devRoad';
+      break;
+    case DevKind.YearOfPlenty:
+      key = 'cardTex.devPlenty';
+      break;
+    case DevKind.Monopoly:
+      key = 'cardTex.devMonopoly';
+      break;
+    case DevKind.VictoryPoint:
+      key = 'cardTex.devVp';
+      break;
+  }
+  return gt(marker(key));
+}
 
 const DEV_PALETTE: Palette = {
   accent: '#7a2e3a',
@@ -541,7 +571,7 @@ export function makeResourceFaceTexture(kind: ResourceKind): CanvasTexture {
 
   RESOURCE_ICON[kind](ctx, CARD_W / 2, panelTop + panelHeight / 2, panelHeight * 0.78);
 
-  nameLabel(ctx, CARD_W, CARD_H - 70, RESOURCE_LABEL_DE[kind], palette.accent);
+  nameLabel(ctx, CARD_W, CARD_H - 70, resourceKindLabel(kind), palette.accent);
   return finalize(canvas);
 }
 
@@ -599,7 +629,7 @@ export function makeDevFaceTexture(kind: DevKind): CanvasTexture {
 
   DEV_ICON[kind](ctx, CARD_W / 2, panelTop + panelHeight / 2, panelHeight * 0.78);
 
-  nameLabel(ctx, CARD_W, CARD_H - 70, DEV_LABEL_DE[kind], DEV_PALETTE.accent);
+  nameLabel(ctx, CARD_W, CARD_H - 70, devKindLabel(kind), DEV_PALETTE.accent);
   return finalize(canvas);
 }
 

@@ -1,13 +1,17 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  inject,
   input,
   linkedSignal,
   output,
   signal,
 } from '@angular/core';
+import { marker } from '@colsen1991/ngx-translate-extract-marker';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { ResourceType } from '@catan/api-interfaces';
-import { RESOURCE_TYPE_LABEL_DE, RESOURCE_TYPE_ORDER } from '../shared/resource-labels';
+import { TranslateInstantFn } from '../../shared/i18n/translate-instant-fn';
+import { RESOURCE_TYPE_ORDER, resourceTypeLabel } from '../shared/resource-labels';
 
 export interface YearOfPlentyPick {
   readonly first: ResourceType;
@@ -24,6 +28,7 @@ type DevModalView = 'menu' | 'monopoly' | 'plenty';
 @Component({
   selector: 'app-dev-card-modal',
   standalone: true,
+  imports: [TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (open()) {
@@ -31,23 +36,25 @@ type DevModalView = 'menu' | 'monopoly' | 'plenty';
         <button
           type="button"
           class="backdrop"
-          aria-label="Modal schließen"
+          [attr.aria-label]="'devCard.closeBackdropAria' | translate"
           (click)="closed.emit()"
         ></button>
         <div class="modal">
-          <h3>Entwicklungskarte spielen</h3>
+          <h3>{{ 'devCard.title' | translate }}</h3>
 
           @switch (view()) {
             @case ('menu') {
               <div class="actions">
-                <button type="button" (click)="playKnight.emit()">Ritter</button>
-                <button type="button" (click)="view.set('monopoly')">Monopol</button>
-                <button type="button" (click)="view.set('plenty')">Erfindung</button>
-                <button type="button" (click)="playRoadBuilding.emit()">Straßenbau</button>
+                <button type="button" (click)="playKnight.emit()">{{ 'devCard.knight' | translate }}</button>
+                <button type="button" (click)="view.set('monopoly')">{{ 'devCard.monopoly' | translate }}</button>
+                <button type="button" (click)="view.set('plenty')">{{ 'devCard.plenty' | translate }}</button>
+                <button type="button" (click)="playRoadBuilding.emit()">
+                  {{ 'devCard.roadBuilding' | translate }}
+                </button>
               </div>
             }
             @case ('monopoly') {
-              <p class="hint">Welcher Rohstoff?</p>
+              <p class="hint">{{ 'devCard.whichResource' | translate }}</p>
               <div class="picker">
                 @for (resource of order; track resource) {
                   <button
@@ -59,16 +66,12 @@ type DevModalView = 'menu' | 'monopoly' | 'plenty';
                   </button>
                 }
               </div>
-              <button
-                type="button"
-                class="confirm"
-                (click)="playMonopoly.emit(monopolyResource())"
-              >
-                Monopol spielen
+              <button type="button" class="confirm" (click)="playMonopoly.emit(monopolyResource())">
+                {{ 'devCard.playMonopoly' | translate }}
               </button>
             }
             @case ('plenty') {
-              <p class="hint">Erste Karte</p>
+              <p class="hint">{{ 'devCard.firstCard' | translate }}</p>
               <div class="picker">
                 @for (resource of order; track resource) {
                   <button
@@ -80,7 +83,7 @@ type DevModalView = 'menu' | 'monopoly' | 'plenty';
                   </button>
                 }
               </div>
-              <p class="hint">Zweite Karte</p>
+              <p class="hint">{{ 'devCard.secondCard' | translate }}</p>
               <div class="picker">
                 @for (resource of order; track resource) {
                   <button
@@ -99,12 +102,14 @@ type DevModalView = 'menu' | 'monopoly' | 'plenty';
                   playYearOfPlenty.emit({ first: plentyFirst(), second: plentySecond() })
                 "
               >
-                Erfindung spielen
+                {{ 'devCard.playPlenty' | translate }}
               </button>
             }
           }
 
-          <button type="button" class="dismiss" (click)="closed.emit()">Schließen</button>
+          <button type="button" class="dismiss" (click)="closed.emit()">
+            {{ 'devCard.dismiss' | translate }}
+          </button>
         </div>
       </div>
     }
@@ -200,6 +205,10 @@ type DevModalView = 'menu' | 'monopoly' | 'plenty';
   ],
 })
 export class DevCardModalComponent {
+    private readonly translate = inject(TranslateService);
+  private readonly instant: TranslateInstantFn = (key, params) =>
+    this.translate.instant(marker(key), params);
+
   readonly open = input<boolean>(false);
   readonly playKnight = output<void>();
   readonly playMonopoly = output<ResourceType>();
@@ -220,6 +229,6 @@ export class DevCardModalComponent {
   protected readonly plentySecond = signal<ResourceType>(ResourceType.Brick);
 
   protected label(resource: ResourceType): string {
-    return RESOURCE_TYPE_LABEL_DE[resource];
+    return resourceTypeLabel(this.instant, resource);
   }
 }

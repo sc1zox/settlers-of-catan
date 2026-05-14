@@ -7,8 +7,10 @@ import {
   SceneUserDataKey,
   TileClickHandler,
 } from '@catan/api-interfaces';
+import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { Card } from '../cards/card';
-import { DEV_LABEL_DE, RESOURCE_LABEL_DE } from '../cards/textures';
+import { devKindLabel, resourceKindLabel } from '../cards/textures';
+import { gt } from '../i18n-bridge';
 import { Die } from '../dice/die';
 import { CardHoverGroup } from '../shared/card-hover';
 import { Harbor } from '../world/harbors';
@@ -58,6 +60,7 @@ export class HoverSystem {
   private arsenalClickHandler: ArsenalClickHandler | null = null;
   private tileClickHandler: TileClickHandler | null = null;
   private pointerPickEnabled = true;
+  private exploreReadOnly = false;
   private lastState: HoverState | null = null;
   private currentTile: Tile | null = null;
   private currentCard: Card | null = null;
@@ -118,6 +121,10 @@ export class HoverSystem {
 
   public setPointerPickEnabled(enabled: boolean): void {
     this.pointerPickEnabled = enabled;
+  }
+
+  public setExploreReadOnly(enabled: boolean): void {
+    this.exploreReadOnly = enabled;
   }
 
   update(): void {
@@ -279,6 +286,9 @@ export class HoverSystem {
     if (!this.pointerPickEnabled) {
       return;
     }
+    if (this.exploreReadOnly) {
+      return;
+    }
     const rect = this.domElement.getBoundingClientRect();
     const ndc = new Vector2(
       ((ev.clientX - rect.left) / rect.width) * 2 - 1,
@@ -321,14 +331,14 @@ export class HoverSystem {
     if (!info) return null;
     if (info.group === CardHoverGroup.Resource && info.resourceKind) {
       return {
-        title: 'Rohstoffkarte',
-        detail: RESOURCE_LABEL_DE[info.resourceKind],
+        title: gt(marker('hover.resourceCardTitle')),
+        detail: resourceKindLabel(info.resourceKind),
       };
     }
     if (info.group === CardHoverGroup.Development && info.devKind) {
       return {
-        title: 'Entwicklungskarte',
-        detail: DEV_LABEL_DE[info.devKind],
+        title: gt(marker('hover.devCardTitle')),
+        detail: devKindLabel(info.devKind),
       };
     }
     return null;

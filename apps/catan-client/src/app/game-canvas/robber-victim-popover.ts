@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { TranslatePipe } from '@ngx-translate/core';
 import { PlayerSeat } from '@catan/api-interfaces';
 
 export interface RobberVictimCandidate {
@@ -7,31 +8,29 @@ export interface RobberVictimCandidate {
 }
 
 export interface RobberVictimModel {
-  /** Screen position of the clicked tile. */
   readonly x: number;
   readonly y: number;
   readonly candidates: readonly RobberVictimCandidate[];
 }
 
-/**
- * After the robber is placed, lets the player pick whom to rob (or no one).
- * Anchored at the clicked tile.
- */
 @Component({
   selector: 'app-robber-victim-popover',
   standalone: true,
+  imports: [TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @let m = model();
     @if (m) {
       <div class="popover" [style.left.px]="m.x" [style.top.px]="m.y">
-        <p class="title">Wen bestehlen?</p>
+        <p class="title">{{ 'robberVictim.title' | translate }}</p>
         <div class="list">
           @for (candidate of m.candidates; track candidate.seat) {
             <button type="button" (click)="pick.emit(candidate.seat)">{{ candidate.name }}</button>
           }
           @if (m.candidates.length === 0) {
-            <button type="button" class="none" (click)="pick.emit(null)">Kein Opfer</button>
+            <button type="button" class="none" (click)="pick.emit(null)">
+              {{ 'robberVictim.none' | translate }}
+            </button>
           }
         </div>
       </div>
@@ -88,6 +87,6 @@ export interface RobberVictimModel {
   ],
 })
 export class RobberVictimPopoverComponent {
-  readonly model = input<RobberVictimModel | null>(null);
+    readonly model = input<RobberVictimModel | null>(null);
   readonly pick = output<PlayerSeat | null>();
 }

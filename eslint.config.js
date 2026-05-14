@@ -5,11 +5,16 @@ const tseslint = require('typescript-eslint');
 const angular = require('angular-eslint');
 const prettier = require('eslint-config-prettier');
 const globals = require('globals');
+const nxPlugin = require('@nx/eslint-plugin');
 
 const unusedVarsRule = ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }];
 
 const tsStylisticOverrides = {
   '@typescript-eslint/prefer-for-of': 'off',
+  '@typescript-eslint/no-empty-function': [
+    'error',
+    { allow: ['private-constructors', 'protected-constructors'] },
+  ],
 };
 
 module.exports = defineConfig([
@@ -98,6 +103,33 @@ module.exports = defineConfig([
     rules: {
       '@typescript-eslint/no-unused-vars': unusedVarsRule,
       ...tsStylisticOverrides,
+    },
+  },
+  {
+    files: ['apps/catan-client/**/*.ts', 'apps/catan-api/**/*.ts', 'libs/**/*.ts'],
+    plugins: { '@nx': nxPlugin },
+    rules: {
+      '@nx/enforce-module-boundaries': [
+        'error',
+        {
+          enforceBuildableLibDependency: false,
+          allow: [],
+          depConstraints: [
+            {
+              sourceTag: '*',
+              onlyDependOnLibsWithTags: ['scope:shared', 'layer:domain'],
+            },
+            {
+              sourceTag: 'layer:contracts',
+              onlyDependOnLibsWithTags: ['layer:domain'],
+            },
+            {
+              sourceTag: 'layer:domain',
+              onlyDependOnLibsWithTags: ['layer:domain'],
+            },
+          ],
+        },
+      ],
     },
   },
 ]);

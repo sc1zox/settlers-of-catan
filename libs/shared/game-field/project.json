@@ -3,7 +3,7 @@
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "libs/shared/game-field/src",
   "projectType": "library",
-  "tags": ["scope:shared", "type:util"],
+  "tags": ["layer:domain", "type:util"],
   "targets": {
     "lint": {
       "executor": "@nx/eslint:lint",

@@ -14,7 +14,7 @@ import { Public } from '../http/decorators/public.decorator';
 import { SessionBootstrapDto } from './dto/session-bootstrap.dto';
 import { SessionRefreshDto } from './dto/session-refresh.dto';
 import { PlayerSessionJwtService } from './player-session-jwt.service';
-import { isUuid } from '../game/uuid.util';
+import { isUuid } from '../game/utils/uuid.util';
 
 @Controller('session')
 @ApiTags(SwaggerApiTag.Session)

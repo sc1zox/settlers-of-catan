@@ -11,10 +11,13 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { marker } from '@colsen1991/ngx-translate-extract-marker';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { BuildKind, SceneObjectKind } from '@catan/api-interfaces';
 import { GameEngine } from '../../game/engine';
-import { GameStateResource } from '../game/game-state.resource';
-import { SpectatorCameraService } from '../features/spectator-camera';
+import { setGameTranslateFn } from '../../game/i18n-bridge';
+import { GameStateResource } from '../core/game/game-state.resource';
+import { SpectatorCameraService } from '../features/spectator-camera/spectator-camera.service';
 import { HoverState } from '../../game/interaction/hover';
 import { BuildConfirmModel } from './build-confirm-popover';
 import { CardTooltipComponent, CardTooltipModel } from './card-tooltip';
@@ -32,27 +35,32 @@ export interface RobberTilePick {
   selector: 'app-game-canvas',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DiceOverlayComponent, HarborTooltipComponent, CardTooltipComponent],
+  imports: [TranslatePipe, DiceOverlayComponent, HarborTooltipComponent, CardTooltipComponent],
   template: `
     <div #host class="game-host"></div>
-    <app-harbor-tooltip [model]="harborTooltip()" />
-    <app-card-tooltip [model]="cardTooltip()" />
-    @if (cardFocused()) {
+    @if (!uiChromeHidden()) {
+      <app-harbor-tooltip [model]="harborTooltip()" />
+      <app-card-tooltip [model]="cardTooltip()" />
+    }
+    @if (cardFocused() && !uiChromeHidden()) {
       <button
         class="card-backdrop"
         type="button"
-        aria-label="Karte schließen"
+        [attr.aria-label]="'gameCanvas.closeCardAria' | translate"
         (click)="dismissFocusedCard()"
       ></button>
     }
-    <app-dice-overlay [model]="diceOverlay()" (dismiss)="dismissDice()" />
+    @if (!uiChromeHidden()) {
+      <app-dice-overlay [model]="diceOverlay()" (dismiss)="dismissDice()" />
+    }
   `,
   styleUrl: './game-canvas.scss',
 })
 export class GameCanvasComponent implements AfterViewInit, OnDestroy {
-  @ViewChild('host', { static: true }) private hostRef!: ElementRef<HTMLDivElement>;
+    @ViewChild('host', { static: true }) private hostRef!: ElementRef<HTMLDivElement>;
   private readonly gameState = inject(GameStateResource);
   private readonly spectatorCam = inject(SpectatorCameraService);
+  private readonly translate = inject(TranslateService);
   private engine: GameEngine | null = null;
   private diceNonce = 0;
 
@@ -62,6 +70,10 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
   readonly freeRoadMode = input<boolean>(false);
   /** Activates robber placement (tile clicks report their coordinate). */
   readonly robberMode = input<boolean>(false);
+  /** When true, 3D die clicks request a roll (must match server-side legality). */
+  readonly diceRollClickEnabled = input<boolean>(false);
+  /** When true, DOM overlays tied to the match HUD are suppressed (e.g. free camera). */
+  readonly uiChromeHidden = input<boolean>(false);
 
   readonly arsenalBuild = output<BuildKind>();
   readonly buildSpotPicked = output<BuildConfirmModel>();
@@ -74,6 +86,19 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
   readonly cardTooltip = signal<CardTooltipModel | null>(null);
   readonly diceOverlay = signal<DiceOverlayModel | null>(null);
   readonly cardFocused = signal<boolean>(false);
+
+  private readonly diceOverlayAutoDismiss = effect((onCleanup) => {
+    const overlay = this.diceOverlay();
+    if (overlay === null) {
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      this.diceOverlay.set(null);
+    }, 3000);
+    onCleanup(() => {
+      window.clearTimeout(handle);
+    });
+  });
 
   // Pushes every lobby-state update into the Three.js scene. Registered in the
   // injection context; the engine may not exist on the first run (before
@@ -101,6 +126,19 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
     this.engine?.setSpectatorCameraMode(active);
   });
 
+  private readonly diceRollClickGate = effect(() => {
+    this.engine?.setDiceRollClickEnabled(this.diceRollClickEnabled());
+  });
+
+  private readonly uiChromeClear = effect(() => {
+    if (!this.uiChromeHidden()) {
+      return;
+    }
+    this.harborTooltip.set(null);
+    this.cardTooltip.set(null);
+    this.diceOverlay.set(null);
+  });
+
   // The server roll is authoritative — drive the dice-tray animation with its
   // values so the menu roll button and a die click both tumble the 3D dice.
   private readonly diceRollSync = effect(() => {
@@ -111,9 +149,13 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
   });
 
   public ngAfterViewInit(): void {
+    setGameTranslateFn((key, params) => this.translate.instant(marker(key), params));
     this.engine = new GameEngine(this.hostRef.nativeElement);
     this.engine.setHoverHandler((state) => this.handleHover(state));
     this.engine.setDiceResultHandler((result) => {
+      if (this.uiChromeHidden()) {
+        return;
+      }
       this.diceNonce += 1;
       this.diceOverlay.set({ result, nonce: this.diceNonce });
     });
@@ -139,9 +181,11 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
     this.engine.showBuildSpots(this.buildMode(), this.freeRoadMode());
     this.engine.setRobberMode(this.robberMode());
     this.engine.setSpectatorCameraMode(this.spectatorCam.mode());
+    this.engine.setDiceRollClickEnabled(this.diceRollClickEnabled());
   }
 
   public ngOnDestroy(): void {
+    setGameTranslateFn(null);
     this.engine?.dispose();
     this.engine = null;
   }
@@ -155,6 +199,9 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
   }
 
   private handleHover(state: HoverState | null): void {
+    if (this.uiChromeHidden()) {
+      return;
+    }
     if (state?.target.kind === SceneObjectKind.Harbor) {
       this.harborTooltip.set({
         harbor: state.target.harbor.info,

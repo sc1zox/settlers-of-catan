@@ -21,6 +21,10 @@ export class SessionTokenService {
     localStorage.setItem(this.storageKey, token);
   }
 
+  public clear(): void {
+    localStorage.removeItem(this.storageKey);
+  }
+
   private readFromStorage(): string {
     return localStorage.getItem(this.storageKey) ?? '';
   }

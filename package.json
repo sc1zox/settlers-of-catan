@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "nx serve catan-client",
+    "start": "nx run-many -t serve --projects=catan-client,catan-api --parallel=2 --output-style=stream",
+    "start:client": "nx serve catan-client",
     "start:api": "nx serve catan-api",
     "build": "nx run-many -t build --projects=catan-client,catan-api",
     "watch": "nx build catan-client --watch --configuration development",

@@ -4,17 +4,39 @@ const { defineConfig } = require('eslint/config');
 const tseslint = require('typescript-eslint');
 const angular = require('angular-eslint');
 const prettier = require('eslint-config-prettier');
+const globals = require('globals');
+
+const unusedVarsRule = ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }];
+
+const tsStylisticOverrides = {
+  '@typescript-eslint/prefer-for-of': 'off',
+};
 
 module.exports = defineConfig([
   {
-    files: ['**/*.ts'],
+    ignores: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/out-tsc/**',
+      '**/.angular/**',
+      '**/coverage/**',
+      'apps/catan-api/webpack.config.js',
+    ],
+  },
+  {
+    files: ['apps/catan-client/**/*.ts'],
     extends: [
       eslint.configs.recommended,
-      tseslint.configs.recommended,
-      tseslint.configs.stylistic,
-      angular.configs.tsRecommended,
+      ...tseslint.configs.recommended,
+      ...tseslint.configs.stylistic,
+      ...angular.configs.tsRecommended,
       prettier,
     ],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+      },
+    },
     processor: angular.processInlineTemplates,
     rules: {
       '@angular-eslint/directive-selector': [
@@ -33,12 +55,49 @@ module.exports = defineConfig([
           style: 'kebab-case',
         },
       ],
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': unusedVarsRule,
+      ...tsStylisticOverrides,
     },
   },
   {
-    files: ['**/*.html'],
+    files: ['apps/catan-client/**/*.html'],
     extends: [angular.configs.templateRecommended, angular.configs.templateAccessibility],
     rules: {},
+  },
+  {
+    files: ['apps/catan-api/**/*.ts'],
+    extends: [
+      eslint.configs.recommended,
+      ...tseslint.configs.recommended,
+      ...tseslint.configs.stylistic,
+      prettier,
+    ],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-unused-vars': unusedVarsRule,
+      ...tsStylisticOverrides,
+    },
+  },
+  {
+    files: ['libs/**/*.ts'],
+    extends: [
+      eslint.configs.recommended,
+      ...tseslint.configs.recommended,
+      ...tseslint.configs.stylistic,
+      prettier,
+    ],
+    languageOptions: {
+      globals: {
+        ...globals.es2021,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-unused-vars': unusedVarsRule,
+      ...tsStylisticOverrides,
+    },
   },
 ]);

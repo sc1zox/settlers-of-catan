@@ -40,4 +40,24 @@ export class TradeService {
     this.offers.set(id, next);
     return next;
   }
+
+  /**
+   * Mark every open offer for the given lobby as Rejected and return the
+   * resulting list so the caller can broadcast a `TradeUpdated` per offer.
+   * Called whenever the lobby leaves the Trading phase (finishTrading, or
+   * any abnormal phase transition) so that reconnecting clients never see
+   * an open offer that is no longer acceptable.
+   */
+  public expireOpenOffersForLobby(lobbyId: string): TradeOfferDto[] {
+    const expired: TradeOfferDto[] = [];
+    for (const [id, offer] of this.offers) {
+      if (offer.lobbyId !== lobbyId || offer.status !== TradeStatus.Open) {
+        continue;
+      }
+      const next: TradeOfferDto = { ...offer, status: TradeStatus.Rejected };
+      this.offers.set(id, next);
+      expired.push(next);
+    }
+    return expired;
+  }
 }

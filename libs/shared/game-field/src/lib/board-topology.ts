@@ -1,4 +1,4 @@
-import type { TilePlacement } from '@catan/shared-game-field';
+import type { TilePlacement } from './tile-placement';
 
 interface CubeCoord {
   readonly x: number;
@@ -48,9 +48,9 @@ export function createBoardTopology(tiles: readonly TilePlacement[]): BoardTopol
     const tileKey = makeTileKey(tile.coord.q, tile.coord.r);
     const center = axialToCube(tile.coord.q, tile.coord.r);
     const centerInt = {
-      x2: center.x * 2,
-      y2: center.y * 2,
-      z2: center.z * 2,
+      x2: center.x * 3,
+      y2: center.y * 3,
+      z2: center.z * 3,
     };
     const vertexIds: string[] = [];
     for (let cornerIndex = 0; cornerIndex < CORNER_OFFSETS.length; cornerIndex += 1) {

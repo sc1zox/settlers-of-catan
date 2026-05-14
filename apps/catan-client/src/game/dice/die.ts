@@ -1,4 +1,5 @@
 import { BoxGeometry, Material, Mesh, MeshStandardMaterial, Quaternion, Vector3 } from 'three';
+import { SceneObjectKind, SceneUserDataKey } from '@catan/api-interfaces';
 import { makeDieFaceTexture } from './textures';
 
 export type DieState = 'idle' | 'rolling' | 'settled';
@@ -66,8 +67,8 @@ export class Die {
     this.mesh.castShadow = true;
     this.mesh.receiveShadow = true;
     this.mesh.position.copy(this.restPosition);
-    this.mesh.userData['kind'] = 'die';
-    this.mesh.userData['die'] = this;
+    this.mesh.userData[SceneUserDataKey.Kind] = SceneObjectKind.Die;
+    this.mesh.userData[SceneUserDataKey.Die] = this;
 
     // Start showing a 1.
     this.applyValueOrientation(1);

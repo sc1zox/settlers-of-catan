@@ -10,6 +10,7 @@ import {
 } from 'three';
 import { AxialCoord, axialToWorld, hexRing } from '../board/hex';
 import { ResourceTileType, TileType } from '@catan/shared-game-field';
+import { SceneObjectKind, SceneUserDataKey } from '@catan/api-interfaces';
 import { TILE_HEIGHT, WATER_LEVEL_Y } from '../tiles/tile';
 
 export enum HarborKind {
@@ -254,8 +255,8 @@ export class Harbor {
     const pickMat = new MeshStandardMaterial({ visible: false });
     const pick = new Mesh(pickGeom, pickMat);
     pick.position.set(0, buildingCenterY + 0.3, 0);
-    pick.userData['kind'] = 'harbor';
-    pick.userData['harbor'] = this;
+    pick.userData[SceneUserDataKey.Kind] = SceneObjectKind.Harbor;
+    pick.userData[SceneUserDataKey.Harbor] = this;
     this.group.add(pick);
     this.pickMesh = pick;
   }

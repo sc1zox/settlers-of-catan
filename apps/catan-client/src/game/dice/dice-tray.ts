@@ -17,9 +17,9 @@ export interface DiceTrayOptions {
 }
 
 /**
- * Two dice resting on the tabletop. Clicking either one rolls both with a
- * tumble animation; after they settle the registered handler receives the
- * pair of values.
+ * Two dice resting on the tabletop. `rollTo` tumbles both towards the
+ * server-authoritative values; after they settle the registered handler
+ * receives the pair.
  */
 export class DiceTray {
   readonly group: Group = new Group();
@@ -48,19 +48,13 @@ export class DiceTray {
     this.handler = handler;
   }
 
-  /** Triggered by a click on either die — both tumble together. */
-  rollBoth(): void {
+  /** Tumble both dice towards the given server-authoritative face values. */
+  rollTo(a: number, b: number): void {
     if (this.rolling) return;
     this.rolling = true;
     this.resultEmitted = false;
-    for (const die of this.dice) {
-      die.beginRoll(1 + Math.floor(Math.random() * 6));
-    }
-  }
-
-  /** Public alias — same as rollBoth. */
-  roll(): void {
-    this.rollBoth();
+    this.dice[0].beginRoll(a);
+    this.dice[1].beginRoll(b);
   }
 
   update(dt: number): void {

@@ -1,4 +1,12 @@
 import { Camera, Object3D, Raycaster, Vector2 } from 'three';
+import {
+  ArsenalClickHandler,
+  BuildSpotClickHandler,
+  BuildSpotHoverHandler,
+  SceneObjectKind,
+  SceneUserDataKey,
+  TileClickHandler,
+} from '@catan/api-interfaces';
 import { Card } from '../cards/card';
 import { DEV_LABEL_DE, RESOURCE_LABEL_DE } from '../cards/textures';
 import { Die } from '../dice/die';
@@ -12,9 +20,9 @@ export interface CardHoverTooltip {
 }
 
 export type HoverTarget =
-  | { kind: 'harbor'; harbor: Harbor }
-  | { kind: 'chip'; tile: Tile }
-  | { kind: 'card'; card: Card; tooltip: CardHoverTooltip };
+  | { kind: SceneObjectKind.Harbor; harbor: Harbor }
+  | { kind: SceneObjectKind.Chip; tile: Tile }
+  | { kind: SceneObjectKind.Card; card: Card; tooltip: CardHoverTooltip };
 
 export interface HoverState {
   readonly target: HoverTarget;
@@ -29,9 +37,11 @@ export type BackgroundClickHandler = () => void;
 
 /**
  * Tracks mouse position and raycasts each frame to detect what the cursor is
- * over. Three target families are supported via `userData['kind']`:
- *  - 'harbor' / 'chip' for hover (tooltip)
- *  - 'card' / 'die'   for click  (focus / roll)
+ * over. Targets are classified via {@link SceneUserDataKey.Kind} carrying a
+ * {@link SceneObjectKind}:
+ *  - Harbor / Chip      → hover tooltip
+ *  - Card / Die         → click (focus / roll)
+ *  - BuildSpot / Arsenal→ build-mode interaction
  */
 export class HoverSystem {
   private readonly raycaster = new Raycaster();
@@ -43,18 +53,34 @@ export class HoverSystem {
   private cardClickHandler: CardClickHandler | null = null;
   private dieClickHandler: DieClickHandler | null = null;
   private backgroundClickHandler: BackgroundClickHandler | null = null;
+  private buildSpotHoverHandler: BuildSpotHoverHandler | null = null;
+  private buildSpotClickHandler: BuildSpotClickHandler | null = null;
+  private arsenalClickHandler: ArsenalClickHandler | null = null;
+  private tileClickHandler: TileClickHandler | null = null;
+  private pointerPickEnabled = true;
   private lastState: HoverState | null = null;
   private currentTile: Tile | null = null;
   private currentCard: Card | null = null;
+  private currentBuildSpot: Object3D | null = null;
+  private hoverables: readonly Object3D[];
 
   constructor(
     private readonly domElement: HTMLElement,
     private readonly camera: Camera,
-    private readonly hoverables: readonly Object3D[],
+    hoverables: readonly Object3D[],
   ) {
+    this.hoverables = hoverables;
     domElement.addEventListener('pointermove', this.onPointerMove);
     domElement.addEventListener('pointerleave', this.onPointerLeave);
     domElement.addEventListener('click', this.onClick);
+  }
+
+  /** Replace the raycast set after the board or player hands are rebuilt. */
+  setHoverables(hoverables: readonly Object3D[]): void {
+    this.hoverables = hoverables;
+    this.setHoveredTile(null);
+    this.setHoveredCard(null);
+    this.setHoveredBuildSpot(null);
   }
 
   setHandler(handler: HoverHandler | null): void {
@@ -73,11 +99,40 @@ export class HoverSystem {
     this.backgroundClickHandler = handler;
   }
 
+  setBuildSpotHoverHandler(handler: BuildSpotHoverHandler | null): void {
+    this.buildSpotHoverHandler = handler;
+  }
+
+  setBuildSpotClickHandler(handler: BuildSpotClickHandler | null): void {
+    this.buildSpotClickHandler = handler;
+  }
+
+  setArsenalClickHandler(handler: ArsenalClickHandler | null): void {
+    this.arsenalClickHandler = handler;
+  }
+
+  /** Set during robber placement so a chip click reports the targeted tile. */
+  setTileClickHandler(handler: TileClickHandler | null): void {
+    this.tileClickHandler = handler;
+  }
+
+  public setPointerPickEnabled(enabled: boolean): void {
+    this.pointerPickEnabled = enabled;
+  }
+
   update(): void {
     if (!this.pointerInside) {
       this.emit(null);
       this.setHoveredTile(null);
       this.setHoveredCard(null);
+      this.setHoveredBuildSpot(null);
+      return;
+    }
+    if (!this.pointerPickEnabled) {
+      this.emit(null);
+      this.setHoveredTile(null);
+      this.setHoveredCard(null);
+      this.setHoveredBuildSpot(null);
       return;
     }
     this.raycaster.setFromCamera(this.pointer, this.camera);
@@ -85,39 +140,56 @@ export class HoverSystem {
     for (let i = 0; i < hits.length; i++) {
       const obj = walkToKind(hits[i].object);
       if (!obj) continue;
-      const kind = obj.userData['kind'];
-      if (kind === 'harbor') {
-        const harbor = obj.userData['harbor'] as Harbor;
+      const kind = obj.userData[SceneUserDataKey.Kind] as SceneObjectKind | undefined;
+      if (kind === SceneObjectKind.BuildSpot) {
+        this.setHoveredBuildSpot(obj);
+        this.setHoveredTile(null);
+        this.setHoveredCard(null);
+        this.emit(null);
+        return;
+      }
+      if (kind === SceneObjectKind.Arsenal) {
+        this.setHoveredBuildSpot(null);
+        this.setHoveredTile(null);
+        this.setHoveredCard(null);
+        this.emit(null);
+        return;
+      }
+      if (kind === SceneObjectKind.Harbor) {
+        const harbor = obj.userData[SceneUserDataKey.Harbor] as Harbor;
+        this.setHoveredBuildSpot(null);
         this.setHoveredTile(null);
         this.setHoveredCard(null);
         this.emit({
-          target: { kind: 'harbor', harbor },
+          target: { kind: SceneObjectKind.Harbor, harbor },
           screenX: this.screenX,
           screenY: this.screenY,
         });
         return;
       }
-      if (kind === 'chip') {
-        const tile = obj.userData['tile'] as Tile;
+      if (kind === SceneObjectKind.Chip) {
+        const tile = obj.userData[SceneUserDataKey.Tile] as Tile;
+        this.setHoveredBuildSpot(null);
         this.setHoveredTile(tile);
         this.setHoveredCard(null);
         this.emit({
-          target: { kind: 'chip', tile },
+          target: { kind: SceneObjectKind.Chip, tile },
           screenX: this.screenX,
           screenY: this.screenY,
         });
         return;
       }
-      if (kind === 'card' || kind === 'die') {
+      if (kind === SceneObjectKind.Card || kind === SceneObjectKind.Die) {
         const topObj = this.pickTopOpaqueHit(hits, i, obj);
-        const topKind = topObj.userData['kind'];
+        const topKind = topObj.userData[SceneUserDataKey.Kind] as SceneObjectKind | undefined;
+        this.setHoveredBuildSpot(null);
         this.setHoveredTile(null);
-        if (topKind === 'die') {
+        if (topKind === SceneObjectKind.Die) {
           this.setHoveredCard(null);
           this.emit(null);
           return;
         }
-        const card = topObj.userData['card'] as Card;
+        const card = topObj.userData[SceneUserDataKey.Card] as Card;
         this.setHoveredCard(card);
         const tooltip = this.buildCardTooltip(card);
         if (!tooltip) {
@@ -125,7 +197,7 @@ export class HoverSystem {
           return;
         }
         this.emit({
-          target: { kind: 'card', card, tooltip },
+          target: { kind: SceneObjectKind.Card, card, tooltip },
           screenX: this.screenX,
           screenY: this.screenY,
         });
@@ -134,6 +206,7 @@ export class HoverSystem {
     }
     this.setHoveredTile(null);
     this.setHoveredCard(null);
+    this.setHoveredBuildSpot(null);
     this.emit(null);
   }
 
@@ -159,6 +232,12 @@ export class HoverSystem {
     this.currentCard = card;
   }
 
+  private setHoveredBuildSpot(figure: Object3D | null): void {
+    if (this.currentBuildSpot === figure) return;
+    this.currentBuildSpot = figure;
+    this.buildSpotHoverHandler?.(figure);
+  }
+
   private emit(state: HoverState | null): void {
     // Only emit when the target or its position meaningfully changed.
     if (!state && !this.lastState) return;
@@ -166,13 +245,13 @@ export class HoverSystem {
       state &&
       this.lastState &&
       this.lastState.target.kind === state.target.kind &&
-      (state.target.kind === 'harbor'
-        ? this.lastState.target.kind === 'harbor' &&
+      (state.target.kind === SceneObjectKind.Harbor
+        ? this.lastState.target.kind === SceneObjectKind.Harbor &&
           this.lastState.target.harbor === state.target.harbor
-        : state.target.kind === 'chip'
-          ? this.lastState.target.kind === 'chip' &&
+        : state.target.kind === SceneObjectKind.Chip
+          ? this.lastState.target.kind === SceneObjectKind.Chip &&
             this.lastState.target.tile === state.target.tile
-          : this.lastState.target.kind === 'card' &&
+          : this.lastState.target.kind === SceneObjectKind.Card &&
             this.lastState.target.card === state.target.card) &&
       Math.abs((this.lastState.screenX ?? 0) - state.screenX) < 1 &&
       Math.abs((this.lastState.screenY ?? 0) - state.screenY) < 1
@@ -197,6 +276,9 @@ export class HoverSystem {
   };
 
   private readonly onClick = (ev: MouseEvent): void => {
+    if (!this.pointerPickEnabled) {
+      return;
+    }
     const rect = this.domElement.getBoundingClientRect();
     const ndc = new Vector2(
       ((ev.clientX - rect.left) / rect.width) * 2 - 1,
@@ -207,14 +289,26 @@ export class HoverSystem {
     for (const hit of hits) {
       const obj = walkToKind(hit.object);
       if (!obj) continue;
-      const kind = obj.userData['kind'];
-      if (kind === 'card') {
-        const card = obj.userData['card'] as Card;
+      const kind = obj.userData[SceneUserDataKey.Kind] as SceneObjectKind | undefined;
+      if (kind === SceneObjectKind.BuildSpot) {
+        this.buildSpotClickHandler?.(obj, ev.clientX, ev.clientY);
+        return;
+      }
+      if (kind === SceneObjectKind.Arsenal) {
+        this.arsenalClickHandler?.(obj);
+        return;
+      }
+      if (kind === SceneObjectKind.Chip && this.tileClickHandler) {
+        this.tileClickHandler(obj, ev.clientX, ev.clientY);
+        return;
+      }
+      if (kind === SceneObjectKind.Card) {
+        const card = obj.userData[SceneUserDataKey.Card] as Card;
         this.cardClickHandler?.(card);
         return;
       }
-      if (kind === 'die') {
-        const die = obj.userData['die'] as Die;
+      if (kind === SceneObjectKind.Die) {
+        const die = obj.userData[SceneUserDataKey.Die] as Die;
         this.dieClickHandler?.(die);
         return;
       }
@@ -249,8 +343,8 @@ export class HoverSystem {
     for (let i = startIndex + 1; i < hits.length; i++) {
       const candidate = walkToKind(hits[i].object);
       if (!candidate) continue;
-      const candidateKind = candidate.userData['kind'];
-      if (candidateKind !== 'card' && candidateKind !== 'die') continue;
+      const candidateKind = candidate.userData[SceneUserDataKey.Kind] as SceneObjectKind | undefined;
+      if (candidateKind !== SceneObjectKind.Card && candidateKind !== SceneObjectKind.Die) continue;
       if (candidate.renderOrder > topObj.renderOrder) {
         topObj = candidate;
       }
@@ -262,7 +356,7 @@ export class HoverSystem {
 function walkToKind(obj: Object3D): Object3D | null {
   let current: Object3D | null = obj;
   while (current) {
-    if (current.userData && current.userData['kind']) return current;
+    if (current.userData && current.userData[SceneUserDataKey.Kind]) return current;
     current = current.parent;
   }
   return null;

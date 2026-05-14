@@ -1,4 +1,5 @@
 import { ActionRejectCode, PlayerSeat, ResourceType, TileType } from '@catan/api-interfaces';
+import { collectRobberVictimSeats } from '@catan/shared-game-field';
 import { LobbyPlayerSlot, LobbyRuntime } from './lobby-runtime';
 
 export function applyRobberMove(
@@ -38,43 +39,26 @@ function collectRobberVictims(
   q: number,
   r: number,
 ): LobbyPlayerSlot[] {
-  const tileKey = `${q},${r}`;
+  const seats = collectRobberVictimSeats(
+    lobby.tiles,
+    lobby.settlements.map((s) => ({ seat: s.seat, vertexId: s.vertexId })),
+    lobby.players.map((p) => ({
+      seat: p.seat,
+      totalResourceCards: countTotalResources(p),
+    })),
+    actorSeat,
+    q,
+    r,
+  );
   const victims: LobbyPlayerSlot[] = [];
-  for (let i = 0; i < lobby.players.length; i += 1) {
-    const candidate = lobby.players[i];
-    if (candidate.seat === actorSeat) {
-      continue;
+  for (let i = 0; i < seats.length; i += 1) {
+    const seat = seats[i] as PlayerSeat;
+    const found = lobby.players.find((p) => p.seat === seat);
+    if (found) {
+      victims.push(found);
     }
-    if (countTotalResources(candidate) === 0) {
-      continue;
-    }
-    if (!playerHasSettlementOnTile(lobby, candidate.seat, tileKey)) {
-      continue;
-    }
-    victims.push(candidate);
   }
   return victims;
-}
-
-function playerHasSettlementOnTile(
-  lobby: LobbyRuntime,
-  seat: PlayerSeat,
-  tileKey: string,
-): boolean {
-  for (let i = 0; i < lobby.settlements.length; i += 1) {
-    const settlement = lobby.settlements[i];
-    if (settlement.seat !== seat) {
-      continue;
-    }
-    const vertex = lobby.verticesById.get(settlement.vertexId);
-    if (!vertex) {
-      continue;
-    }
-    if (vertex.adjacentTileKeys.includes(tileKey)) {
-      return true;
-    }
-  }
-  return false;
 }
 
 function countTotalResources(player: LobbyPlayerSlot): number {

@@ -1,0 +1,359 @@
+npm verbose cli /usr/bin/node /run/user/1000/fnm_multishells/667263_1778732991192/bin/npm
+npm info using npm@11.6.1
+npm info using node@v26.1.0
+npm verbose title npm install
+npm verbose argv "install" "--loglevel" "verbose"
+npm verbose logfile logs-max:10 dir:/home/sc1zox/.npm/_logs/2026-05-14T04_29_52_549Z-
+npm verbose logfile /home/sc1zox/.npm/_logs/2026-05-14T04_29_52_549Z-debug-0.log
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/win32-ia32
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/win32-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/win32-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/sunos-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/openbsd-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/openbsd-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/netbsd-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/netbsd-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/linux-arm
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/linux-riscv64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/linux-s390x
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/linux-ppc64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/linux-mips64el
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/linux-loong64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/linux-ia32
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/linux-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/freebsd-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/freebsd-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/darwin-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/darwin-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/android-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/android-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/android-arm
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@modern-js/node-bundle-require/node_modules/@esbuild/aix-ppc64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@unrs/resolver-binding-win32-x64-msvc
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@unrs/resolver-binding-win32-arm64-msvc
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@unrs/resolver-binding-win32-ia32-msvc
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@unrs/resolver-binding-wasm32-wasi
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@unrs/resolver-binding-wasm32-wasi/node_modules/@napi-rs/wasm-runtime
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@unrs/resolver-binding-linux-riscv64-gnu
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@unrs/resolver-binding-linux-s390x-gnu
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@unrs/resolver-binding-linux-riscv64-musl
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@unrs/resolver-binding-linux-arm64-musl
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@unrs/resolver-binding-linux-ppc64-gnu
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@unrs/resolver-binding-linux-arm64-gnu
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@unrs/resolver-binding-linux-arm-musleabihf
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@unrs/resolver-binding-linux-arm-gnueabihf
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@unrs/resolver-binding-freebsd-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@unrs/resolver-binding-darwin-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@unrs/resolver-binding-darwin-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@unrs/resolver-binding-android-arm-eabi
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@unrs/resolver-binding-android-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@swc/core-win32-x64-msvc
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@swc/core-win32-ia32-msvc
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@swc/core-win32-arm64-msvc
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@swc/core-linux-arm64-musl
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@swc/core-linux-arm-gnueabihf
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@swc/core-linux-arm64-gnu
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@swc/core-darwin-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@swc/core-darwin-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rspack/binding-win32-ia32-msvc
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rspack/binding-win32-arm64-msvc
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rspack/binding-win32-x64-msvc
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rspack/binding-wasm32-wasi
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rspack/binding-wasm32-wasi/node_modules/@napi-rs/wasm-runtime
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rspack/binding-linux-arm64-musl
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rspack/binding-linux-arm64-gnu
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rspack/binding-darwin-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rspack/binding-darwin-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-win32-x64-gnu
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-win32-x64-msvc
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-win32-ia32-msvc
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-openharmony-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-win32-arm64-msvc
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-openbsd-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-linux-s390x-gnu
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-linux-riscv64-gnu
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-linux-riscv64-musl
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-linux-ppc64-musl
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-linux-ppc64-gnu
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-linux-loong64-musl
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-linux-loong64-gnu
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-linux-arm64-gnu
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-linux-arm64-musl
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-linux-arm-gnueabihf
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-freebsd-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-linux-arm-musleabihf
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-freebsd-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-darwin-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-android-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-android-arm-eabi
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rollup/rollup-darwin-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rolldown/binding-win32-x64-msvc
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rolldown/binding-wasm32-wasi
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@napi-rs/wasm-runtime
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rolldown/binding-openharmony-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rolldown/binding-win32-arm64-msvc
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rolldown/binding-linux-arm-gnueabihf
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rolldown/binding-linux-arm64-musl
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rolldown/binding-freebsd-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rolldown/binding-linux-arm64-gnu
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rolldown/binding-darwin-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rolldown/binding-darwin-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@rolldown/binding-android-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@parcel/watcher-win32-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@parcel/watcher-win32-ia32
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@parcel/watcher-win32-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@parcel/watcher-linux-arm64-musl
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@parcel/watcher-linux-arm64-glibc
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@parcel/watcher-linux-arm-glibc
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@parcel/watcher-linux-arm-musl
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@parcel/watcher-darwin-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@parcel/watcher-freebsd-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@parcel/watcher-darwin-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@parcel/watcher-android-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@nx/nx-win32-x64-msvc
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@nx/nx-win32-arm64-msvc
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@nx/nx-linux-arm64-musl
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@nx/nx-linux-arm64-gnu
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@nx/nx-linux-arm-gnueabihf
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@nx/nx-freebsd-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@nx/nx-darwin-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@nx/nx-darwin-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@napi-rs/nice-win32-x64-msvc
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@napi-rs/nice-win32-arm64-msvc
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@napi-rs/nice-openharmony-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@napi-rs/nice-win32-ia32-msvc
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@napi-rs/nice-linux-s390x-gnu
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@napi-rs/nice-linux-ppc64-gnu
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@napi-rs/nice-linux-riscv64-gnu
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@napi-rs/nice-linux-arm64-musl
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@napi-rs/nice-linux-arm-gnueabihf
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@napi-rs/nice-linux-arm64-gnu
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@napi-rs/nice-freebsd-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@napi-rs/nice-darwin-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@napi-rs/nice-darwin-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@napi-rs/nice-android-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@napi-rs/nice-android-arm-eabi
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@msgpackr-extract/msgpackr-extract-win32-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@msgpackr-extract/msgpackr-extract-linux-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@msgpackr-extract/msgpackr-extract-linux-arm
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@msgpackr-extract/msgpackr-extract-darwin-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@msgpackr-extract/msgpackr-extract-darwin-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@lmdb/lmdb-win32-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@lmdb/lmdb-win32-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@lmdb/lmdb-linux-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@lmdb/lmdb-linux-arm
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@lmdb/lmdb-darwin-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@lmdb/lmdb-darwin-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/win32-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/win32-ia32
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/win32-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/sunos-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/openbsd-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/openharmony-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/netbsd-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/openbsd-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/netbsd-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/linux-s390x
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/linux-ppc64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/linux-riscv64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/linux-loong64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/aix-ppc64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/linux-mips64el
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/linux-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/linux-ia32
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/linux-arm
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/freebsd-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/android-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/freebsd-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/darwin-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/darwin-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/android-arm
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/@esbuild/android-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-win32-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-win32-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-unknown-all
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-unknown-all/node_modules/sass
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-unknown-all/node_modules/chokidar
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-unknown-all/node_modules/readdirp
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-linux-riscv64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-linux-musl-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-linux-musl-riscv64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-linux-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-linux-musl-arm
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-linux-arm
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-darwin-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-android-x64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-android-riscv64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-darwin-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-android-arm
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-android-arm64
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-all-unknown
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-all-unknown/node_modules/sass
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-all-unknown/node_modules/chokidar
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/sass-embedded-all-unknown/node_modules/readdirp
+npm verbose reify failed optional dependency /home/sc1zox/code/settlers-of-catan/node_modules/fsevents
+npm http cache @zkochan/js-yaml@https://registry.npmjs.org/@zkochan/js-yaml/-/js-yaml-0.0.7.tgz 1ms (cache hit)
+npm http cache @nuxt/opencollective@https://registry.npmjs.org/@nuxt/opencollective/-/opencollective-0.4.1.tgz 0ms (cache hit)
+npm http cache @module-federation/enhanced@https://registry.npmjs.org/@module-federation/enhanced/-/enhanced-0.18.4.tgz 0ms (cache hit)
+npm http cache @bramus/specificity@https://registry.npmjs.org/@bramus/specificity/-/specificity-2.4.2.tgz 0ms (cache hit)
+npm http cache @module-federation/cli@https://registry.npmjs.org/@module-federation/cli/-/cli-0.18.4.tgz 0ms (cache hit)
+npm http cache @npmcli/installed-package-contents@https://registry.npmjs.org/@npmcli/installed-package-contents/-/installed-package-contents-4.0.0.tgz 0ms (cache hit)
+npm http cache @babel/parser@https://registry.npmjs.org/@babel/parser/-/parser-7.29.3.tgz 0ms (cache hit)
+npm http cache @angular/cli@https://registry.npmjs.org/@angular/cli/-/cli-21.2.10.tgz 0ms (cache hit)
+npm http cache @angular-devkit/architect@https://registry.npmjs.org/@angular-devkit/architect/-/architect-0.2102.10.tgz 0ms (cache hit)
+npm http cache which@https://registry.npmjs.org/which/-/which-2.0.2.tgz 0ms (cache hit)
+npm http cache @angular/compiler-cli@https://registry.npmjs.org/@angular/compiler-cli/-/compiler-cli-21.2.12.tgz 0ms (cache hit)
+npm http cache why-is-node-running@https://registry.npmjs.org/why-is-node-running/-/why-is-node-running-2.3.0.tgz 0ms (cache hit)
+npm http cache webpack-cli@https://registry.npmjs.org/webpack-cli/-/webpack-cli-5.1.4.tgz 0ms (cache hit)
+npm http cache webpack@https://registry.npmjs.org/webpack/-/webpack-5.106.2.tgz 0ms (cache hit)
+npm http cache webpack-dev-server@https://registry.npmjs.org/webpack-dev-server/-/webpack-dev-server-5.2.4.tgz 0ms (cache hit)
+npm http cache vite@https://registry.npmjs.org/vite/-/vite-7.3.2.tgz 0ms (cache hit)
+npm http cache vitest@https://registry.npmjs.org/vitest/-/vitest-4.1.6.tgz 0ms (cache hit)
+npm http cache update-browserslist-db@https://registry.npmjs.org/update-browserslist-db/-/update-browserslist-db-1.2.3.tgz 0ms (cache hit)
+npm http cache typescript@https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz 0ms (cache hit)
+npm http cache uuid@https://registry.npmjs.org/uuid/-/uuid-8.3.2.tgz 0ms (cache hit)
+npm http cache tree-kill@https://registry.npmjs.org/tree-kill/-/tree-kill-1.2.2.tgz 0ms (cache hit)
+npm http cache tldts@https://registry.npmjs.org/tldts/-/tldts-7.0.30.tgz 0ms (cache hit)
+npm http cache svgo@https://registry.npmjs.org/svgo/-/svgo-3.3.3.tgz 0ms (cache hit)
+npm http cache terser@https://registry.npmjs.org/terser/-/terser-5.47.1.tgz 0ms (cache hit)
+npm http cache sass-embedded@https://registry.npmjs.org/sass-embedded/-/sass-embedded-1.99.0.tgz 0ms (cache hit)
+npm http cache semver@https://registry.npmjs.org/semver/-/semver-7.7.4.tgz 0ms (cache hit)
+npm http cache sass@https://registry.npmjs.org/sass/-/sass-1.97.3.tgz 0ms (cache hit)
+npm http cache rollup@https://registry.npmjs.org/rollup/-/rollup-4.60.3.tgz 0ms (cache hit)
+npm http cache resolve@https://registry.npmjs.org/resolve/-/resolve-1.22.8.tgz 0ms (cache hit)
+npm http cache regjsparser@https://registry.npmjs.org/regjsparser/-/regjsparser-0.13.1.tgz 0ms (cache hit)
+npm http cache prettier@https://registry.npmjs.org/prettier/-/prettier-3.8.3.tgz 0ms (cache hit)
+npm http cache rolldown@https://registry.npmjs.org/rolldown/-/rolldown-1.0.0-rc.4.tgz 0ms (cache hit)
+npm http cache opener@https://registry.npmjs.org/opener/-/opener-1.5.2.tgz 0ms (cache hit)
+npm http cache pacote@https://registry.npmjs.org/pacote/-/pacote-21.3.1.tgz 0ms (cache hit)
+npm http cache nx@https://registry.npmjs.org/nx/-/nx-21.6.11.tgz 0ms (cache hit)
+npm http cache nopt@https://registry.npmjs.org/nopt/-/nopt-9.0.0.tgz 0ms (cache hit)
+npm http cache node-gyp-build-optional-packages@https://registry.npmjs.org/node-gyp-build-optional-packages/-/node-gyp-build-optional-packages-5.2.2.tgz 0ms (cache hit)
+npm http cache node-gyp@https://registry.npmjs.org/node-gyp/-/node-gyp-12.3.0.tgz 0ms (cache hit)
+npm http cache needle@https://registry.npmjs.org/needle/-/needle-3.5.0.tgz 0ms (cache hit)
+npm http cache napi-postinstall@https://registry.npmjs.org/napi-postinstall/-/napi-postinstall-0.3.4.tgz 0ms (cache hit)
+npm http cache nanoid@https://registry.npmjs.org/nanoid/-/nanoid-3.3.12.tgz 0ms (cache hit)
+npm http cache msgpackr-extract@https://registry.npmjs.org/msgpackr-extract/-/msgpackr-extract-3.0.3.tgz 0ms (cache hit)
+npm http cache multicast-dns@https://registry.npmjs.org/multicast-dns/-/multicast-dns-7.2.5.tgz 0ms (cache hit)
+npm http cache mime@https://registry.npmjs.org/mime/-/mime-1.6.0.tgz 0ms (cache hit)
+npm http cache kill-port@https://registry.npmjs.org/kill-port/-/kill-port-1.6.1.tgz 0ms (cache hit)
+npm http cache less@https://registry.npmjs.org/less/-/less-4.6.4.tgz 0ms (cache hit)
+npm http cache lmdb@https://registry.npmjs.org/lmdb/-/lmdb-3.5.1.tgz 0ms (cache hit)
+npm http cache json5@https://registry.npmjs.org/json5/-/json5-2.2.3.tgz 0ms (cache hit)
+npm http cache js-yaml@https://registry.npmjs.org/js-yaml/-/js-yaml-3.14.2.tgz 0ms (cache hit)
+npm http cache jsesc@https://registry.npmjs.org/jsesc/-/jsesc-3.1.0.tgz 0ms (cache hit)
+npm http cache jiti@https://registry.npmjs.org/jiti/-/jiti-2.7.0.tgz 0ms (cache hit)
+npm http cache is-inside-container@https://registry.npmjs.org/is-inside-container/-/is-inside-container-1.0.0.tgz 0ms (cache hit)
+npm http cache is-docker@https://registry.npmjs.org/is-docker/-/is-docker-3.0.0.tgz 0ms (cache hit)
+npm http cache image-size@https://registry.npmjs.org/image-size/-/image-size-0.5.5.tgz 0ms (cache hit)
+npm http cache jake@https://registry.npmjs.org/jake/-/jake-10.9.4.tgz 0ms (cache hit)
+npm http cache import-local@https://registry.npmjs.org/import-local/-/import-local-3.2.0.tgz 0ms (cache hit)
+npm http cache http-server@https://registry.npmjs.org/http-server/-/http-server-14.1.1.tgz 0ms (cache hit)
+npm http cache he@https://registry.npmjs.org/he/-/he-1.2.0.tgz 0ms (cache hit)
+npm http cache esprima@https://registry.npmjs.org/esprima/-/esprima-4.0.1.tgz 0ms (cache hit)
+npm http cache flat@https://registry.npmjs.org/flat/-/flat-5.0.2.tgz 0ms (cache hit)
+npm http cache esbuild@https://registry.npmjs.org/esbuild/-/esbuild-0.27.3.tgz 0ms (cache hit)
+npm http cache eslint@https://registry.npmjs.org/eslint/-/eslint-9.39.4.tgz 0ms (cache hit)
+npm http cache errno@https://registry.npmjs.org/errno/-/errno-0.1.8.tgz 0ms (cache hit)
+npm http cache envinfo@https://registry.npmjs.org/envinfo/-/envinfo-7.21.0.tgz 0ms (cache hit)
+npm http cache ejs@https://registry.npmjs.org/ejs/-/ejs-3.1.10.tgz 0ms (cache hit)
+npm http cache cssesc@https://registry.npmjs.org/cssesc/-/cssesc-3.0.0.tgz 0ms (cache hit)
+npm http cache eslint-config-prettier@https://registry.npmjs.org/eslint-config-prettier/-/eslint-config-prettier-10.1.8.tgz 0ms (cache hit)
+npm http cache concurrently@https://registry.npmjs.org/concurrently/-/concurrently-9.2.1.tgz 0ms (cache hit)
+npm http cache browserslist@https://registry.npmjs.org/browserslist/-/browserslist-4.28.2.tgz 0ms (cache hit)
+npm http cache btoa@https://registry.npmjs.org/btoa/-/btoa-1.2.1.tgz 0ms (cache hit)
+npm http cache autoprefixer@https://registry.npmjs.org/autoprefixer/-/autoprefixer-10.5.0.tgz 0ms (cache hit)
+npm http cache baseline-browser-mapping@https://registry.npmjs.org/baseline-browser-mapping/-/baseline-browser-mapping-2.10.29.tgz 0ms (cache hit)
+npm http cache ansi-html-community@https://registry.npmjs.org/ansi-html-community/-/ansi-html-community-0.0.8.tgz 0ms (cache hit)
+npm http cache detect-port@https://registry.npmjs.org/detect-port/-/detect-port-1.6.1.tgz 0ms (cache hit)
+npm http cache acorn@https://registry.npmjs.org/acorn/-/acorn-8.16.0.tgz 0ms (cache hit)
+npm http cache which@https://registry.npmjs.org/which/-/which-6.0.1.tgz 0ms (cache hit)
+npm http cache js-yaml@https://registry.npmjs.org/js-yaml/-/js-yaml-4.1.1.tgz 0ms (cache hit)
+npm http cache @module-federation/enhanced@https://registry.npmjs.org/@module-federation/enhanced/-/enhanced-2.4.0.tgz 0ms (cache hit)
+npm http cache semver@https://registry.npmjs.org/semver/-/semver-7.6.3.tgz 0ms (cache hit)
+npm http cache jiti@https://registry.npmjs.org/jiti/-/jiti-2.4.2.tgz 0ms (cache hit)
+npm http cache @module-federation/cli@https://registry.npmjs.org/@module-federation/cli/-/cli-2.4.0.tgz 0ms (cache hit)
+npm http cache semver@https://registry.npmjs.org/semver/-/semver-7.6.3.tgz 0ms (cache hit)
+npm http cache which@https://registry.npmjs.org/which/-/which-6.0.1.tgz 0ms (cache hit)
+npm http cache glob@https://registry.npmjs.org/glob/-/glob-10.5.0.tgz 0ms (cache hit)
+npm http cache esbuild@https://registry.npmjs.org/esbuild/-/esbuild-0.25.5.tgz 0ms (cache hit)
+npm http cache js-yaml@https://registry.npmjs.org/js-yaml/-/js-yaml-4.1.1.tgz 0ms (cache hit)
+npm http cache semver@https://registry.npmjs.org/semver/-/semver-6.3.1.tgz 0ms (cache hit)
+npm http cache semver@https://registry.npmjs.org/semver/-/semver-6.3.1.tgz 0ms (cache hit)
+npm http cache resolve@https://registry.npmjs.org/resolve/-/resolve-1.22.12.tgz 0ms (cache hit)
+npm http cache semver@https://registry.npmjs.org/semver/-/semver-6.3.1.tgz 0ms (cache hit)
+npm http cache semver@https://registry.npmjs.org/semver/-/semver-6.3.1.tgz 0ms (cache hit)
+npm http cache semver@https://registry.npmjs.org/semver/-/semver-6.3.1.tgz 0ms (cache hit)
+npm http cache semver@https://registry.npmjs.org/semver/-/semver-6.3.1.tgz 0ms (cache hit)
+npm http cache is-docker@https://registry.npmjs.org/is-docker/-/is-docker-2.2.1.tgz 0ms (cache hit)
+npm http cache js-yaml@https://registry.npmjs.org/js-yaml/-/js-yaml-4.1.1.tgz 0ms (cache hit)
+npm http cache yaml@https://registry.npmjs.org/yaml/-/yaml-2.9.0.tgz 0ms (cache hit)
+npm http cache which@https://registry.npmjs.org/which/-/which-6.0.1.tgz 0ms (cache hit)
+npm http cache semver@https://registry.npmjs.org/semver/-/semver-5.7.2.tgz 0ms (cache hit)
+npm http cache glob@https://registry.npmjs.org/glob/-/glob-10.5.0.tgz 0ms (cache hit)
+npm http cache glob@https://registry.npmjs.org/glob/-/glob-10.5.0.tgz 0ms (cache hit)
+npm http cache which@https://registry.npmjs.org/which/-/which-1.3.1.tgz 0ms (cache hit)
+npm http cache sass@https://registry.npmjs.org/sass/-/sass-1.99.0.tgz 0ms (cache hit)
+npm http cache semver@https://registry.npmjs.org/semver/-/semver-6.3.1.tgz 0ms (cache hit)
+npm http cache sass@https://registry.npmjs.org/sass/-/sass-1.99.0.tgz 0ms (cache hit)
+npm warn deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm info run lmdb@3.5.1 install node_modules/lmdb node-gyp-build-optional-packages
+npm info run msgpackr-extract@3.0.3 install node_modules/msgpackr-extract node-gyp-build-optional-packages
+npm info run msgpackr-extract@3.0.3 install { code: 0, signal: null }
+npm info run lmdb@3.5.1 install { code: 0, signal: null }
+npm info run esbuild@0.27.3 postinstall node_modules/esbuild node install.js
+npm info run nx@21.6.11 postinstall node_modules/nx node ./bin/post-install || exit 0
+npm info run esbuild@0.25.5 postinstall node_modules/@modern-js/node-bundle-require/node_modules/esbuild node install.js
+npm http fetch POST 200 https://registry.npmjs.org/-/npm/v1/security/advisories/bulk 1052ms
+npm http cache https://registry.npmjs.org/koa 8ms (cache hit)
+npm http cache https://registry.npmjs.org/minimatch 11ms (cache hit)
+npm http cache https://registry.npmjs.org/serialize-javascript 12ms (cache hit)
+npm http cache https://registry.npmjs.org/picomatch 13ms (cache hit)
+npm http cache https://registry.npmjs.org/@nx%2fdevkit 7ms (cache hit)
+npm http cache https://registry.npmjs.org/@nx%2fjest 42ms (cache hit)
+npm http cache https://registry.npmjs.org/nx 90ms (cache hit)
+npm info run esbuild@0.25.5 postinstall { code: 0, signal: null }
+npm info run esbuild@0.27.3 postinstall { code: 0, signal: null }
+npm http cache https://registry.npmjs.org/@nx%2fjs 11ms (cache hit)
+npm info run nx@21.6.11 postinstall { code: 0, signal: null }
+npm http fetch GET 200 https://registry.npmjs.org/@nx%2fangular 2365ms (cache miss)
+npm http fetch GET 200 https://registry.npmjs.org/@nx%2fworkspace 2939ms (cache miss)
+npm http fetch GET 200 https://registry.npmjs.org/@module-federation%2fdts-plugin 758ms (cache miss)
+npm http fetch GET 200 https://registry.npmjs.org/copy-webpack-plugin 142ms (cache miss)
+npm http fetch GET 200 https://registry.npmjs.org/css-minimizer-webpack-plugin 165ms (cache miss)
+npm http fetch GET 200 https://registry.npmjs.org/@nx%2fdocker 2392ms (cache miss)
+npm http fetch GET 200 https://registry.npmjs.org/@nx%2feslint 3968ms (cache miss)
+npm http fetch GET 200 https://registry.npmjs.org/@nx%2fmodule-federation 4051ms (cache miss)
+npm http fetch GET 200 https://registry.npmjs.org/@nx%2frspack 4333ms (cache miss)
+npm http fetch GET 200 https://registry.npmjs.org/@nx%2fweb 5065ms (cache miss)
+npm http fetch GET 200 https://registry.npmjs.org/@nx%2fnode 5127ms (cache miss)
+npm http fetch GET 200 https://registry.npmjs.org/@nx%2fwebpack 5204ms (cache miss)
+npm http fetch GET 200 https://registry.npmjs.org/@nx%2fnest 5263ms (cache miss)
+npm http fetch GET 200 https://registry.npmjs.org/@module-federation%2fcli 1042ms (cache miss)
+npm http fetch GET 200 https://registry.npmjs.org/@module-federation%2fmanifest 1462ms (cache miss)
+npm http fetch GET 200 https://registry.npmjs.org/@module-federation%2frspack 1785ms (cache miss)
+npm http fetch GET 200 https://registry.npmjs.org/@module-federation%2fenhanced 2107ms (cache miss)
+
+changed 282 packages, and audited 2233 packages in 27s
+
+327 packages are looking for funding
+  run `npm fund` for details
+
+25 vulnerabilities (5 moderate, 20 high)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+npm verbose cwd /home/sc1zox/code/settlers-of-catan
+npm verbose os Linux 7.0.5-arch1-1
+npm verbose node v26.1.0
+npm verbose npm  v11.6.1
+npm verbose exit 0
+npm info ok

@@ -7,16 +7,16 @@ import {
   PlayerSeat,
   ResourceType,
 } from '@catan/api-interfaces';
-import { makeStandardLandPlacements } from '@catan/shared-game-field';
-import type { TilePlacement } from '@catan/shared-game-field';
-import { TurnStateMachine } from './turn-state-machine';
 import {
-  BoardEdgeRuntime,
-  BoardVertexRuntime,
   createBoardTopology,
-} from './board-topology';
+  makeStandardLandPlacements,
+  type BoardEdgeRuntime,
+  type BoardVertexRuntime,
+  type TilePlacement,
+} from '@catan/shared-game-field';
+import { TurnStateMachine } from './turn-state-machine';
 
-const SEATS: readonly PlayerSeat[] = [
+export const CLOCKWISE_SEATS: readonly PlayerSeat[] = [
   PlayerSeat.North,
   PlayerSeat.East,
   PlayerSeat.South,
@@ -117,8 +117,8 @@ export class LobbyRuntime {
   }
 
   public nextFreeSeat(): PlayerSeat | undefined {
-    for (let s = 0; s < SEATS.length; s++) {
-      const seat = SEATS[s];
+    for (let s = 0; s < CLOCKWISE_SEATS.length; s += 1) {
+      const seat = CLOCKWISE_SEATS[s];
       let taken = false;
       for (let p = 0; p < this.players.length; p++) {
         if (this.players[p].seat === seat) {

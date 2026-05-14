@@ -27,16 +27,32 @@ export function getTotalVictoryPoints(player: LobbyPlayerSlot): number {
   return player.visibleVictoryPoints + hiddenVictoryCards + bonus;
 }
 
-export function recomputeWinner(lobby: LobbyRuntime, triggeringSeat: PlayerSeat): void {
+export function recomputeWinner(lobby: LobbyRuntime): void {
   if (lobby.winnerSeat !== null) {
     return;
   }
-  const player = lobby.findPlayerBySeat(triggeringSeat);
-  if (!player) {
-    return;
+  for (let i = 0; i < lobby.players.length; i += 1) {
+    const player = lobby.players[i];
+    if (getTotalVictoryPoints(player) >= 10) {
+      lobby.winnerSeat = player.seat;
+      return;
+    }
   }
-  if (getTotalVictoryPoints(player) >= 10) {
-    lobby.winnerSeat = player.seat;
+}
+
+/**
+ * Single end-of-action scoring pass: refresh longest-road / largest-army,
+ * recompute the winner, and lock the FSM into Finished if anyone hit 10 VP.
+ *
+ * Centralized so every state-mutating handler ends with the same scoring
+ * order, and so the Finished transition lives in exactly one place.
+ */
+export function applyPostActionScoring(lobby: LobbyRuntime): void {
+  recomputeLongestRoad(lobby);
+  recomputeLargestArmy(lobby);
+  recomputeWinner(lobby);
+  if (lobby.winnerSeat !== null) {
+    lobby.fsm.onWinnerDeclared();
   }
 }
 

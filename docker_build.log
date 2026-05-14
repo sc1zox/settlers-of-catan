@@ -1,0 +1,15 @@
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+Sending build context to Docker daemon  1.776MB
+Step 1/7 : FROM node:24-bookworm-slim AS base
+ ---> 24dc26ef1e3c
+Step 2/7 : WORKDIR /workspace
+ ---> Using cache
+ ---> 0030e0619b83
+Step 3/7 : COPY package.json package-lock.json .npmrc ./
+ ---> Using cache
+ ---> ccbdce65c25d
+Step 4/7 : RUN --mount=type=cache,target=/root/.npm npm ci
+the --mount option requires BuildKit. Refer to https://docs.docker.com/go/buildkit/ to learn how to build images with BuildKit enabled

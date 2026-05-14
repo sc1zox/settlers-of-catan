@@ -1,14 +1,32 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
+  BuildKind,
   DefaultDisplayName,
   GamePhase,
   KnownLobbyId,
   LobbyFullStatePayload,
+  LobbyPlayerPublicDto,
   PlayerSeat,
   ResourceType,
+  TradeOfferDto,
 } from '@catan/api-interfaces';
-import { GameCanvasComponent } from './game-canvas/game-canvas';
+import { GameCanvasComponent, RobberTilePick } from './game-canvas/game-canvas';
+import { BuildConfirmModel, BuildConfirmPopoverComponent } from './game-canvas/build-confirm-popover';
+import { DiscardModalComponent, DiscardModalModel } from './game-canvas/discard-modal';
+import { DevCardModalComponent, YearOfPlentyPick } from './game-canvas/dev-card-modal';
+import {
+  BankTradeRequest,
+  ProposeTradeRequest,
+  TradePanelComponent,
+  TradePartner,
+} from './game-canvas/trade-panel';
+import {
+  RobberVictimCandidate,
+  RobberVictimModel,
+  RobberVictimPopoverComponent,
+} from './game-canvas/robber-victim-popover';
+import { SpectatorCameraService, SpectatorCameraToggleComponent } from './features/spectator-camera';
 import { GameStateResource } from './game/game-state.resource';
 import {
   LobbySeatUiState,
@@ -19,12 +37,22 @@ import {
   UiFeedbackTone,
 } from './shared/types/lobby-ui-state';
 import { PlayerSessionService } from './http/player-session.service';
+import { collectRobberVictimSeats } from '@catan/shared-game-field';
 
 @Component({
   selector: 'app-lobby-shell',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [GameCanvasComponent, ReactiveFormsModule],
+  imports: [
+    GameCanvasComponent,
+    ReactiveFormsModule,
+    BuildConfirmPopoverComponent,
+    DiscardModalComponent,
+    DevCardModalComponent,
+    TradePanelComponent,
+    RobberVictimPopoverComponent,
+    SpectatorCameraToggleComponent,
+  ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
@@ -32,6 +60,7 @@ export class LobbyShellComponent {
   private readonly fb = inject(FormBuilder);
   private readonly gameState = inject(GameStateResource);
   private readonly playerSession = inject(PlayerSessionService);
+  private readonly spectatorCamService = inject(SpectatorCameraService);
 
   public readonly uiStep = signal<LobbyUiStep>(LobbyUiStep.SignIn);
   public readonly feedback = signal<UiFeedbackState | null>(null);
@@ -47,59 +76,23 @@ export class LobbyShellComponent {
       validators: [Validators.required, Validators.minLength(2)],
     }),
   });
-  public readonly settlementForm = this.fb.nonNullable.group({
-    vertexId: ['', [Validators.required]],
-  });
-  public readonly roadForm = this.fb.nonNullable.group({
-    edgeId: ['', [Validators.required]],
-  });
-  public readonly cityForm = this.fb.nonNullable.group({
-    vertexId: ['', [Validators.required]],
-  });
-  public readonly roadBuildingForm = this.fb.nonNullable.group({
-    firstEdgeId: ['', [Validators.required]],
-    secondEdgeId: '',
-  });
-  public readonly robberMoveForm = this.fb.nonNullable.group({
-    q: '0',
-    r: '0',
-    victimSeat: '',
-  });
-  public readonly monopolyForm = this.fb.nonNullable.group({
-    resource: ResourceType.Wheat,
-  });
-  public readonly plentyForm = this.fb.nonNullable.group({
-    first: ResourceType.Wood,
-    second: ResourceType.Brick,
-  });
-  public readonly bankTradeForm = this.fb.nonNullable.group({
-    giveResource: ResourceType.Wood,
-    giveAmount: ['4', [Validators.required]],
-    receiveResource: ResourceType.Brick,
-  });
-  public readonly discardForm = this.fb.nonNullable.group({
-    wood: '0',
-    brick: '0',
-    wheat: '0',
-    wool: '0',
-    ore: '0',
-  });
-  public readonly tradeProposeForm = this.fb.nonNullable.group({
-    toSeat: String(PlayerSeat.East),
-    offerWood: '0',
-    offerBrick: '0',
-    offerWheat: '0',
-    offerWool: '0',
-    offerOre: '0',
-    requestWood: '0',
-    requestBrick: '0',
-    requestWheat: '0',
-    requestWool: '0',
-    requestOre: '0',
-  });
-  public readonly tradeRespondForm = this.fb.nonNullable.group({
-    tradeId: ['', [Validators.required]],
-  });
+
+  // === In-game interaction state ===
+  /** Active build kind — drives the 3D ghost figures. */
+  public readonly buildMode = signal<BuildKind | null>(null);
+  /** When true the road ghosts use the cost-free road-building dev-card list. */
+  public readonly freeRoadMode = signal<boolean>(false);
+  /** Pending build-spot confirmation popover. */
+  public readonly buildConfirm = signal<BuildConfirmModel | null>(null);
+  /** Road-building dev card in progress — holds the first chosen edge. */
+  private readonly roadBuildingFirstEdgeId = signal<string | null>(null);
+  /** Knight card played: robber placement is active outside the RobberMove phase. */
+  private readonly knightActive = signal<boolean>(false);
+  /** Robber tile picked, waiting for victim selection. */
+  private readonly pendingRobberCoord = signal<{ q: number; r: number } | null>(null);
+  public readonly robberVictim = signal<RobberVictimModel | null>(null);
+  public readonly tradeOpen = signal<boolean>(false);
+  public readonly devCardOpen = signal<boolean>(false);
 
   public readonly lobbyUiState = computed<LobbyUiState | null>(() => {
     const lobbyState = this.gameState.lobby.value();
@@ -109,21 +102,19 @@ export class LobbyShellComponent {
     return this.mapLobbyState(lobbyState);
   });
 
+  private readonly rawLobbyState = computed<LobbyFullStatePayload | undefined>(() =>
+    this.gameState.lobby.value(),
+  );
+
   public readonly isLobbyLoading = computed<boolean>(() => this.gameState.lobby.isLoading());
   public readonly isJoinInProgress = computed<boolean>(() => this.joinInProgress());
   public readonly activeSeatLabel = computed<string>(() => {
     const state = this.lobbyUiState();
-    if (state === null) {
-      return '-';
-    }
-    return this.seatLabel(state.activeSeat);
+    return state === null ? '-' : this.seatLabel(state.activeSeat);
   });
   public readonly phaseLabel = computed<string>(() => {
     const state = this.lobbyUiState();
-    if (state === null) {
-      return '-';
-    }
-    return this.phaseToLabel(state.phase);
+    return state === null ? '-' : this.phaseToLabel(state.phase);
   });
   public readonly longestRoadLabel = computed<string>(() => {
     const state = this.lobbyUiState();
@@ -152,12 +143,18 @@ export class LobbyShellComponent {
       return null;
     }
     for (let i = 0; i < state.seats.length; i += 1) {
-      const seat = state.seats[i];
-      if (seat.isSelf) {
-        return seat.seat;
+      if (state.seats[i].isSelf) {
+        return state.seats[i].seat;
       }
     }
     return null;
+  });
+  private readonly selfPlayer = computed<LobbyPlayerPublicDto | undefined>(() => {
+    const payload = this.rawLobbyState();
+    if (payload === undefined) {
+      return undefined;
+    }
+    return payload.players.find((player) => player.isSelf);
   });
   public readonly isSelfTurn = computed<boolean>(() => {
     const state = this.lobbyUiState();
@@ -173,47 +170,50 @@ export class LobbyShellComponent {
       return false;
     }
     for (let i = 0; i < state.seats.length; i += 1) {
-      const seat = state.seats[i];
-      if (seat.isSelf) {
-        return seat.seat === state.adminSeat;
+      if (state.seats[i].isSelf) {
+        return state.seats[i].seat === state.adminSeat;
       }
     }
     return false;
   });
-  public readonly canStartLobby = computed<boolean>(() => {
-    const state = this.lobbyUiState();
-    if (state === null) {
-      return false;
-    }
-    return this.isLobbyAdmin() && state.phase === GamePhase.LobbyWaiting;
+  public readonly canStartLobby = computed<boolean>(
+    () => this.isLobbyAdmin() && this.lobbyUiState()?.phase === GamePhase.LobbyWaiting,
+  );
+  public readonly canRollDice = computed<boolean>(
+    () => this.isSelfTurn() && this.lobbyUiState()?.phase === GamePhase.Rolling,
+  );
+  public readonly canFinishTrading = computed<boolean>(
+    () => this.isSelfTurn() && this.lobbyUiState()?.phase === GamePhase.Trading,
+  );
+  public readonly canEndTurn = computed<boolean>(
+    () => this.isSelfTurn() && this.lobbyUiState()?.phase === GamePhase.Building,
+  );
+  public readonly canOpenTrade = computed<boolean>(
+    () => this.lobbyUiState()?.phase === GamePhase.Trading,
+  );
+  public readonly canBuyDevCard = computed<boolean>(() => this.canEndTurn());
+  public readonly canPlayDevCard = computed<boolean>(() => {
+    const phase = this.lobbyUiState()?.phase;
+    return this.isSelfTurn() && (phase === GamePhase.Trading || phase === GamePhase.Building);
   });
-  public readonly canRollDice = computed<boolean>(() => {
+  public readonly canMoveRobber = computed<boolean>(
+    () => this.isSelfTurn() && this.lobbyUiState()?.phase === GamePhase.RobberMove,
+  );
+
+  private readonly setupPendingRoadVertexId = computed<string | null>(() => {
     const state = this.lobbyUiState();
-    if (state === null) {
-      return false;
+    const seat = this.selfSeat();
+    if (state === null || seat === null || state.pendingSetupRoadSeat !== seat) {
+      return null;
     }
-    return this.isSelfTurn() && state.phase === GamePhase.Rolling;
-  });
-  public readonly canFinishTrading = computed<boolean>(() => {
-    const state = this.lobbyUiState();
-    if (state === null) {
-      return false;
-    }
-    return this.isSelfTurn() && state.phase === GamePhase.Trading;
-  });
-  public readonly canEndTurn = computed<boolean>(() => {
-    const state = this.lobbyUiState();
-    if (state === null) {
-      return false;
-    }
-    return this.isSelfTurn() && state.phase === GamePhase.Building;
+    return state.pendingSetupRoadFromVertexId;
   });
   public readonly canBuildSettlement = computed<boolean>(() => {
     const state = this.lobbyUiState();
+    const seat = this.selfSeat();
     if (state === null) {
       return false;
     }
-    const seat = this.selfSeat();
     const setupPendingForSelf =
       seat !== null &&
       state.pendingSetupRoadSeat === seat &&
@@ -225,41 +225,9 @@ export class LobbyShellComponent {
           !setupPendingForSelf))
     );
   });
-  public readonly setupPendingRoadVertexId = computed<string | null>(() => {
-    const state = this.lobbyUiState();
-    const seat = this.selfSeat();
-    if (state === null || seat === null) {
-      return null;
-    }
-    if (state.pendingSetupRoadSeat !== seat) {
-      return null;
-    }
-    return state.pendingSetupRoadFromVertexId;
-  });
-  public readonly availableRoadEdgeIds = computed<readonly string[]>(() => {
-    const state = this.lobbyUiState();
-    if (state === null) {
-      return [];
-    }
-    const pendingVertexId = this.setupPendingRoadVertexId();
-    if (pendingVertexId === null) {
-      return state.edgeIds;
-    }
-    const filtered: string[] = [];
-    for (let i = 0; i < state.edgeIds.length; i += 1) {
-      const edgeId = state.edgeIds[i];
-      if (this.edgeTouchesVertex(edgeId, pendingVertexId)) {
-        filtered.push(edgeId);
-      }
-    }
-    return filtered;
-  });
   public readonly canBuildRoad = computed<boolean>(() => {
     const state = this.lobbyUiState();
-    if (state === null) {
-      return false;
-    }
-    if (!this.isSelfTurn()) {
+    if (state === null || !this.isSelfTurn()) {
       return false;
     }
     if (state.phase === GamePhase.Building) {
@@ -270,59 +238,46 @@ export class LobbyShellComponent {
     }
     return false;
   });
-  public readonly canSubmitRobberDiscard = computed<boolean>(() => {
+  public readonly canBuildCity = computed<boolean>(() => this.canEndTurn());
+
+  /** Robber placement is active either during RobberMove or after a Knight card. */
+  public readonly robberMode = computed<boolean>(
+    () => this.canMoveRobber() || this.knightActive(),
+  );
+
+  public readonly discardModel = computed<DiscardModalModel | null>(() => {
     const state = this.lobbyUiState();
     const seat = this.selfSeat();
-    if (state === null || seat === null) {
-      return false;
+    const self = this.selfPlayer();
+    if (state === null || seat === null || self === undefined) {
+      return null;
     }
     if (state.phase !== GamePhase.RobberDiscard) {
-      return false;
+      return null;
     }
-    return state.pendingRobberDiscardSeats.includes(seat);
-  });
-  public readonly canMoveRobber = computed<boolean>(() => {
-    const state = this.lobbyUiState();
-    if (state === null) {
-      return false;
+    if (!state.pendingRobberDiscardSeats.includes(seat)) {
+      return null;
     }
-    return this.isSelfTurn() && state.phase === GamePhase.RobberMove;
+    const total = this.totalResources(self.resources);
+    return { required: Math.floor(total / 2), handCounts: self.resources };
   });
-  public readonly canProposeTrade = computed<boolean>(() => this.canFinishTrading());
-  public readonly canBuildCity = computed<boolean>(() => this.canEndTurn());
-  public readonly canBuyDevCard = computed<boolean>(() => this.canEndTurn());
-  public readonly canPlayDevCard = computed<boolean>(() => {
-    const state = this.lobbyUiState();
-    if (state === null) {
-      return false;
+  public readonly tradePartners = computed<readonly TradePartner[]>(() => {
+    const payload = this.rawLobbyState();
+    if (payload === undefined) {
+      return [];
     }
-    return this.isSelfTurn() && (state.phase === GamePhase.Trading || state.phase === GamePhase.Building);
+    return payload.players
+      .filter((player) => !player.isSelf)
+      .map((player) => ({ seat: player.seat, name: player.displayName }));
   });
-  public readonly canBankTrade = computed<boolean>(() => this.canFinishTrading());
-  public readonly canRespondTrade = computed<boolean>(() => {
-    const state = this.lobbyUiState();
-    if (state === null) {
-      return false;
-    }
-    return state.phase === GamePhase.Trading;
-  });
-  public readonly lastTradeStatus = computed<string>(() => {
+  public readonly pendingTrade = computed<TradeOfferDto | null>(() => {
     const trade = this.gameState.tradeUpdated.value();
-    if (trade === undefined) {
-      return '-';
-    }
-    return trade.trade.status;
-  });
-  public readonly lastTradeId = computed<string>(() => {
-    const trade = this.gameState.tradeUpdated.value();
-    if (trade === undefined) {
-      return '';
-    }
-    return trade.trade.id;
+    return trade === undefined ? null : trade.trade;
   });
 
   public readonly lobbyUiStep = LobbyUiStep;
   public readonly uiFeedbackTone = UiFeedbackTone;
+
   private readonly phaseSync = effect(() => {
     const state = this.lobbyUiState();
     if (state === null) {
@@ -337,42 +292,6 @@ export class LobbyShellComponent {
     if (this.uiStep() !== LobbyUiStep.InGame) {
       this.uiStep.set(LobbyUiStep.InGame);
       this.setFeedback(UiFeedbackTone.Success, 'Spiel gestartet.');
-    }
-  });
-  private readonly tradeSync = effect(() => {
-    const trade = this.gameState.tradeUpdated.value();
-    if (trade === undefined) {
-      return;
-    }
-    this.tradeRespondForm.controls.tradeId.setValue(trade.trade.id);
-  });
-  private readonly topologySync = effect(() => {
-    const state = this.lobbyUiState();
-    if (state === null) {
-      return;
-    }
-    if (this.settlementForm.controls.vertexId.value.length === 0 && state.vertexIds.length > 0) {
-      this.settlementForm.controls.vertexId.setValue(state.vertexIds[0]);
-    }
-    if (this.roadForm.controls.edgeId.value.length === 0 && state.edgeIds.length > 0) {
-      this.roadForm.controls.edgeId.setValue(state.edgeIds[0]);
-    }
-    if (this.cityForm.controls.vertexId.value.length === 0 && state.vertexIds.length > 0) {
-      this.cityForm.controls.vertexId.setValue(state.vertexIds[0]);
-    }
-    if (
-      this.roadBuildingForm.controls.firstEdgeId.value.length === 0 &&
-      state.edgeIds.length > 0
-    ) {
-      this.roadBuildingForm.controls.firstEdgeId.setValue(state.edgeIds[0]);
-    }
-    const allowedRoadEdgeIds = this.availableRoadEdgeIds();
-    if (allowedRoadEdgeIds.length > 0) {
-      if (!allowedRoadEdgeIds.includes(this.roadForm.controls.edgeId.value)) {
-        this.roadForm.controls.edgeId.setValue(allowedRoadEdgeIds[0]);
-      }
-    } else if (this.roadForm.controls.edgeId.value.length > 0) {
-      this.roadForm.controls.edgeId.setValue('');
     }
   });
 
@@ -396,6 +315,7 @@ export class LobbyShellComponent {
 
   public backToSignIn(): void {
     this.joinInProgress.set(false);
+    this.spectatorCamService.reset();
     this.uiStep.set(LobbyUiStep.SignIn);
     this.setFeedback(UiFeedbackTone.Info, 'Bitte gib deinen Namen ein.');
   }
@@ -403,6 +323,7 @@ export class LobbyShellComponent {
   public backToJoinLobby(): void {
     this.gameState.disconnectLobby();
     this.joinInProgress.set(false);
+    this.spectatorCamService.reset();
     this.uiStep.set(LobbyUiStep.JoinLobby);
     this.setFeedback(UiFeedbackTone.Info, 'Waehle eine Lobby-ID und tritt erneut bei.');
   }
@@ -413,6 +334,7 @@ export class LobbyShellComponent {
     this.sessionState.set(null);
     this.joinInProgress.set(false);
     this.feedback.set(null);
+    this.spectatorCamService.reset();
     this.uiStep.set(LobbyUiStep.SignIn);
   }
 
@@ -420,24 +342,16 @@ export class LobbyShellComponent {
     this.feedback.set(null);
   }
 
-  public cancelAllIngameActions(): void {
-    this.cancelSettlementAction();
-    this.cancelRoadAction();
-    this.cancelCityAction();
-    this.cancelDevCardActions();
-    this.cancelBankTradeAction();
-    this.cancelDiscardAction();
-    this.cancelRobberAction();
-    this.cancelTradeProposeAction();
-    this.cancelTradeRespondAction();
-    this.clearFeedback();
-  }
-
   public startLobby(): void {
     this.gameState.startLobby();
   }
 
   public rollDice(): void {
+    // Reached from the menu button (already gated) and from a 3D die click —
+    // guard so a die click outside the roll phase is a no-op.
+    if (!this.canRollDice()) {
+      return;
+    }
     this.gameState.rollDice();
   }
 
@@ -449,239 +363,184 @@ export class LobbyShellComponent {
     this.gameState.endTurn();
   }
 
-  public buildSettlement(): void {
-    if (this.settlementForm.invalid) {
-      this.settlementForm.markAllAsTouched();
-      this.setFeedback(UiFeedbackTone.Error, 'Bitte waehle eine gueltige Vertex-ID.');
-      return;
-    }
-    const vertexId = this.settlementForm.controls.vertexId.value.trim();
-    if (vertexId.length === 0) {
-      return;
-    }
-    this.gameState.buildSettlement(vertexId);
-  }
-
-  public cancelSettlementAction(): void {
-    this.settlementForm.markAsPristine();
-    this.settlementForm.markAsUntouched();
-    const state = this.lobbyUiState();
-    if (state !== null && state.vertexIds.length > 0) {
-      this.settlementForm.controls.vertexId.setValue(state.vertexIds[0]);
-      return;
-    }
-    this.settlementForm.controls.vertexId.setValue('');
-  }
-
-  public buildRoad(): void {
-    if (this.roadForm.invalid) {
-      this.roadForm.markAllAsTouched();
-      this.setFeedback(UiFeedbackTone.Error, 'Bitte waehle eine gueltige Edge-ID.');
-      return;
-    }
-    const edgeId = this.roadForm.controls.edgeId.value.trim();
-    if (edgeId.length === 0) {
-      return;
-    }
-    this.gameState.buildRoad(edgeId);
-  }
-
-  public cancelRoadAction(): void {
-    this.roadForm.markAsPristine();
-    this.roadForm.markAsUntouched();
-    const roadOptions = this.availableRoadEdgeIds();
-    if (roadOptions.length > 0) {
-      this.roadForm.controls.edgeId.setValue(roadOptions[0]);
-      return;
-    }
-    this.roadForm.controls.edgeId.setValue('');
-  }
-
-  public buildCity(): void {
-    if (this.cityForm.invalid) {
-      this.cityForm.markAllAsTouched();
-      this.setFeedback(UiFeedbackTone.Error, 'Bitte waehle eine gueltige Vertex-ID.');
-      return;
-    }
-    const vertexId = this.cityForm.controls.vertexId.value.trim();
-    if (vertexId.length === 0) {
-      return;
-    }
-    this.gameState.buildCity(vertexId);
-  }
-
-  public cancelCityAction(): void {
-    this.cityForm.markAsPristine();
-    this.cityForm.markAsUntouched();
-    const state = this.lobbyUiState();
-    if (state !== null && state.vertexIds.length > 0) {
-      this.cityForm.controls.vertexId.setValue(state.vertexIds[0]);
-      return;
-    }
-    this.cityForm.controls.vertexId.setValue('');
-  }
-
   public buyDevCard(): void {
     this.gameState.buyDevCard();
   }
 
-  public cancelDevCardActions(): void {
-    this.monopolyForm.reset({ resource: ResourceType.Wheat });
-    this.plentyForm.reset({ first: ResourceType.Wood, second: ResourceType.Brick });
-    const state = this.lobbyUiState();
-    const defaultEdge = state !== null && state.edgeIds.length > 0 ? state.edgeIds[0] : '';
-    this.roadBuildingForm.reset({
-      firstEdgeId: defaultEdge,
-      secondEdgeId: '',
-    });
-    this.robberMoveForm.reset({ q: '0', r: '0', victimSeat: '' });
+  // === Build flow ===
+
+  /** A figure in the player's own arsenal was clicked — enter build mode if allowed. */
+  public onArsenalBuild(kind: BuildKind): void {
+    if (kind === BuildKind.Settlement && this.canBuildSettlement()) {
+      this.enterBuildMode(BuildKind.Settlement);
+    } else if (kind === BuildKind.Road && this.canBuildRoad()) {
+      this.enterBuildMode(BuildKind.Road);
+    } else if (kind === BuildKind.City && this.canBuildCity()) {
+      this.enterBuildMode(BuildKind.City);
+    }
   }
 
-  public submitRobberDiscard(): void {
-    if (!this.isValidResourceInputs('discard')) {
-      this.setFeedback(UiFeedbackTone.Error, 'Raeuber-Abwurf muss aus gueltigen Ganzzahlen bestehen.');
+  public onBuildSpotPicked(model: BuildConfirmModel): void {
+    this.buildConfirm.set(model);
+  }
+
+  public confirmBuild(): void {
+    const pending = this.buildConfirm();
+    if (pending === null) {
       return;
     }
-    this.gameState.submitRobberDiscard(this.readResourceMap('discard'));
-  }
-
-  public cancelDiscardAction(): void {
-    this.discardForm.reset({
-      wood: '0',
-      brick: '0',
-      wheat: '0',
-      wool: '0',
-      ore: '0',
-    });
-  }
-
-  public moveRobber(): void {
-    if (!this.isValidIntegerInput(this.robberMoveForm.controls.q.value) || !this.isValidIntegerInput(this.robberMoveForm.controls.r.value)) {
-      this.setFeedback(UiFeedbackTone.Error, 'Raeuber-Koordinaten muessen Ganzzahlen sein.');
+    this.buildConfirm.set(null);
+    if (this.freeRoadMode()) {
+      const firstEdgeId = this.roadBuildingFirstEdgeId();
+      if (firstEdgeId === null) {
+        // First of the two free roads — keep build mode for the second pick.
+        this.roadBuildingFirstEdgeId.set(pending.id);
+        return;
+      }
+      this.gameState.playRoadBuilding(firstEdgeId, pending.id);
+      this.exitBuildMode();
       return;
     }
-    const q = this.parseIntOrZero(this.robberMoveForm.controls.q.value);
-    const r = this.parseIntOrZero(this.robberMoveForm.controls.r.value);
-    const victimSeat = this.parseOptionalSeat(this.robberMoveForm.controls.victimSeat.value);
-    this.gameState.moveRobber(q, r, victimSeat);
-  }
-
-  public cancelRobberAction(): void {
-    this.robberMoveForm.reset({ q: '0', r: '0', victimSeat: '' });
-  }
-
-  public playKnight(): void {
-    if (!this.isValidIntegerInput(this.robberMoveForm.controls.q.value) || !this.isValidIntegerInput(this.robberMoveForm.controls.r.value)) {
-      this.setFeedback(UiFeedbackTone.Error, 'Ritter braucht gueltige Raeuber-Koordinaten.');
-      return;
+    if (pending.kind === BuildKind.Settlement) {
+      this.gameState.buildSettlement(pending.id);
+    } else if (pending.kind === BuildKind.Road) {
+      this.gameState.buildRoad(pending.id);
+    } else {
+      this.gameState.buildCity(pending.id);
     }
-    const q = this.parseIntOrZero(this.robberMoveForm.controls.q.value);
-    const r = this.parseIntOrZero(this.robberMoveForm.controls.r.value);
-    const victimSeat = this.parseOptionalSeat(this.robberMoveForm.controls.victimSeat.value);
-    this.gameState.playKnight(q, r, victimSeat);
   }
 
-  public playMonopoly(): void {
-    this.gameState.playMonopoly(this.monopolyForm.controls.resource.value);
+  public cancelBuild(): void {
+    this.buildConfirm.set(null);
   }
 
-  public playYearOfPlenty(): void {
-    this.gameState.playYearOfPlenty(
-      this.plentyForm.controls.first.value,
-      this.plentyForm.controls.second.value,
-    );
+  public onBuildModeCancelled(): void {
+    this.exitBuildMode();
   }
 
-  public playRoadBuilding(): void {
-    if (this.roadBuildingForm.controls.firstEdgeId.invalid) {
-      this.roadBuildingForm.controls.firstEdgeId.markAsTouched();
-      this.setFeedback(UiFeedbackTone.Error, 'Bitte waehle mindestens eine gueltige Edge-ID.');
-      return;
+  private enterBuildMode(kind: BuildKind): void {
+    this.freeRoadMode.set(false);
+    this.roadBuildingFirstEdgeId.set(null);
+    this.buildConfirm.set(null);
+    this.buildMode.set(kind);
+  }
+
+  private exitBuildMode(): void {
+    this.buildMode.set(null);
+    this.freeRoadMode.set(false);
+    this.roadBuildingFirstEdgeId.set(null);
+    this.buildConfirm.set(null);
+  }
+
+  // === Robber flow ===
+
+  public onRobberTilePicked(pick: RobberTilePick): void {
+    this.pendingRobberCoord.set({ q: pick.q, r: pick.r });
+    const payload = this.rawLobbyState();
+    const selfSeat = this.selfSeat();
+    let candidates: RobberVictimCandidate[] = [];
+    if (payload !== undefined && selfSeat !== null) {
+      const victimSeats = collectRobberVictimSeats(
+        payload.tiles,
+        payload.settlements.map((s) => ({ seat: s.seat, vertexId: s.vertexId })),
+        payload.players.map((p) => ({
+          seat: p.seat,
+          totalResourceCards: this.totalResources(p.resources),
+        })),
+        selfSeat,
+        pick.q,
+        pick.r,
+      );
+      const allowed = new Set(victimSeats);
+      candidates = payload.players
+        .filter((p) => allowed.has(p.seat))
+        .map((p) => ({ seat: p.seat, name: p.displayName }));
     }
-    const first = this.roadBuildingForm.controls.firstEdgeId.value.trim();
-    if (first.length === 0) {
-      return;
-    }
-    const secondRaw = this.roadBuildingForm.controls.secondEdgeId.value.trim();
-    const second = secondRaw.length > 0 ? secondRaw : undefined;
-    this.gameState.playRoadBuilding(first, second);
+    this.robberVictim.set({ x: pick.x, y: pick.y, candidates });
   }
 
-  public bankTrade(): void {
-    if (!this.isValidPositiveIntegerInput(this.bankTradeForm.controls.giveAmount.value)) {
-      this.bankTradeForm.controls.giveAmount.markAsTouched();
-      this.setFeedback(UiFeedbackTone.Error, 'Bankhandel braucht eine positive Ganzzahl als Menge.');
-      return;
+  public onRobberVictimPick(victimSeat: PlayerSeat | null): void {
+    const coord = this.pendingRobberCoord();
+    if (coord !== null) {
+      if (this.knightActive()) {
+        this.gameState.playKnight(coord.q, coord.r, victimSeat ?? undefined);
+        this.knightActive.set(false);
+      } else {
+        this.gameState.moveRobber(coord.q, coord.r, victimSeat ?? undefined);
+      }
     }
-    const giveAmount = this.parseIntOrZero(this.bankTradeForm.controls.giveAmount.value);
-    this.gameState.bankTrade(
-      this.bankTradeForm.controls.giveResource.value,
-      giveAmount,
-      this.bankTradeForm.controls.receiveResource.value,
-    );
+    this.pendingRobberCoord.set(null);
+    this.robberVictim.set(null);
   }
 
-  public cancelBankTradeAction(): void {
-    this.bankTradeForm.reset({
-      giveResource: ResourceType.Wood,
-      giveAmount: '4',
-      receiveResource: ResourceType.Brick,
-    });
+  // === Trade flow ===
+
+  public openTrade(): void {
+    this.tradeOpen.set(true);
   }
 
-  public proposeTrade(): void {
-    if (!this.isValidResourceInputs('offer') || !this.isValidResourceInputs('request')) {
-      this.setFeedback(UiFeedbackTone.Error, 'Handelswerte muessen gueltige nicht-negative Ganzzahlen sein.');
-      return;
-    }
-    const toSeat = this.parseSeatOrDefault(this.tradeProposeForm.controls.toSeat.value, PlayerSeat.East);
-    this.gameState.proposeTrade(toSeat, this.readResourceMap('offer'), this.readResourceMap('request'));
+  public closeTrade(): void {
+    this.tradeOpen.set(false);
   }
 
-  public cancelTradeProposeAction(): void {
-    this.tradeProposeForm.reset({
-      toSeat: String(PlayerSeat.East),
-      offerWood: '0',
-      offerBrick: '0',
-      offerWheat: '0',
-      offerWool: '0',
-      offerOre: '0',
-      requestWood: '0',
-      requestBrick: '0',
-      requestWheat: '0',
-      requestWool: '0',
-      requestOre: '0',
-    });
+  public onBankTrade(request: BankTradeRequest): void {
+    this.gameState.bankTrade(request.give, request.amount, request.receive);
+    this.tradeOpen.set(false);
   }
 
-  public acceptTrade(): void {
-    if (this.tradeRespondForm.invalid) {
-      this.tradeRespondForm.markAllAsTouched();
-      this.setFeedback(UiFeedbackTone.Error, 'Bitte gib eine gueltige tradeId ein.');
-      return;
-    }
-    const tradeId = this.tradeRespondForm.controls.tradeId.value.trim();
-    if (tradeId.length === 0) {
-      return;
-    }
+  public onProposeTrade(request: ProposeTradeRequest): void {
+    this.gameState.proposeTrade(request.toSeat, request.offer, request.request);
+    this.tradeOpen.set(false);
+  }
+
+  public onAcceptTrade(tradeId: string): void {
     this.gameState.acceptTrade(tradeId);
+    this.tradeOpen.set(false);
   }
 
-  public rejectTrade(): void {
-    if (this.tradeRespondForm.invalid) {
-      this.tradeRespondForm.markAllAsTouched();
-      this.setFeedback(UiFeedbackTone.Error, 'Bitte gib eine gueltige tradeId ein.');
-      return;
-    }
-    const tradeId = this.tradeRespondForm.controls.tradeId.value.trim();
-    if (tradeId.length === 0) {
-      return;
-    }
+  public onRejectTrade(tradeId: string): void {
     this.gameState.rejectTrade(tradeId);
   }
 
-  public cancelTradeRespondAction(): void {
-    this.tradeRespondForm.reset({ tradeId: '' });
+  // === Dev card flow ===
+
+  public onDevCardClicked(): void {
+    if (this.canPlayDevCard()) {
+      this.devCardOpen.set(true);
+    }
+  }
+
+  public closeDevCard(): void {
+    this.devCardOpen.set(false);
+  }
+
+  public onPlayKnight(): void {
+    this.devCardOpen.set(false);
+    this.knightActive.set(true);
+  }
+
+  public onPlayMonopoly(resource: ResourceType): void {
+    this.gameState.playMonopoly(resource);
+    this.devCardOpen.set(false);
+  }
+
+  public onPlayYearOfPlenty(pick: YearOfPlentyPick): void {
+    this.gameState.playYearOfPlenty(pick.first, pick.second);
+    this.devCardOpen.set(false);
+  }
+
+  public onPlayRoadBuilding(): void {
+    this.devCardOpen.set(false);
+    this.roadBuildingFirstEdgeId.set(null);
+    this.buildConfirm.set(null);
+    this.freeRoadMode.set(true);
+    this.buildMode.set(BuildKind.Road);
+  }
+
+  // === Discard flow ===
+
+  public onSubmitDiscard(discard: Readonly<Record<ResourceType, number>>): void {
+    this.gameState.submitRobberDiscard(discard);
   }
 
   private async runStartSession(): Promise<void> {
@@ -731,6 +590,15 @@ export class LobbyShellComponent {
 
   private setFeedback(tone: UiFeedbackTone, message: string): void {
     this.feedback.set({ tone, message });
+  }
+
+  private totalResources(resources: Readonly<Record<ResourceType, number>>): number {
+    let total = 0;
+    const keys = Object.values(ResourceType);
+    for (let i = 0; i < keys.length; i += 1) {
+      total += resources[keys[i]] ?? 0;
+    }
+    return total;
   }
 
   private mapLobbyState(payload: LobbyFullStatePayload): LobbyUiState {
@@ -795,155 +663,8 @@ export class LobbyShellComponent {
       [GamePhase.Trading]: 'Handel',
       [GamePhase.Building]: 'Bauen',
       [GamePhase.EndTurn]: 'Rundenende',
+      [GamePhase.Finished]: 'Spielende',
     };
     return phaseLabels[phase];
-  }
-
-  private parseIntOrZero(value: string): number {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) {
-      return 0;
-    }
-    return Math.trunc(parsed);
-  }
-
-  private isValidIntegerInput(value: string): boolean {
-    return /^-?\d+$/.test(value.trim());
-  }
-
-  private isValidPositiveIntegerInput(value: string): boolean {
-    return /^[1-9]\d*$/.test(value.trim());
-  }
-
-  private parseSeatOrDefault(value: string, fallback: PlayerSeat): PlayerSeat {
-    const parsed = Number(value);
-    if (
-      parsed === PlayerSeat.North ||
-      parsed === PlayerSeat.East ||
-      parsed === PlayerSeat.South ||
-      parsed === PlayerSeat.West
-    ) {
-      return parsed;
-    }
-    return fallback;
-  }
-
-  private parseOptionalSeat(value: string): PlayerSeat | undefined {
-    const trimmed = value.trim();
-    if (trimmed.length === 0) {
-      return undefined;
-    }
-    return this.parseSeatOrDefault(trimmed, PlayerSeat.North);
-  }
-
-  private edgeTouchesVertex(edgeId: string, vertexId: string): boolean {
-    const separatorIndex = edgeId.indexOf('|');
-    if (separatorIndex <= 0 || separatorIndex >= edgeId.length - 1) {
-      return false;
-    }
-    const firstVertexId = edgeId.slice(0, separatorIndex);
-    const secondVertexId = edgeId.slice(separatorIndex + 1);
-    return firstVertexId === vertexId || secondVertexId === vertexId;
-  }
-
-  private readResourceMap(kind: 'offer' | 'request' | 'discard'): Readonly<Partial<Record<ResourceType, number>>> {
-    const wood = this.readResourceInput(kind, ResourceType.Wood);
-    const brick = this.readResourceInput(kind, ResourceType.Brick);
-    const wheat = this.readResourceInput(kind, ResourceType.Wheat);
-    const wool = this.readResourceInput(kind, ResourceType.Wool);
-    const ore = this.readResourceInput(kind, ResourceType.Ore);
-    return {
-      [ResourceType.Wood]: wood,
-      [ResourceType.Brick]: brick,
-      [ResourceType.Wheat]: wheat,
-      [ResourceType.Wool]: wool,
-      [ResourceType.Ore]: ore,
-    };
-  }
-
-  private readResourceInput(kind: 'offer' | 'request' | 'discard', resource: ResourceType): number {
-    let raw = '0';
-    if (kind === 'offer') {
-      raw = this.readOfferResource(resource);
-    } else if (kind === 'request') {
-      raw = this.readRequestResource(resource);
-    } else {
-      raw = this.readDiscardResource(resource);
-    }
-    const parsed = Number(raw);
-    if (!Number.isFinite(parsed) || parsed < 0) {
-      return 0;
-    }
-    return Math.trunc(parsed);
-  }
-
-  private isValidResourceInputs(kind: 'offer' | 'request' | 'discard'): boolean {
-    const keys = Object.values(ResourceType);
-    for (let i = 0; i < keys.length; i += 1) {
-      const key = keys[i];
-      const raw = this.readResourceRaw(kind, key);
-      if (!/^\d+$/.test(raw.trim())) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  private readResourceRaw(kind: 'offer' | 'request' | 'discard', resource: ResourceType): string {
-    if (kind === 'offer') {
-      return this.readOfferResource(resource);
-    }
-    if (kind === 'request') {
-      return this.readRequestResource(resource);
-    }
-    return this.readDiscardResource(resource);
-  }
-
-  private readOfferResource(resource: ResourceType): string {
-    if (resource === ResourceType.Wood) {
-      return this.tradeProposeForm.controls.offerWood.value;
-    }
-    if (resource === ResourceType.Brick) {
-      return this.tradeProposeForm.controls.offerBrick.value;
-    }
-    if (resource === ResourceType.Wheat) {
-      return this.tradeProposeForm.controls.offerWheat.value;
-    }
-    if (resource === ResourceType.Wool) {
-      return this.tradeProposeForm.controls.offerWool.value;
-    }
-    return this.tradeProposeForm.controls.offerOre.value;
-  }
-
-  private readRequestResource(resource: ResourceType): string {
-    if (resource === ResourceType.Wood) {
-      return this.tradeProposeForm.controls.requestWood.value;
-    }
-    if (resource === ResourceType.Brick) {
-      return this.tradeProposeForm.controls.requestBrick.value;
-    }
-    if (resource === ResourceType.Wheat) {
-      return this.tradeProposeForm.controls.requestWheat.value;
-    }
-    if (resource === ResourceType.Wool) {
-      return this.tradeProposeForm.controls.requestWool.value;
-    }
-    return this.tradeProposeForm.controls.requestOre.value;
-  }
-
-  private readDiscardResource(resource: ResourceType): string {
-    if (resource === ResourceType.Wood) {
-      return this.discardForm.controls.wood.value;
-    }
-    if (resource === ResourceType.Brick) {
-      return this.discardForm.controls.brick.value;
-    }
-    if (resource === ResourceType.Wheat) {
-      return this.discardForm.controls.wheat.value;
-    }
-    if (resource === ResourceType.Wool) {
-      return this.discardForm.controls.wool.value;
-    }
-    return this.discardForm.controls.ore.value;
   }
 }

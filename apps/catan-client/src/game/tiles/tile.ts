@@ -15,6 +15,7 @@ import {
 } from 'three';
 import { AxialCoord, HEX_SIZE } from '../board/hex';
 import { TILE_COLOR, TileType } from '@catan/shared-game-field';
+import { SceneObjectKind, SceneUserDataKey } from '@catan/api-interfaces';
 
 export interface TileInit {
   readonly coord: AxialCoord;
@@ -108,8 +109,8 @@ export abstract class Tile {
     const sprite = new Sprite(material);
     sprite.scale.set(CHIP_BASE_SCALE, CHIP_BASE_SCALE, 1);
     sprite.position.set(0, CHIP_FLOAT_Y, 0);
-    sprite.userData['kind'] = 'chip';
-    sprite.userData['tile'] = this;
+    sprite.userData[SceneUserDataKey.Kind] = SceneObjectKind.Chip;
+    sprite.userData[SceneUserDataKey.Tile] = this;
     this.group.add(sprite);
     this.chipSprite = sprite;
     this.chipPhase = (this.coord.q * 0.9 + this.coord.r * 1.7) % (Math.PI * 2);

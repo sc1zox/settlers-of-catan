@@ -60,7 +60,7 @@ export class PlayerSessionService {
   private async hydrateFromStorageOrNetwork(): Promise<void> {
     const sessionId = this.readSessionId();
     const refresh = this.readRefresh();
-    let access = this.readAccess();
+    const access = this.readAccess();
     if (
       sessionId.length > 0 &&
       refresh.length > 0 &&

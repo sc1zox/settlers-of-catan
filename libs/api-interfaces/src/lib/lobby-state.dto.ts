@@ -1,5 +1,4 @@
 import type { TilePlacement } from '@catan/shared-game-field';
-import { DevCardType } from './dev-card-type.enum';
 import { GamePhase } from './game-phase.enum';
 import { PlayerSeat } from './player-seat.enum';
 import { ResourceType } from './resource-type.enum';
@@ -58,6 +57,14 @@ export interface LobbyFullStatePayload {
   readonly tiles: readonly TilePlacement[];
   readonly vertexIds: readonly string[];
   readonly edgeIds: readonly string[];
+  /** Vertices the *recipient* may legally settle right now; empty when not their turn / wrong phase. */
+  readonly legalSettlementVertexIds: readonly string[];
+  /** Edges the *recipient* may legally (and affordably) build a road on right now. */
+  readonly legalRoadEdgeIds: readonly string[];
+  /** Own settlement vertices the *recipient* may legally upgrade to a city right now. */
+  readonly legalCityVertexIds: readonly string[];
+  /** Edges legal for a *free* road-building dev-card road (placement-legal, cost ignored). */
+  readonly legalRoadBuildingEdgeIds: readonly string[];
   readonly settlements: readonly LobbySettlementDto[];
   readonly roads: readonly LobbyRoadDto[];
   readonly robberCoord: AxialCoordDto;

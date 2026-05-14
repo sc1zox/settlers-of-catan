@@ -13,7 +13,6 @@ import {
   PlayYearOfPlentyPayload,
   DefaultDisplayName,
   FinishTradingPayload,
-  GamePhase,
   formatSocketIoLobbyRoomId,
   GameSocketClientEvent,
   GameSocketServerEvent,
@@ -22,7 +21,6 @@ import {
   JoinLobbyPayload,
   KnownLobbyId,
   LobbyJoinedPayload,
-  ResourceType,
   RobberDiscardPayload,
   RollDicePayload,
   SocketAuthPayloadKey,
@@ -31,8 +29,6 @@ import {
   TradeAcceptPayload,
   TradeProposePayload,
   TradeRejectPayload,
-  TradeStatus,
-  TradeUpdatedPayload,
   parseAuthorizationBearerFromUnknown,
 } from '@catan/api-interfaces';
 import {
@@ -46,9 +42,9 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { GameService } from './game.service';
-import type { LobbyPlayerSlot, LobbyRuntime } from './lobby-runtime';
+import type { LobbyRuntime } from './lobby-runtime';
 import { SocketConnectionRegistry } from './socket-connection.registry';
-import { TradeService } from './trade.service';
+import { TradeActionsService } from './trade-actions.service';
 import { PlayerSessionJwtService } from '../session/player-session-jwt.service';
 import { isUuid } from './uuid.util';
 import { resolveSocketIoCors } from '../http/cors-env.util';
@@ -66,7 +62,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   public constructor(
     private readonly gameService: GameService,
     private readonly registry: SocketConnectionRegistry,
-    private readonly tradeService: TradeService,
+    private readonly tradeActions: TradeActionsService,
     private readonly playerJwt: PlayerSessionJwtService,
   ) {}
 
@@ -429,24 +425,10 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (!sessionToken) {
         throw new Error(ActionRejectCode.PlayerNotInLobby);
       }
-      const lobby = this.gameService.getLobby(payload.lobbyId);
-      if (!lobby) {
-        throw new Error(ActionRejectCode.UnknownLobby);
-      }
-      this.assertLobbyOpen(lobby);
-      const from = lobby.findPlayerByToken(sessionToken);
-      if (!from) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      if (lobby.fsm.getPhase() !== GamePhase.Trading) {
-        throw new Error(ActionRejectCode.WrongPhase);
-      }
-      if (from.seat !== lobby.currentSeat) {
-        throw new Error(ActionRejectCode.NotYourTurn);
-      }
-      const trade = this.tradeService.createOpenOffer(lobby, from, payload);
-      const body: TradeUpdatedPayload = { lobbyId: lobby.lobbyId, trade };
-      this.server.to(formatSocketIoLobbyRoomId(lobby.lobbyId)).emit(GameSocketServerEvent.TradeUpdated, body);
+      const body = this.tradeActions.proposeTrade(this.tradeActionContext(), sessionToken, payload);
+      this.server
+        .to(formatSocketIoLobbyRoomId(body.lobbyId))
+        .emit(GameSocketServerEvent.TradeUpdated, body);
     } catch (e) {
       this.emitRejected(client, e);
     }
@@ -462,41 +444,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (!sessionToken) {
         throw new Error(ActionRejectCode.PlayerNotInLobby);
       }
-      const lobby = this.gameService.getLobby(payload.lobbyId);
-      if (!lobby) {
-        throw new Error(ActionRejectCode.UnknownLobby);
+      const result = this.tradeActions.acceptTrade(this.tradeActionContext(), sessionToken, payload);
+      if (result.tradeUpdated !== null) {
+        this.server
+          .to(formatSocketIoLobbyRoomId(result.lobbyId))
+          .emit(GameSocketServerEvent.TradeUpdated, result.tradeUpdated);
       }
-      this.assertLobbyOpen(lobby);
-      const accepter = lobby.findPlayerByToken(sessionToken);
-      if (!accepter) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      if (lobby.fsm.getPhase() !== GamePhase.Trading) {
-        throw new Error(ActionRejectCode.WrongPhase);
-      }
-      const offer = this.tradeService.getOffer(payload.tradeId);
-      if (!offer || offer.status !== TradeStatus.Open) {
-        throw new Error(ActionRejectCode.TradeNotOpen);
-      }
-      if (offer.toSeat !== accepter.seat) {
-        throw new Error(ActionRejectCode.NotYourTurn);
-      }
-      const from = lobby.findPlayerBySeat(offer.fromSeat);
-      if (!from) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      this.assertCanPayMap(from, offer.offer);
-      this.assertCanPayMap(accepter, offer.request);
-      this.applyResourceDelta(from, offer.offer, -1);
-      this.applyResourceDelta(from, offer.request, 1);
-      this.applyResourceDelta(accepter, offer.request, -1);
-      this.applyResourceDelta(accepter, offer.offer, 1);
-      const updated = this.tradeService.setStatus(offer.id, TradeStatus.Accepted);
-      if (updated) {
-        const body: TradeUpdatedPayload = { lobbyId: lobby.lobbyId, trade: updated };
-        this.server.to(formatSocketIoLobbyRoomId(lobby.lobbyId)).emit(GameSocketServerEvent.TradeUpdated, body);
-      }
-      this.gameService.broadcastFullState(this.server, lobby);
     } catch (e) {
       this.emitRejected(client, e);
     }
@@ -512,29 +465,11 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (!sessionToken) {
         throw new Error(ActionRejectCode.PlayerNotInLobby);
       }
-      const lobby = this.gameService.getLobby(payload.lobbyId);
-      if (!lobby) {
-        throw new Error(ActionRejectCode.UnknownLobby);
-      }
-      this.assertLobbyOpen(lobby);
-      const actor = lobby.findPlayerByToken(sessionToken);
-      if (!actor) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      if (lobby.fsm.getPhase() !== GamePhase.Trading) {
-        throw new Error(ActionRejectCode.WrongPhase);
-      }
-      const offer = this.tradeService.getOffer(payload.tradeId);
-      if (!offer || offer.status !== TradeStatus.Open) {
-        throw new Error(ActionRejectCode.TradeNotOpen);
-      }
-      if (offer.fromSeat !== actor.seat && offer.toSeat !== actor.seat) {
-        throw new Error(ActionRejectCode.NotYourTurn);
-      }
-      const updated = this.tradeService.setStatus(offer.id, TradeStatus.Rejected);
-      if (updated) {
-        const body: TradeUpdatedPayload = { lobbyId: lobby.lobbyId, trade: updated };
-        this.server.to(formatSocketIoLobbyRoomId(lobby.lobbyId)).emit(GameSocketServerEvent.TradeUpdated, body);
+      const result = this.tradeActions.rejectTrade(this.tradeActionContext(), sessionToken, payload);
+      if (result.tradeUpdated !== null) {
+        this.server
+          .to(formatSocketIoLobbyRoomId(result.lobbyId))
+          .emit(GameSocketServerEvent.TradeUpdated, result.tradeUpdated);
       }
     } catch (e) {
       this.emitRejected(client, e);
@@ -547,36 +482,13 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.emit(GameSocketServerEvent.ActionRejected, payload);
   }
 
-  private assertCanPayMap(
-    player: LobbyPlayerSlot,
-    cost: Readonly<Partial<Record<ResourceType, number>>>,
-  ): void {
-    const keys = Object.keys(cost) as ResourceType[];
-    for (let i = 0; i < keys.length; i++) {
-      const k = keys[i];
-      const need = cost[k] ?? 0;
-      if ((player.resources[k] ?? 0) < need) {
-        throw new Error(ActionRejectCode.InsufficientResources);
-      }
-    }
-  }
-
-  private applyResourceDelta(
-    player: LobbyPlayerSlot,
-    delta: Readonly<Partial<Record<ResourceType, number>>>,
-    sign: 1 | -1,
-  ): void {
-    const keys = Object.keys(delta) as ResourceType[];
-    for (let i = 0; i < keys.length; i++) {
-      const k = keys[i];
-      const v = delta[k] ?? 0;
-      player.resources[k] = (player.resources[k] ?? 0) + sign * v;
-    }
-  }
-
-  private assertLobbyOpen(lobby: LobbyRuntime): void {
-    if (lobby.winnerSeat !== null) {
-      throw new Error(ActionRejectCode.GameFinished);
-    }
+  private tradeActionContext(): {
+    getLobby: (lobbyId: string) => LobbyRuntime | undefined;
+    broadcastLobby: (lobby: LobbyRuntime) => void;
+  } {
+    return {
+      getLobby: (lobbyId: string) => this.gameService.getLobby(lobbyId),
+      broadcastLobby: (lobby: LobbyRuntime) => this.gameService.broadcastFullState(this.server, lobby),
+    };
   }
 }

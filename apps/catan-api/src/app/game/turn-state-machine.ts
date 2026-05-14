@@ -1,10 +1,20 @@
 import { GamePhase, ActionRejectCode } from '@catan/api-interfaces';
 
+/**
+ * Authoritative phase machine for one lobby. Every transition is a single
+ * method; the only way to read the phase is `getPhase()`. There is no public
+ * `setPhase` on purpose — callers must go through a transition method so the
+ * assertions cannot be bypassed.
+ */
 export class TurnStateMachine {
   private phase: GamePhase = GamePhase.LobbyWaiting;
 
   public getPhase(): GamePhase {
     return this.phase;
+  }
+
+  public isFinished(): boolean {
+    return this.phase === GamePhase.Finished;
   }
 
   public assertOneOf(allowed: readonly GamePhase[]): void {
@@ -13,15 +23,8 @@ export class TurnStateMachine {
     }
   }
 
-  public setPhase(next: GamePhase): void {
-    this.phase = next;
-  }
-
-  public onLobbyWaiting(): void {
-    this.phase = GamePhase.LobbyWaiting;
-  }
-
   public onLobbyStarted(): void {
+    this.assertOneOf([GamePhase.LobbyWaiting]);
     this.phase = GamePhase.SetupForward;
   }
 
@@ -64,7 +67,19 @@ export class TurnStateMachine {
   }
 
   public onTurnEnded(): void {
-    this.assertOneOf([GamePhase.Building, GamePhase.EndTurn]);
+    this.assertOneOf([GamePhase.Building]);
     this.phase = GamePhase.Rolling;
+  }
+
+  /**
+   * Idempotent: collapsing into Finished from any other phase is allowed, and
+   * a redundant call from Finished is a no-op. This is the only legal exit
+   * once a winner has been declared.
+   */
+  public onWinnerDeclared(): void {
+    if (this.phase === GamePhase.Finished) {
+      return;
+    }
+    this.phase = GamePhase.Finished;
   }
 }

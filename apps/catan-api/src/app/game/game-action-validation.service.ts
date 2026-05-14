@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ActionRejectCode, GamePhase, ResourceType } from '@catan/api-interfaces';
+import { ActionRejectCode, GamePhase, PlayerSeat, ResourceType } from '@catan/api-interfaces';
 import type { LobbyPlayerSlot, LobbyRuntime } from './lobby-runtime';
 
 const SETTLEMENT_COST: Readonly<Partial<Record<ResourceType, number>>> = {
@@ -247,6 +247,104 @@ export class GameActionValidationService {
       const r = keys[i];
       const need = SETTLEMENT_COST[r] ?? 0;
       player.resources[r] = (player.resources[r] ?? 0) - need;
+    }
+  }
+
+  /**
+   * Enumerate every placement the given seat may legally make *right now* by
+   * replaying the same assertions the action handlers use. Returns empty lists
+   * when it is not that seat's turn or the phase forbids building — the client
+   * uses these to highlight buildable spots.
+   */
+  public computeLegalMoves(
+    lobby: LobbyRuntime,
+    seat: PlayerSeat,
+  ): { settlements: string[]; roads: string[]; cities: string[]; roadBuilding: string[] } {
+    const settlements: string[] = [];
+    const roads: string[] = [];
+    const cities: string[] = [];
+    const roadBuilding: string[] = [];
+    const player = lobby.findPlayerBySeat(seat);
+    if (!player || lobby.currentSeat !== seat) {
+      return { settlements, roads, cities, roadBuilding };
+    }
+    const phase = lobby.fsm.getPhase();
+
+    if (phase === GamePhase.SetupForward || phase === GamePhase.SetupBackward) {
+      const pendingVertexId =
+        lobby.pendingSetupRoadSeat === seat ? lobby.pendingSetupRoadFromVertexId : null;
+      if (pendingVertexId !== null) {
+        for (const edgeId of lobby.edgesById.keys()) {
+          if (
+            this.isPlacementLegal(() =>
+              this.assertLegalRoadEdge(lobby, player, edgeId, pendingVertexId),
+            )
+          ) {
+            roads.push(edgeId);
+          }
+        }
+      } else {
+        for (const vertexId of lobby.verticesById.keys()) {
+          if (
+            this.isPlacementLegal(() =>
+              this.assertLegalSettlementVertex(lobby, player, vertexId, false),
+            )
+          ) {
+            settlements.push(vertexId);
+          }
+        }
+      }
+      return { settlements, roads, cities, roadBuilding };
+    }
+
+    if (phase === GamePhase.Building) {
+      if (this.isPlacementLegal(() => this.assertSettlementCost(player))) {
+        for (const vertexId of lobby.verticesById.keys()) {
+          if (
+            this.isPlacementLegal(() =>
+              this.assertLegalSettlementVertex(lobby, player, vertexId, true),
+            )
+          ) {
+            settlements.push(vertexId);
+          }
+        }
+      }
+      if (this.isPlacementLegal(() => this.assertRoadCost(player))) {
+        for (const edgeId of lobby.edgesById.keys()) {
+          if (this.isPlacementLegal(() => this.assertLegalRoadEdge(lobby, player, edgeId))) {
+            roads.push(edgeId);
+          }
+        }
+      }
+      if (this.isPlacementLegal(() => this.assertCityCost(player))) {
+        for (let i = 0; i < lobby.settlements.length; i += 1) {
+          const settlement = lobby.settlements[i];
+          if (settlement.seat === seat && !settlement.isCity) {
+            cities.push(settlement.vertexId);
+          }
+        }
+      }
+    }
+
+    // Road-building dev card places roads for free, so its legal edges ignore
+    // resource cost — available in both trading and building phases.
+    if (phase === GamePhase.Trading || phase === GamePhase.Building) {
+      for (const edgeId of lobby.edgesById.keys()) {
+        if (this.isPlacementLegal(() => this.assertLegalRoadEdge(lobby, player, edgeId))) {
+          roadBuilding.push(edgeId);
+        }
+      }
+    }
+
+    return { settlements, roads, cities, roadBuilding };
+  }
+
+  private isPlacementLegal(assertion: () => void): boolean {
+    try {
+      assertion();
+      return true;
+    } catch {
+      return false;
     }
   }
 }

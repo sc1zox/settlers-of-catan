@@ -8,6 +8,7 @@ import {
   Vector3,
 } from 'three';
 import { CardHoverInfo } from '../shared/card-hover';
+import { SceneObjectKind, SceneUserDataKey } from '@catan/api-interfaces';
 
 export type CardMode = 'rest' | 'focused';
 
@@ -70,8 +71,8 @@ export class Card {
     this.mesh = new Mesh(new BoxGeometry(height, thickness, width), mats);
     this.mesh.castShadow = true;
     this.mesh.receiveShadow = true;
-    this.mesh.userData['kind'] = 'card';
-    this.mesh.userData['card'] = this;
+    this.mesh.userData[SceneUserDataKey.Kind] = SceneObjectKind.Card;
+    this.mesh.userData[SceneUserDataKey.Card] = this;
 
     this.allMaterials = [backMaterial, faceMaterial, edgeMaterial];
     this.texturedMaterials = [backMaterial, faceMaterial];

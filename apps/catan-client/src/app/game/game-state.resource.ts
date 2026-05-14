@@ -1,6 +1,12 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
-import { PlayerSeat, ResourceType, type LobbyFullStatePayload, type TradeUpdatedPayload } from '@catan/api-interfaces';
+import {
+  PlayerSeat,
+  ResourceType,
+  type DiceRolledPayload,
+  type LobbyFullStatePayload,
+  type TradeUpdatedPayload,
+} from '@catan/api-interfaces';
 import { EMPTY } from 'rxjs';
 import { filter, takeUntil } from 'rxjs/operators';
 import { GameSocketService } from '../game-socket.service';
@@ -45,6 +51,23 @@ export class GameStateResource {
       }
       return this.sockets.tradeUpdated$.pipe(
         filter((state) => state.lobbyId === params.lobbyId),
+        takeUntil(observeAbort(abortSignal)),
+      );
+    },
+    defaultValue: undefined,
+  });
+
+  public readonly diceRolled = rxResource<
+    DiceRolledPayload | undefined,
+    LobbyConnectionParams | undefined
+  >({
+    params: () => this.lobbyParams(),
+    stream: ({ params, abortSignal }) => {
+      if (params === undefined) {
+        return EMPTY;
+      }
+      return this.sockets.diceRolled$.pipe(
+        filter((payload) => payload.lobbyId === params.lobbyId),
         takeUntil(observeAbort(abortSignal)),
       );
     },

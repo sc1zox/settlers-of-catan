@@ -1,6 +1,6 @@
 import { PlayerSeat, ResourceType } from '@catan/api-interfaces';
 import { hexRing } from '@catan/shared-game-field';
-import { makeTileKey } from './board-topology';
+import { makeTileKey } from '@catan/shared-game-field';
 import { LobbyRuntime } from './lobby-runtime';
 
 const HARBOR_HEX_INDICES: readonly number[] = [0, 1, 2, 4, 5, 6, 8, 9, 10];
@@ -76,9 +76,9 @@ function playerOwnsAnyVertex(
 
 function getHarborVertexSets(
   lobby: LobbyRuntime,
-): Array<{ vertexIds: readonly string[]; resource: ResourceType | null; ratio: number }> {
+): { vertexIds: readonly string[]; resource: ResourceType | null; ratio: number }[] {
   const ring = hexRing(2);
-  const sets: Array<{ vertexIds: readonly string[]; resource: ResourceType | null; ratio: number }> = [];
+  const sets: { vertexIds: readonly string[]; resource: ResourceType | null; ratio: number }[] = [];
   for (let i = 0; i < HARBOR_HEX_INDICES.length; i += 1) {
     const ringIndex = HARBOR_HEX_INDICES[i];
     const tile = ring[ringIndex];

@@ -15,6 +15,6 @@ export class App {
 
   constructor() {
     this.gameSocket.connect();
-    this.gameSocket.joinSession('demo');
+    this.gameSocket.joinLobby('demo', 'Spieler');
   }
 }

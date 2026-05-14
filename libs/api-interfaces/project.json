@@ -1,0 +1,16 @@
+{
+  "name": "api-interfaces",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/api-interfaces/src",
+  "projectType": "library",
+  "tags": ["scope:shared", "type:interfaces"],
+  "targets": {
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "options": {
+        "lintFilePatterns": ["{projectRoot}/src/**/*.ts"]
+      },
+      "outputs": ["{options.outputFile}"]
+    }
+  }
+}

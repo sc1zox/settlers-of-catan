@@ -7,7 +7,7 @@ const prettier = require('eslint-config-prettier');
 
 module.exports = defineConfig([
   {
-    files: ['**/*.ts'],
+    files: ['apps/**/*.ts', 'libs/**/*.ts'],
     extends: [
       eslint.configs.recommended,
       tseslint.configs.recommended,
@@ -37,7 +37,7 @@ module.exports = defineConfig([
     },
   },
   {
-    files: ['**/*.html'],
+    files: ['apps/**/*.html'],
     extends: [angular.configs.templateRecommended, angular.configs.templateAccessibility],
     rules: {},
   },

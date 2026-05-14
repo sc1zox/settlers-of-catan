@@ -5,9 +5,10 @@ import { AppService } from './app.service';
 import { GameModule } from './game/game.module';
 import { BearerSessionGuard } from './http/guards/bearer-session.guard';
 import { ApiStandardHttpInterceptor } from './http/interceptors/api-standard-http.interceptor';
+import { SessionModule } from './session/session.module';
 
 @Module({
-  imports: [GameModule],
+  imports: [GameModule, SessionModule],
   controllers: [AppController],
   providers: [
     AppService,

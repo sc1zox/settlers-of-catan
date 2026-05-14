@@ -1,5 +1,6 @@
 export enum SocketAuthPayloadKey {
   SessionToken = 'sessionToken',
+  AccessToken = 'accessToken',
 }
 
 export enum SocketIoTransportName {

@@ -8,6 +8,7 @@ import {
   SwaggerUiPath,
 } from '@catan/api-interfaces';
 import { AppModule } from './app/app.module';
+import { applyHttpCorsFromEnv } from './app/http/cors-env.util';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -19,7 +20,7 @@ async function bootstrap(): Promise<void> {
       transformOptions: { enableImplicitConversion: true },
     }),
   );
-  app.enableCors({ origin: true, credentials: true });
+  applyHttpCorsFromEnv(app);
   app.useWebSocketAdapter(new IoAdapter(app));
   const globalPrefix = ApiGlobalPathPrefix.Rest;
   app.setGlobalPrefix(globalPrefix);

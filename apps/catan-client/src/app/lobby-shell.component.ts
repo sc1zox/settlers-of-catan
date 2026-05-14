@@ -1,26 +1,3 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { LobbyShellComponent } from './lobby-shell.component';
-
-@Component({
-  selector: 'app-root',
-  standalone: true,
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LobbyShellComponent],
-  template: `<app-lobby-shell />`,
-})
-export class App {}
-/*
-import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { LobbyShellComponent } from './lobby-shell.component';
-
-@Component({
-  selector: 'app-root',
-  standalone: true,
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LobbyShellComponent],
-  template: `<app-lobby-shell />`,
-})
-export class App {}
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
@@ -44,14 +21,14 @@ import {
 import { PlayerSessionService } from './http/player-session.service';
 
 @Component({
-  selector: 'app-root',
+  selector: 'app-lobby-shell',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [GameCanvasComponent, ReactiveFormsModule],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
-export class App {
+export class LobbyShellComponent {
   private readonly fb = inject(FormBuilder);
   private readonly gameState = inject(GameStateResource);
   private readonly playerSession = inject(PlayerSessionService);
@@ -970,4 +947,3 @@ export class App {
     return this.discardForm.controls.ore.value;
   }
 }
-*/

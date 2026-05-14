@@ -1,8 +1,20 @@
 import { randomInt } from 'node:crypto';
-import { ActionRejectCode, PlayerSeat, ResourceType } from '@catan/api-interfaces';
+import {
+  ActionRejectCode,
+  AxialCoordDto,
+  DevCardType,
+  DiceRollDto,
+  PlayerSeat,
+  ResourceType,
+} from '@catan/api-interfaces';
 import { makeStandardLandPlacements } from '@catan/shared-game-field';
 import type { TilePlacement } from '@catan/shared-game-field';
 import { TurnStateMachine } from './turn-state-machine';
+import {
+  BoardEdgeRuntime,
+  BoardVertexRuntime,
+  createBoardTopology,
+} from './board-topology';
 
 const SEATS: readonly PlayerSeat[] = [
   PlayerSeat.North,
@@ -17,7 +29,24 @@ export interface LobbyPlayerSlot {
   seat: PlayerSeat;
   socketId: string | null;
   resources: Record<ResourceType, number>;
+  devCards: DevCardType[];
+  playedKnights: number;
+  visibleVictoryPoints: number;
+  longestRoadLength: number;
+  hasLongestRoad: boolean;
+  hasLargestArmy: boolean;
   disconnectTimer: NodeJS.Timeout | null;
+}
+
+export interface LobbySettlementSlot {
+  seat: PlayerSeat;
+  vertexId: string;
+  isCity: boolean;
+}
+
+export interface LobbyRoadSlot {
+  seat: PlayerSeat;
+  edgeId: string;
 }
 
 export class LobbyRuntime {
@@ -26,12 +55,38 @@ export class LobbyRuntime {
   public readonly tiles: readonly TilePlacement[];
   public readonly fsm: TurnStateMachine = new TurnStateMachine();
   public currentSeat: PlayerSeat = PlayerSeat.North;
+  public adminSessionToken: string | null = null;
   public readonly players: LobbyPlayerSlot[] = [];
+  public readonly settlements: LobbySettlementSlot[] = [];
+  public readonly roads: LobbyRoadSlot[] = [];
+  public robberCoord: AxialCoordDto;
+  public pendingRobberDiscardSeats: PlayerSeat[] = [];
+  public lastDiceRoll: DiceRollDto | null = null;
+  public setupPlacementsBySeat: Record<PlayerSeat, number>;
+  public pendingSetupRoadSeat: PlayerSeat | null = null;
+  public pendingSetupRoadFromVertexId: string | null = null;
+  public pendingSetupResourceSeat: PlayerSeat | null = null;
+  public pendingSetupResourceFromVertexId: string | null = null;
+  public readonly verticesById: Map<string, BoardVertexRuntime>;
+  public readonly edgesById: Map<string, BoardEdgeRuntime>;
+  public readonly devDeck: DevCardType[];
+  public longestRoadSeat: PlayerSeat | null = null;
+  public largestArmySeat: PlayerSeat | null = null;
+  public winnerSeat: PlayerSeat | null = null;
 
   public constructor(lobbyId: string) {
     this.lobbyId = lobbyId;
     this.seed = randomInt(0, 0xffffffff);
     this.tiles = makeStandardLandPlacements(this.seed);
+    const topology = createBoardTopology(this.tiles);
+    this.verticesById = topology.verticesById;
+    this.edgesById = topology.edgesById;
+    const desert = this.tiles.find((tile) => tile.number === null);
+    this.robberCoord = desert
+      ? { q: desert.coord.q, r: desert.coord.r }
+      : { q: 0, r: 0 };
+    this.setupPlacementsBySeat = this.createSeatCounter();
+    this.devDeck = this.createDevDeck();
   }
 
   public findPlayerBySeat(seat: PlayerSeat): LobbyPlayerSlot | undefined {
@@ -88,23 +143,24 @@ export class LobbyRuntime {
     };
   }
 
-  public addPlayer(sessionToken: string, displayName: string, socketId: string): PlayerSeat {
+  public addPlayer(sessionToken: string, displayName: string, socketId: string | null): PlayerSeat {
     const seat = this.nextFreeSeat();
     if (seat === undefined) {
       throw new Error(ActionRejectCode.LobbyFull);
     }
     const resources = this.emptyResourceBag();
-    resources[ResourceType.Wood] = 2;
-    resources[ResourceType.Brick] = 2;
-    resources[ResourceType.Wheat] = 2;
-    resources[ResourceType.Wool] = 2;
-    resources[ResourceType.Ore] = 2;
     this.players.push({
       sessionToken,
       displayName,
       seat,
       socketId,
       resources,
+      devCards: [],
+      playedKnights: 0,
+      visibleVictoryPoints: 0,
+      longestRoadLength: 0,
+      hasLongestRoad: false,
+      hasLargestArmy: false,
       disconnectTimer: null,
     });
     return seat;
@@ -127,5 +183,54 @@ export class LobbyRuntime {
   public startDisconnectHold(player: LobbyPlayerSlot, delayMs: number, onExpire: () => void): void {
     this.clearDisconnectTimer(player);
     player.disconnectTimer = setTimeout(onExpire, delayMs);
+  }
+
+  public countTotalResources(player: LobbyPlayerSlot): number {
+    let total = 0;
+    const keys = Object.values(ResourceType);
+    for (let i = 0; i < keys.length; i += 1) {
+      const key = keys[i];
+      total += player.resources[key] ?? 0;
+    }
+    return total;
+  }
+
+  public requiredRobberDiscardCount(player: LobbyPlayerSlot): number {
+    const total = this.countTotalResources(player);
+    if (total <= 7) {
+      return 0;
+    }
+    return Math.floor(total / 2);
+  }
+
+  public createSeatCounter(initialValue = 0): Record<PlayerSeat, number> {
+    return {
+      [PlayerSeat.North]: initialValue,
+      [PlayerSeat.East]: initialValue,
+      [PlayerSeat.South]: initialValue,
+      [PlayerSeat.West]: initialValue,
+    };
+  }
+
+  private createDevDeck(): DevCardType[] {
+    const cards: DevCardType[] = [];
+    for (let i = 0; i < 14; i += 1) {
+      cards.push(DevCardType.Knight);
+    }
+    for (let i = 0; i < 5; i += 1) {
+      cards.push(DevCardType.VictoryPoint);
+    }
+    for (let i = 0; i < 2; i += 1) {
+      cards.push(DevCardType.Monopoly);
+      cards.push(DevCardType.YearOfPlenty);
+      cards.push(DevCardType.RoadBuilding);
+    }
+    for (let i = cards.length - 1; i > 0; i -= 1) {
+      const j = randomInt(0, i + 1);
+      const temp = cards[i];
+      cards[i] = cards[j];
+      cards[j] = temp;
+    }
+    return cards;
   }
 }

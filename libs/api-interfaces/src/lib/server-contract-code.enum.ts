@@ -1,5 +1,7 @@
 export enum AuthErrorCode {
   MissingBearerSessionToken = 'missing_bearer_session_token',
+  InvalidAccessToken = 'invalid_access_token',
+  InvalidRefreshToken = 'invalid_refresh_token',
 }
 
 export enum InternalApiErrorCode {
@@ -21,4 +23,5 @@ export enum ApiEnvelopeFieldKey {
 
 export enum SwaggerApiTag {
   System = 'system',
+  Session = 'session',
 }

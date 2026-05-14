@@ -24,7 +24,7 @@ export class ApiStandardHttpInterceptor implements NestInterceptor {
     const authHeader = req.get(HttpHeaderName.Authorization);
     const bearer = parseAuthorizationBearer(authHeader ?? '');
     if (bearer !== undefined) {
-      req.sessionToken = bearer;
+      req.sessionBearerRaw = bearer;
     }
 
     return next.handle().pipe(

@@ -1,7 +1,366 @@
 <main class="shell">
-  <header class="overlay overlay--top">
-    <h1>Catan</h1>
-    <p class="subtitle">Low-poly prototype</p>
-  </header>
   <app-game-canvas class="canvas-layer" />
+  <section class="ui-layer">
+    @if (uiStep() !== lobbyUiStep.InGame) {
+      <article class="panel">
+        <header class="panel__header">
+          <h1>Catan Online</h1>
+          <p>Session-basiert anmelden, Lobby beitreten und gemeinsam starten.</p>
+        </header>
+
+        @if (feedback() !== null) {
+          <p class="feedback" [class.feedback--info]="feedback()?.tone === uiFeedbackTone.Info" [class.feedback--success]="feedback()?.tone === uiFeedbackTone.Success" [class.feedback--error]="feedback()?.tone === uiFeedbackTone.Error" aria-live="polite">
+            {{ feedback()?.message }}
+          </p>
+        }
+
+        @if (uiStep() === lobbyUiStep.SignIn) {
+          <form class="form-block" [formGroup]="sessionForm" (ngSubmit)="startSession()">
+            <label for="displayName">Dein Name</label>
+            <input id="displayName" type="text" autocomplete="nickname" formControlName="displayName" />
+            @if (sessionForm.controls.displayName.invalid && sessionForm.controls.displayName.touched) {
+              <p class="status">Name muss mindestens 2 Zeichen haben.</p>
+            }
+            <button type="submit">Session starten</button>
+          </form>
+        }
+
+        @if (uiStep() === lobbyUiStep.JoinLobby) {
+          <form class="form-block" [formGroup]="lobbyForm" (ngSubmit)="joinLobby()">
+            <p class="session-pill">
+              Session: <strong>{{ sessionState()?.displayName }}</strong>
+            </p>
+            <label for="lobbyId">Lobby-ID</label>
+            <input id="lobbyId" type="text" autocomplete="off" formControlName="lobbyId" />
+            @if (lobbyForm.controls.lobbyId.invalid && lobbyForm.controls.lobbyId.touched) {
+              <p class="status">Lobby-ID muss mindestens 2 Zeichen haben.</p>
+            }
+            <div class="button-row">
+              <button
+                type="button"
+                class="button--ghost"
+                [disabled]="isJoinInProgress()"
+                (click)="backToSignIn()"
+              >
+                Name aendern
+              </button>
+              <button type="submit" [disabled]="isJoinInProgress()">
+                @if (isJoinInProgress()) {
+                  <span class="button-spinner" aria-hidden="true"></span>
+                  <span>Verbinde...</span>
+                } @else {
+                  <span>Spiel beitreten</span>
+                }
+              </button>
+            </div>
+          </form>
+        }
+
+        @if (uiStep() === lobbyUiStep.Lobby) {
+          <div class="lobby-block">
+            <div class="lobby-meta">
+              <p><span>Lobby</span><strong>{{ lobbyUiState()?.lobbyId ?? lobbyIdValue() }}</strong></p>
+              <p><span>Aktiver Sitz</span><strong>{{ activeSeatLabel() }}</strong></p>
+              <p><span>Phase</span><strong>{{ phaseLabel() }}</strong></p>
+            </div>
+
+            @if (isLobbyLoading() || isJoinInProgress()) {
+              <p class="status">
+                <span class="status-spinner" aria-hidden="true"></span>
+                <span>Verbinde...</span>
+              </p>
+            }
+
+            <ul class="seat-list">
+              @for (seat of lobbyUiState()?.seats ?? []; track seat.seat) {
+                <li class="seat-item">
+                  <div>
+                    <p class="seat-title">{{ seat.seatLabel }}</p>
+                    <p class="seat-name">{{ seat.playerName }}</p>
+                  </div>
+                  <div class="seat-badges">
+                    @if (seat.isSelf) {
+                      <span class="badge">Du</span>
+                    }
+                    @if (seat.isConnected) {
+                      <span class="badge badge--online">Online</span>
+                    } @else {
+                      <span class="badge badge--offline">Offline</span>
+                    }
+                  </div>
+                </li>
+              }
+            </ul>
+
+            <div class="button-row">
+              @if (canStartLobby()) {
+                <button
+                  type="button"
+                  [disabled]="isJoinInProgress() || isLobbyLoading()"
+                  (click)="startLobby()"
+                >
+                  Spiel starten
+                </button>
+              }
+              <button
+                type="button"
+                class="button--ghost"
+                [disabled]="isJoinInProgress() || isLobbyLoading()"
+                (click)="backToJoinLobby()"
+              >
+                Andere Lobby
+              </button>
+              <button
+                type="button"
+                class="button--danger"
+                [disabled]="isJoinInProgress() || isLobbyLoading()"
+                (click)="resetSession()"
+              >
+                Session beenden
+              </button>
+            </div>
+          </div>
+        }
+      </article>
+    } @else {
+      <aside class="ingame-hud">
+        <p><span>Lobby</span><strong>{{ lobbyUiState()?.lobbyId ?? lobbyIdValue() }}</strong></p>
+        <p><span>Aktiver Sitz</span><strong>{{ activeSeatLabel() }}</strong></p>
+        <p><span>Phase</span><strong>{{ phaseLabel() }}</strong></p>
+        <p><span>Laengste Strasse</span><strong>{{ longestRoadLabel() }}</strong></p>
+        <p><span>Groesste Rittermacht</span><strong>{{ largestArmyLabel() }}</strong></p>
+        <p><span>Sieger</span><strong>{{ winnerLabel() }}</strong></p>
+        <p><span>Letzter Trade</span><strong>{{ lastTradeId() || '-' }} ({{ lastTradeStatus() }})</strong></p>
+        <div class="ingame-actions">
+          <button
+            type="button"
+            [disabled]="!canRollDice() || isJoinInProgress() || isLobbyLoading()"
+            (click)="rollDice()"
+          >
+            Wuerfeln
+          </button>
+          <button
+            type="button"
+            [disabled]="!canFinishTrading() || isJoinInProgress() || isLobbyLoading()"
+            (click)="finishTrading()"
+          >
+            Handel beenden
+          </button>
+          <button
+            type="button"
+            [disabled]="!canEndTurn() || isJoinInProgress() || isLobbyLoading()"
+            (click)="endTurn()"
+          >
+            Zug beenden
+          </button>
+          <button type="button" class="button--ghost" (click)="cancelAllIngameActions()">
+            Aktionen zuruecksetzen
+          </button>
+        </div>
+        <form class="ingame-form" [formGroup]="settlementForm" (ngSubmit)="buildSettlement()">
+          <h3>Siedlung bauen</h3>
+          @if (setupPendingRoadVertexId() !== null) {
+            <p class="status">Bitte zuerst die Pflicht-Strasse zur gesetzten Start-Siedlung bauen.</p>
+          }
+          <div class="grid-one">
+            <select formControlName="vertexId">
+              @for (vertexId of lobbyUiState()?.vertexIds ?? []; track vertexId) {
+                <option [value]="vertexId">{{ vertexId }}</option>
+              }
+            </select>
+          </div>
+          <div class="grid-two">
+            <button type="submit" [disabled]="!canBuildSettlement() || settlementForm.invalid">Siedlung senden</button>
+            <button type="button" class="button--ghost" (click)="cancelSettlementAction()">Abbrechen</button>
+          </div>
+        </form>
+        <form class="ingame-form" [formGroup]="roadForm" (ngSubmit)="buildRoad()">
+          <h3>Strasse bauen</h3>
+          @if (setupPendingRoadVertexId() !== null) {
+            <p class="status">Waehle eine Kante an Vertex {{ setupPendingRoadVertexId() }}.</p>
+          }
+          <div class="grid-one">
+            <select formControlName="edgeId">
+              @for (edgeId of availableRoadEdgeIds(); track edgeId) {
+                <option [value]="edgeId">{{ edgeId }}</option>
+              }
+            </select>
+          </div>
+          <div class="grid-two">
+            <button type="submit" [disabled]="!canBuildRoad() || roadForm.invalid">Strasse senden</button>
+            <button type="button" class="button--ghost" (click)="cancelRoadAction()">Abbrechen</button>
+          </div>
+        </form>
+        <form class="ingame-form" [formGroup]="cityForm" (ngSubmit)="buildCity()">
+          <h3>Stadt bauen</h3>
+          <div class="grid-one">
+            <select formControlName="vertexId">
+              @for (vertexId of lobbyUiState()?.vertexIds ?? []; track vertexId) {
+                <option [value]="vertexId">{{ vertexId }}</option>
+              }
+            </select>
+          </div>
+          <div class="grid-two">
+            <button type="submit" [disabled]="!canBuildCity() || cityForm.invalid">Stadt senden</button>
+            <button type="button" class="button--ghost" (click)="cancelCityAction()">Abbrechen</button>
+          </div>
+        </form>
+        <div class="ingame-form">
+          <h3>Entwicklungskarten</h3>
+          <div class="grid-two">
+            <button type="button" [disabled]="!canBuyDevCard()" (click)="buyDevCard()">Karte kaufen</button>
+            <button type="button" [disabled]="!canPlayDevCard()" (click)="playKnight()">Ritter spielen</button>
+          </div>
+          <div class="grid-three">
+            <select [formControl]="monopolyForm.controls.resource">
+              <option value="wood">Monopol Holz</option>
+              <option value="brick">Monopol Lehm</option>
+              <option value="wheat">Monopol Getreide</option>
+              <option value="wool">Monopol Wolle</option>
+              <option value="ore">Monopol Erz</option>
+            </select>
+            <button type="button" [disabled]="!canPlayDevCard()" (click)="playMonopoly()">Monopol</button>
+            <button type="button" [disabled]="!canPlayDevCard()" (click)="playYearOfPlenty()">Erfindung</button>
+          </div>
+          <div class="grid-two">
+            <select [formControl]="plentyForm.controls.first">
+              <option value="wood">Holz</option>
+              <option value="brick">Lehm</option>
+              <option value="wheat">Getreide</option>
+              <option value="wool">Wolle</option>
+              <option value="ore">Erz</option>
+            </select>
+            <select [formControl]="plentyForm.controls.second">
+              <option value="wood">Holz</option>
+              <option value="brick">Lehm</option>
+              <option value="wheat">Getreide</option>
+              <option value="wool">Wolle</option>
+              <option value="ore">Erz</option>
+            </select>
+          </div>
+          <div class="grid-two">
+            <select [formControl]="roadBuildingForm.controls.firstEdgeId">
+              @for (edgeId of lobbyUiState()?.edgeIds ?? []; track edgeId) {
+                <option [value]="edgeId">{{ edgeId }}</option>
+              }
+            </select>
+            <select [formControl]="roadBuildingForm.controls.secondEdgeId">
+              <option value="">zweite optional</option>
+              @for (edgeId of lobbyUiState()?.edgeIds ?? []; track edgeId) {
+                <option [value]="edgeId">{{ edgeId }}</option>
+              }
+            </select>
+          </div>
+          <div class="grid-two">
+            <button type="button" [disabled]="!canPlayDevCard()" (click)="playRoadBuilding()">Strassenbau</button>
+            <button type="button" class="button--ghost" (click)="cancelDevCardActions()">Abbrechen</button>
+          </div>
+        </div>
+        <form class="ingame-form" [formGroup]="bankTradeForm" (ngSubmit)="bankTrade()">
+          <h3>Bank-/Hafenhandel</h3>
+          <div class="grid-three">
+            <select formControlName="giveResource">
+              <option value="wood">Gebe Holz</option>
+              <option value="brick">Gebe Lehm</option>
+              <option value="wheat">Gebe Getreide</option>
+              <option value="wool">Gebe Wolle</option>
+              <option value="ore">Gebe Erz</option>
+            </select>
+            <input type="number" min="2" formControlName="giveAmount" placeholder="Menge" />
+            <select formControlName="receiveResource">
+              <option value="wood">Nehme Holz</option>
+              <option value="brick">Nehme Lehm</option>
+              <option value="wheat">Nehme Getreide</option>
+              <option value="wool">Nehme Wolle</option>
+              <option value="ore">Nehme Erz</option>
+            </select>
+          </div>
+          <div class="grid-two">
+            <button type="submit" [disabled]="!canBankTrade() || bankTradeForm.invalid">Bankhandel senden</button>
+            <button type="button" class="button--ghost" (click)="cancelBankTradeAction()">Abbrechen</button>
+          </div>
+        </form>
+        <form class="ingame-form" [formGroup]="discardForm" (ngSubmit)="submitRobberDiscard()">
+          <h3>Raeuber abwerfen</h3>
+          <div class="grid-five">
+            <input type="number" min="0" formControlName="wood" placeholder="Holz" />
+            <input type="number" min="0" formControlName="brick" placeholder="Lehm" />
+            <input type="number" min="0" formControlName="wheat" placeholder="Getreide" />
+            <input type="number" min="0" formControlName="wool" placeholder="Wolle" />
+            <input type="number" min="0" formControlName="ore" placeholder="Erz" />
+          </div>
+          <div class="grid-two">
+            <button type="submit" [disabled]="!canSubmitRobberDiscard()">Abwurf senden</button>
+            <button type="button" class="button--ghost" (click)="cancelDiscardAction()">Abbrechen</button>
+          </div>
+        </form>
+        <form class="ingame-form" [formGroup]="robberMoveForm" (ngSubmit)="moveRobber()">
+          <h3>Raeuber setzen</h3>
+          <div class="grid-three">
+            <input type="number" formControlName="q" placeholder="q" />
+            <input type="number" formControlName="r" placeholder="r" />
+            <select formControlName="victimSeat">
+              <option value="">kein Opfer</option>
+              <option value="0">Nord</option>
+              <option value="1">Ost</option>
+              <option value="2">Sued</option>
+              <option value="3">West</option>
+            </select>
+          </div>
+          <div class="grid-two">
+            <button type="submit" [disabled]="!canMoveRobber()">Raeuber bewegen</button>
+            <button type="button" class="button--ghost" (click)="cancelRobberAction()">Abbrechen</button>
+          </div>
+        </form>
+        <form class="ingame-form" [formGroup]="tradeProposeForm" (ngSubmit)="proposeTrade()">
+          <h3>Handel anbieten</h3>
+          <div class="grid-one">
+            <select formControlName="toSeat">
+              <option value="0">An Nord</option>
+              <option value="1">An Ost</option>
+              <option value="2">An Sued</option>
+              <option value="3">An West</option>
+            </select>
+          </div>
+          <div class="grid-five">
+            <input type="number" min="0" formControlName="offerWood" placeholder="Biete Holz" />
+            <input type="number" min="0" formControlName="offerBrick" placeholder="Biete Lehm" />
+            <input type="number" min="0" formControlName="offerWheat" placeholder="Biete Getreide" />
+            <input type="number" min="0" formControlName="offerWool" placeholder="Biete Wolle" />
+            <input type="number" min="0" formControlName="offerOre" placeholder="Biete Erz" />
+          </div>
+          <div class="grid-five">
+            <input type="number" min="0" formControlName="requestWood" placeholder="Will Holz" />
+            <input type="number" min="0" formControlName="requestBrick" placeholder="Will Lehm" />
+            <input type="number" min="0" formControlName="requestWheat" placeholder="Will Getreide" />
+            <input type="number" min="0" formControlName="requestWool" placeholder="Will Wolle" />
+            <input type="number" min="0" formControlName="requestOre" placeholder="Will Erz" />
+          </div>
+          <div class="grid-two">
+            <button type="submit" [disabled]="!canProposeTrade()">Handel senden</button>
+            <button type="button" class="button--ghost" (click)="cancelTradeProposeAction()">Abbrechen</button>
+          </div>
+        </form>
+        <form class="ingame-form" [formGroup]="tradeRespondForm">
+          <h3>Handel annehmen/ablehnen</h3>
+          <div class="grid-one">
+            <input type="text" formControlName="tradeId" placeholder="tradeId" />
+          </div>
+          <div class="grid-two">
+            <button type="button" [disabled]="!canRespondTrade()" (click)="acceptTrade()">Annehmen</button>
+            <button type="button" [disabled]="!canRespondTrade()" (click)="rejectTrade()">Ablehnen</button>
+          </div>
+          <button type="button" class="button--ghost" (click)="cancelTradeRespondAction()">Abbrechen</button>
+        </form>
+        <button
+          type="button"
+          class="button--danger"
+          [disabled]="isJoinInProgress() || isLobbyLoading()"
+          (click)="resetSession()"
+        >
+          Session beenden
+        </button>
+      </aside>
+    }
+  </section>
 </main>

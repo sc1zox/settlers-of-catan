@@ -1,0 +1,37 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: catan-api
+    working_dir: /workspace
+    command: sh -c "npx nx build catan-api --configuration=development --outputStyle=stream && node dist/apps/catan-api/main.js"
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+      NX_DAEMON: "false"
+      CHOKIDAR_USEPOLLING: "1"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./:/workspace
+      - /workspace/node_modules
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: catan-web
+    working_dir: /workspace
+    command: npx nx serve catan-client --host=0.0.0.0 --outputStyle=stream
+    environment:
+      NODE_ENV: development
+      NX_DAEMON: "false"
+      CHOKIDAR_USEPOLLING: "1"
+    ports:
+      - "4200:4200"
+    depends_on:
+      - api
+    volumes:
+      - ./:/workspace
+      - /workspace/node_modules

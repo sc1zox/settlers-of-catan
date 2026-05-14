@@ -8,6 +8,7 @@ import {
   PerspectiveCamera,
   Quaternion,
   Scene,
+  Vector2,
   Vector3,
   WebGLRenderer,
 } from 'three';
@@ -37,12 +38,30 @@ const OUTER_STRIP_Z = 21.4;
 
 /** Rotation that maps a card's local -Y face into the camera's local +Z view direction. */
 const CARD_FACE_TO_CAMERA = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), -Math.PI / 2);
-/** Fraction of the view dimensions a focused group should occupy — higher = more foreground. */
-const FOCUS_FILL_RATIO = 0.62;
+/** Fraction of the view dimensions for focused hands. */
+const FOCUS_FILL_RATIO_HAND = 0.52;
+/** Single focused card can fill more screen space (e.g. Baukosten). */
+const FOCUS_FILL_RATIO_SINGLE = 0.9;
 /** Spacing between siblings in a focused group, expressed as a fraction of card-X width. */
-const FOCUS_GROUP_SPACING_FACTOR = 0.55;
+const FOCUS_GROUP_SPACING_FACTOR = 0.38;
 /** Hard floor on focus distance to keep cards out of the camera's near plane. */
 const FOCUS_MIN_DISTANCE = 0.9;
+/** NDC margin so focused cards never clip at screen edges. */
+const FOCUS_NDC_MARGIN = 0.08;
+/** Vertical NDC center for a focused hand. Negative means lower half. */
+const FOCUS_CENTER_NDC_HAND = -0.32;
+/** Single focused card is centered for maximum readability. */
+const FOCUS_CENTER_NDC_SINGLE = 0;
+/** Total opening angle of the hand fan in focused mode. */
+const FOCUS_FAN_TOTAL_ANGLE_RAD = Math.PI * 0.34;
+/** Multiplier converting card width to a fan radius. */
+const FOCUS_FAN_RADIUS_FACTOR = 1.1;
+/** Roll factor for card orientation in the fan. */
+const FOCUS_FAN_ROLL_FACTOR = 0.35;
+/** Additional lift when hovering a focused card so it "comes out" from the hand fan. */
+const FOCUS_HOVER_POP_UP = 0.24;
+/** Additional lateral spread when hovering a focused card in hand mode. */
+const FOCUS_HOVER_POP_SIDEWAYS = 0.34;
 
 export class GameEngine {
   private readonly container: HTMLElement;
@@ -68,6 +87,7 @@ export class GameEngine {
   // Reusable scratch values for the per-frame focused-card pose calculation.
   private readonly camForward = new Vector3();
   private readonly camRight = new Vector3();
+  private readonly camUp = new Vector3();
   private readonly worldUp = new Vector3(0, 1, 0);
   private readonly worldTargetPos = new Vector3();
   private readonly worldTargetQuat = new Quaternion();
@@ -75,6 +95,9 @@ export class GameEngine {
   private readonly parentInvQuat = new Quaternion();
   private readonly localTargetPos = new Vector3();
   private readonly localTargetQuat = new Quaternion();
+  private readonly fan2D = new Vector2();
+  private readonly worldCardQuat = new Quaternion();
+  private readonly fanRollQuat = new Quaternion();
 
   constructor(container: HTMLElement, options: EngineOptions = {}) {
     this.container = container;
@@ -140,6 +163,9 @@ export class GameEngine {
     this.hover = new HoverSystem(this.renderer.domElement, this.camera, hoverables);
     this.hover.setCardClickHandler((card) => this.handleCardClick(card));
     this.hover.setDieClickHandler((_die) => this.diceTray.rollBoth());
+    this.hover.setBackgroundClickHandler(() => {
+      if (this.focusedGroup.length > 0) this.clearFocusedCard();
+    });
 
     this.clock = new Clock(false);
 
@@ -284,6 +310,7 @@ export class GameEngine {
     // Build an orthonormal camera basis from world-up. Using the OrbitControls
     // setup the camera never rolls, so this stays stable.
     this.camRight.crossVectors(this.camForward, this.worldUp).normalize();
+    this.camUp.crossVectors(this.camRight, this.camForward).normalize();
 
     let maxX = 0;
     let maxZ = 0;
@@ -293,13 +320,37 @@ export class GameEngine {
       if (s.z > maxZ) maxZ = s.z;
     }
     const spacing = maxX * FOCUS_GROUP_SPACING_FACTOR;
-    const span = (this.focusedGroup.length - 1) * spacing + maxX;
+    const singleCardFocused = this.focusedGroup.length === 1;
+    const fillRatio = singleCardFocused ? FOCUS_FILL_RATIO_SINGLE : FOCUS_FILL_RATIO_HAND;
+    const centerNdcY = singleCardFocused ? FOCUS_CENTER_NDC_SINGLE : FOCUS_CENTER_NDC_HAND;
+    const fanRadius = singleCardFocused
+      ? 0
+      : Math.max((this.focusedGroup.length - 1) * spacing * FOCUS_FAN_RADIUS_FACTOR, maxX * 0.85);
+    const halfFanAngle = singleCardFocused ? 0 : FOCUS_FAN_TOTAL_ANGLE_RAD * 0.5;
+
+    let minX = 0;
+    let maxXOffset = 0;
+    for (let i = 0; i < this.focusedGroup.length; i++) {
+      const half = (this.focusedGroup.length - 1) / 2;
+      const normalized = half === 0 ? 0 : (i - half) / half;
+      const angle = normalized * halfFanAngle;
+      const xOffset = Math.sin(angle) * fanRadius;
+      if (i === 0 || xOffset < minX) minX = xOffset;
+      if (i === 0 || xOffset > maxXOffset) maxXOffset = xOffset;
+    }
+    const span = maxX + (maxXOffset - minX);
 
     const halfTan = Math.tan((this.camera.fov * Math.PI) / 360);
     const aspect = this.camera.aspect;
-    const distanceForHeight = maxZ / (2 * halfTan * FOCUS_FILL_RATIO);
-    const distanceForWidth = span / (2 * halfTan * aspect * FOCUS_FILL_RATIO);
+    const usableHalfNdcX = (1 - FOCUS_NDC_MARGIN) * fillRatio;
+    const usableHalfNdcY = (1 - FOCUS_NDC_MARGIN - Math.abs(centerNdcY)) * fillRatio;
+    const safeHalfNdcX = Math.max(usableHalfNdcX, 0.05);
+    const safeHalfNdcY = Math.max(usableHalfNdcY, 0.05);
+    const effectiveHeight = maxZ + FOCUS_HOVER_POP_UP * 2;
+    const distanceForHeight = effectiveHeight / (2 * halfTan * safeHalfNdcY);
+    const distanceForWidth = span / (2 * halfTan * aspect * safeHalfNdcX);
     const distance = Math.max(distanceForHeight, distanceForWidth, FOCUS_MIN_DISTANCE);
+    const verticalBias = centerNdcY * halfTan * distance;
 
     this.worldTargetQuat.copy(this.camera.quaternion).multiply(CARD_FACE_TO_CAMERA);
 
@@ -309,19 +360,37 @@ export class GameEngine {
       const parent = card.mesh.parent;
       if (!parent) continue;
 
-      const offset = (i - half) * spacing;
+      const normalized = half === 0 ? 0 : (i - half) / half;
+      const angle = normalized * halfFanAngle;
+      this.fan2D.set(Math.sin(angle) * fanRadius, 0);
       this.worldTargetPos
         .copy(this.camForward)
         .multiplyScalar(distance)
         .add(this.camera.position)
-        .addScaledVector(this.camRight, offset);
+        .addScaledVector(this.camRight, this.fan2D.x)
+        .addScaledVector(this.camUp, verticalBias + this.fan2D.y);
+
+      const hoverableInHand = card.getHoverInfo() !== null;
+      if (card.isHovered() && hoverableInHand && !singleCardFocused) {
+        const sideFactor = Math.abs(normalized);
+        const sideSign = normalized < 0 ? -1 : 1;
+        const upFactor = 1 - sideFactor;
+        this.worldTargetPos
+          .addScaledVector(this.camRight, sideSign * FOCUS_HOVER_POP_SIDEWAYS * sideFactor)
+          .addScaledVector(this.camUp, FOCUS_HOVER_POP_UP * (0.45 + upFactor));
+      }
 
       parent.updateWorldMatrix(true, false);
       this.parentInvMatrix.copy(parent.matrixWorld).invert();
       this.localTargetPos.copy(this.worldTargetPos).applyMatrix4(this.parentInvMatrix);
 
       parent.getWorldQuaternion(this.parentInvQuat).invert();
-      this.localTargetQuat.copy(this.parentInvQuat).multiply(this.worldTargetQuat);
+      this.fanRollQuat.setFromAxisAngle(
+        this.camForward,
+        -normalized * halfFanAngle * FOCUS_FAN_ROLL_FACTOR,
+      );
+      this.worldCardQuat.copy(this.worldTargetQuat).multiply(this.fanRollQuat);
+      this.localTargetQuat.copy(this.parentInvQuat).multiply(this.worldCardQuat);
 
       card.setLiveTarget(this.localTargetPos, this.localTargetQuat);
     }

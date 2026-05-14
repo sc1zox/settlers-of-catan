@@ -25,6 +25,7 @@ export interface HoverState {
 export type HoverHandler = (state: HoverState | null) => void;
 export type CardClickHandler = (card: Card) => void;
 export type DieClickHandler = (die: Die) => void;
+export type BackgroundClickHandler = () => void;
 
 /**
  * Tracks mouse position and raycasts each frame to detect what the cursor is
@@ -41,8 +42,10 @@ export class HoverSystem {
   private handler: HoverHandler | null = null;
   private cardClickHandler: CardClickHandler | null = null;
   private dieClickHandler: DieClickHandler | null = null;
+  private backgroundClickHandler: BackgroundClickHandler | null = null;
   private lastState: HoverState | null = null;
   private currentTile: Tile | null = null;
+  private currentCard: Card | null = null;
 
   constructor(
     private readonly domElement: HTMLElement,
@@ -66,21 +69,27 @@ export class HoverSystem {
     this.dieClickHandler = handler;
   }
 
+  setBackgroundClickHandler(handler: BackgroundClickHandler | null): void {
+    this.backgroundClickHandler = handler;
+  }
+
   update(): void {
     if (!this.pointerInside) {
       this.emit(null);
       this.setHoveredTile(null);
+      this.setHoveredCard(null);
       return;
     }
     this.raycaster.setFromCamera(this.pointer, this.camera);
     const hits = this.raycaster.intersectObjects(this.hoverables as Object3D[], true);
-    for (const hit of hits) {
-      const obj = walkToKind(hit.object);
+    for (let i = 0; i < hits.length; i++) {
+      const obj = walkToKind(hits[i].object);
       if (!obj) continue;
       const kind = obj.userData['kind'];
       if (kind === 'harbor') {
         const harbor = obj.userData['harbor'] as Harbor;
         this.setHoveredTile(null);
+        this.setHoveredCard(null);
         this.emit({
           target: { kind: 'harbor', harbor },
           screenX: this.screenX,
@@ -91,6 +100,7 @@ export class HoverSystem {
       if (kind === 'chip') {
         const tile = obj.userData['tile'] as Tile;
         this.setHoveredTile(tile);
+        this.setHoveredCard(null);
         this.emit({
           target: { kind: 'chip', tile },
           screenX: this.screenX,
@@ -99,12 +109,16 @@ export class HoverSystem {
         return;
       }
       if (kind === 'card' || kind === 'die') {
+        const topObj = this.pickTopOpaqueHit(hits, i, obj);
+        const topKind = topObj.userData['kind'];
         this.setHoveredTile(null);
-        if (kind === 'die') {
+        if (topKind === 'die') {
+          this.setHoveredCard(null);
           this.emit(null);
           return;
         }
-        const card = obj.userData['card'] as Card;
+        const card = topObj.userData['card'] as Card;
+        this.setHoveredCard(card);
         const tooltip = this.buildCardTooltip(card);
         if (!tooltip) {
           this.emit(null);
@@ -119,6 +133,7 @@ export class HoverSystem {
       }
     }
     this.setHoveredTile(null);
+    this.setHoveredCard(null);
     this.emit(null);
   }
 
@@ -134,6 +149,14 @@ export class HoverSystem {
     }
     if (tile) tile.setChipHovered(true);
     this.currentTile = tile;
+  }
+
+  private setHoveredCard(card: Card | null): void {
+    if (this.currentCard && this.currentCard !== card) {
+      this.currentCard.setHovered(false);
+    }
+    if (card) card.setHovered(true);
+    this.currentCard = card;
   }
 
   private emit(state: HoverState | null): void {
@@ -196,6 +219,7 @@ export class HoverSystem {
         return;
       }
     }
+    this.backgroundClickHandler?.();
   };
 
   private buildCardTooltip(card: Card): CardHoverTooltip | null {
@@ -214,6 +238,20 @@ export class HoverSystem {
       };
     }
     return null;
+  }
+
+  private pickTopOpaqueHit(hits: readonly { object: Object3D }[], startIndex: number, initial: Object3D): Object3D {
+    let topObj = initial;
+    for (let i = startIndex + 1; i < hits.length; i++) {
+      const candidate = walkToKind(hits[i].object);
+      if (!candidate) continue;
+      const candidateKind = candidate.userData['kind'];
+      if (candidateKind !== 'card' && candidateKind !== 'die') continue;
+      if (candidate.renderOrder > topObj.renderOrder) {
+        topObj = candidate;
+      }
+    }
+    return topObj;
   }
 }
 

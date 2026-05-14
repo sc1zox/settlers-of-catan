@@ -29,6 +29,7 @@ import { GameService, lobbyRoomName } from './game.service';
 import type { LobbyPlayerSlot } from './lobby-runtime';
 import { SocketConnectionRegistry } from './socket-connection.registry';
 import { TradeService } from './trade.service';
+import { tryParseBearerFromHeader } from '../http/bearer-parse.util';
 import { isUuid } from './uuid.util';
 
 @WebSocketGateway({
@@ -48,6 +49,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   public handleConnection(client: Socket): void {
     const raw = client.handshake.auth as Record<string, unknown>;
     let token = typeof raw['sessionToken'] === 'string' ? raw['sessionToken'] : '';
+    const headerRaw = client.handshake.headers['authorization'];
+    const headerValue = Array.isArray(headerRaw) ? headerRaw[0] : headerRaw;
+    const fromBearer = tryParseBearerFromHeader(typeof headerValue === 'string' ? headerValue : '');
+    if (!isUuid(token) && fromBearer !== undefined && isUuid(fromBearer)) {
+      token = fromBearer;
+    }
     if (!isUuid(token)) {
       token = randomUUID();
       const payload: SessionBoundPayload = { sessionToken: token };

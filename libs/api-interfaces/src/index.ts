@@ -1,3 +1,4 @@
+export * from './lib/api-envelope.dto';
 export * from './lib/action-reject-code.enum';
 export * from './lib/board-reexports';
 export * from './lib/game-phase.enum';

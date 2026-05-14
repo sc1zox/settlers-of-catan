@@ -1,4 +1,4 @@
-import { Injectable, OnDestroy } from '@angular/core';
+import { Injectable, OnDestroy, inject } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
 import {
   ActionRejectedPayload,
@@ -10,18 +10,19 @@ import {
   SessionBoundPayload,
 } from '@catan/api-interfaces';
 import { environment } from '../environments/environment';
-
-const STORAGE_KEY = 'catan.sessionToken';
+import { SessionTokenService } from './http/session-token.service';
 
 @Injectable({ providedIn: 'root' })
 export class GameSocketService implements OnDestroy {
+  private readonly sessionTokens = inject(SessionTokenService);
+
   private socket: Socket | null = null;
 
   public connect(): void {
     if (this.socket?.connected) {
       return;
     }
-    const sessionToken = this.readOrCreateSessionToken();
+    const sessionToken = this.sessionTokens.ensureToken();
     const url = `${environment.apiBaseUrl}/game`;
     this.socket = io(url, {
       transports: ['websocket'],
@@ -29,7 +30,7 @@ export class GameSocketService implements OnDestroy {
       auth: { sessionToken },
     });
     this.socket.on(GameSocketServerEvent.SessionBound, (payload: SessionBoundPayload) => {
-      localStorage.setItem(STORAGE_KEY, payload.sessionToken);
+      this.sessionTokens.setTokenFromServer(payload.sessionToken);
     });
   }
 
@@ -53,15 +54,5 @@ export class GameSocketService implements OnDestroy {
 
   public onActionRejected(handler: (payload: ActionRejectedPayload) => void): void {
     this.socket?.on(GameSocketServerEvent.ActionRejected, handler);
-  }
-
-  private readOrCreateSessionToken(): string {
-    const existing = localStorage.getItem(STORAGE_KEY);
-    if (existing && /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(existing)) {
-      return existing;
-    }
-    const created = crypto.randomUUID();
-    localStorage.setItem(STORAGE_KEY, created);
-    return created;
   }
 }

@@ -1,8 +1,9 @@
 import { Injectable } from '@angular/core';
+import { ClientStorageKey } from '@catan/api-interfaces';
 
 @Injectable({ providedIn: 'root' })
 export class SessionTokenService {
-  private readonly storageKey = 'catan.sessionToken';
+  private readonly storageKey = ClientStorageKey.SessionToken;
 
   public token(): string {
     return this.readFromStorage();

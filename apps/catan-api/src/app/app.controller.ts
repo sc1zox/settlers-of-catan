@@ -1,4 +1,8 @@
 import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
+import {
+  HttpApiRelativePath,
+  SwaggerApiTag,
+} from '@catan/api-interfaces';
 import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AppService } from './app.service';
 import { RequestId } from './http/decorators/request-id.decorator';
@@ -7,7 +11,7 @@ import { SessionToken } from './http/decorators/session-token.decorator';
 import { PingDto } from './http/dto/ping.dto';
 import { BearerSessionGuard } from './http/guards/bearer-session.guard';
 
-@ApiTags('system')
+@ApiTags(SwaggerApiTag.System)
 @Controller()
 export class AppController {
   public constructor(private readonly appService: AppService) {}
@@ -20,7 +24,7 @@ export class AppController {
     return this.appService.getData();
   }
 
-  @Post('session/ping')
+  @Post(HttpApiRelativePath.SessionPing)
   @HttpCode(200)
   @UseGuards(BearerSessionGuard)
   @ApiBearerAuth()

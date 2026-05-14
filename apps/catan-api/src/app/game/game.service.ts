@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import {
   ActionRejectCode,
+  DescribeErrorMessage,
   GameDeltaType,
   GamePhase,
   GameSocketServerEvent,
+  formatSocketIoLobbyRoomId,
   type GameDeltaPayload,
   type LobbyFullStatePayload,
   type LobbyJoinedPayload,
@@ -11,10 +13,6 @@ import {
 import { Server } from 'socket.io';
 import { GameActionValidationService } from './game-action-validation.service';
 import { LobbyRuntime } from './lobby-runtime';
-
-export function lobbyRoomName(lobbyId: string): string {
-  return `lobby:${lobbyId}`;
-}
 
 function asRejectCode(message: string): ActionRejectCode {
   const values = Object.values(ActionRejectCode) as string[];
@@ -142,7 +140,7 @@ export class GameService {
       q,
       r,
     };
-    server.to(lobbyRoomName(lobbyId)).emit(GameSocketServerEvent.GameDelta, delta);
+    server.to(formatSocketIoLobbyRoomId(lobbyId)).emit(GameSocketServerEvent.GameDelta, delta);
     this.broadcastFullState(server, lobby);
     return delta;
   }
@@ -156,6 +154,9 @@ export class GameService {
     if (e instanceof Error) {
       return { code: asRejectCode(e.message), message: e.message };
     }
-    return { code: ActionRejectCode.WrongPhase, message: 'unknown_error' };
+    return {
+      code: ActionRejectCode.WrongPhase,
+      message: DescribeErrorMessage.UnknownError,
+    };
   }
 }

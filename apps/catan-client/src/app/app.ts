@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { DefaultDisplayName, KnownLobbyId } from '@catan/api-interfaces';
 import { GameCanvasComponent } from './game-canvas/game-canvas';
 import { GameStateResource } from './game/game-state.resource';
 
@@ -14,6 +15,6 @@ export class App {
   private readonly gameState = inject(GameStateResource);
 
   constructor() {
-    this.gameState.connectToLobby('demo', 'Spieler');
+    this.gameState.connectToLobby(KnownLobbyId.DemoClient, DefaultDisplayName.PlayerDe);
   }
 }

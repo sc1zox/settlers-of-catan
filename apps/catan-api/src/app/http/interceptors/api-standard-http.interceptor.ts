@@ -1,9 +1,13 @@
+import {
+  ApiEnvelopeFieldKey,
+  HttpHeaderName,
+  parseAuthorizationBearer,
+} from '@catan/api-interfaces';
 import { randomUUID } from 'node:crypto';
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs';
-import { tryParseBearerFromHeader } from '../bearer-parse.util';
 
 @Injectable()
 export class ApiStandardHttpInterceptor implements NestInterceptor {
@@ -15,10 +19,10 @@ export class ApiStandardHttpInterceptor implements NestInterceptor {
     const res = context.switchToHttp().getResponse<Response>();
     const requestId = randomUUID();
     req.requestId = requestId;
-    res.setHeader('X-Request-Id', requestId);
+    res.setHeader(HttpHeaderName.XRequestId, requestId);
 
-    const authHeader = req.get('Authorization');
-    const bearer = tryParseBearerFromHeader(authHeader ?? '');
+    const authHeader = req.get(HttpHeaderName.Authorization);
+    const bearer = parseAuthorizationBearer(authHeader ?? '');
     if (bearer !== undefined) {
       req.sessionToken = bearer;
     }
@@ -28,14 +32,14 @@ export class ApiStandardHttpInterceptor implements NestInterceptor {
         if (
           payload !== null &&
           typeof payload === 'object' &&
-          'data' in payload &&
-          'requestId' in payload
+          ApiEnvelopeFieldKey.Data in payload &&
+          ApiEnvelopeFieldKey.RequestId in payload
         ) {
           return payload;
         }
         return {
-          data: payload,
-          requestId,
+          [ApiEnvelopeFieldKey.Data]: payload,
+          [ApiEnvelopeFieldKey.RequestId]: requestId,
         };
       }),
     );

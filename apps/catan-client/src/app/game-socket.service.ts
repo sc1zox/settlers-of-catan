@@ -9,6 +9,9 @@ import {
   JoinLobbyPayload,
   LobbyFullStatePayload,
   SessionBoundPayload,
+  SocketAuthPayloadKey,
+  SocketIoTransportName,
+  SocketIoUrlPathSegment,
 } from '@catan/api-interfaces';
 import { environment } from '../environments/environment';
 import { SessionTokenService } from './http/session-token.service';
@@ -32,11 +35,11 @@ export class GameSocketService implements OnDestroy {
       return;
     }
     const sessionToken = this.sessionTokens.ensureToken();
-    const url = `${environment.apiBaseUrl}/game`;
+    const url = `${environment.apiBaseUrl}/${SocketIoUrlPathSegment.GameNamespace}`;
     this.socket = io(url, {
-      transports: ['websocket'],
+      transports: [SocketIoTransportName.WebSocket],
       autoConnect: true,
-      auth: { sessionToken },
+      auth: { [SocketAuthPayloadKey.SessionToken]: sessionToken },
     });
     this.socket.on(GameSocketServerEvent.SessionBound, (payload: SessionBoundPayload) => {
       this.sessionTokens.setTokenFromServer(payload.sessionToken);

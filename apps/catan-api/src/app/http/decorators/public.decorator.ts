@@ -1,5 +1,4 @@
 import { SetMetadata } from '@nestjs/common';
+import { RouteAccessMetadataKey } from '@catan/api-interfaces';
 
-export const IS_PUBLIC_KEY = 'isPublic';
-
-export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
+export const Public = () => SetMetadata(RouteAccessMetadataKey.IsPublic, true);

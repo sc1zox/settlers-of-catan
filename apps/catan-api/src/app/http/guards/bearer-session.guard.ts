@@ -1,4 +1,5 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import { AuthErrorCode } from '@catan/api-interfaces';
 import type { Request } from 'express';
 
 @Injectable()
@@ -9,7 +10,7 @@ export class BearerSessionGuard implements CanActivate {
     }
     const req = context.switchToHttp().getRequest<Request>();
     if (!req.sessionToken || req.sessionToken.length === 0) {
-      throw new UnauthorizedException('missing_bearer_session_token');
+      throw new UnauthorizedException(AuthErrorCode.MissingBearerSessionToken);
     }
     return true;
   }

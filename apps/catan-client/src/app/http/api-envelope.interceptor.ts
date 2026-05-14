@@ -1,4 +1,5 @@
 import { HttpInterceptorFn, HttpResponse } from '@angular/common/http';
+import { ApiEnvelopeFieldKey } from '@catan/api-interfaces';
 import { map } from 'rxjs';
 
 export const apiEnvelopeInterceptor: HttpInterceptorFn = (req, next) => {
@@ -6,8 +7,11 @@ export const apiEnvelopeInterceptor: HttpInterceptorFn = (req, next) => {
     map((event) => {
       if (event instanceof HttpResponse && event.body !== null && typeof event.body === 'object') {
         const body = event.body as Record<string, unknown>;
-        if ('data' in body && 'requestId' in body) {
-          return event.clone({ body: body['data'] });
+        if (
+          ApiEnvelopeFieldKey.Data in body &&
+          ApiEnvelopeFieldKey.RequestId in body
+        ) {
+          return event.clone({ body: body[ApiEnvelopeFieldKey.Data] });
         }
       }
       return event;

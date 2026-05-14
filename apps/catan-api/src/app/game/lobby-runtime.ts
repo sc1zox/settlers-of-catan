@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { PlayerSeat, ResourceType } from '@catan/api-interfaces';
+import { ActionRejectCode, PlayerSeat, ResourceType } from '@catan/api-interfaces';
 import { makeStandardLandPlacements } from '@catan/shared-game-field';
 import type { TilePlacement } from '@catan/shared-game-field';
 import { TurnStateMachine } from './turn-state-machine';
@@ -91,7 +91,7 @@ export class LobbyRuntime {
   public addPlayer(sessionToken: string, displayName: string, socketId: string): PlayerSeat {
     const seat = this.nextFreeSeat();
     if (seat === undefined) {
-      throw new Error('lobby_full');
+      throw new Error(ActionRejectCode.LobbyFull);
     }
     const resources = this.emptyResourceBag();
     resources[ResourceType.Wood] = 2;

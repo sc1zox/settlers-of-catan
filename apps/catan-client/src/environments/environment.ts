@@ -1,4 +1,6 @@
+import { DevelopmentApiOrigin } from '@catan/api-interfaces';
+
 export const environment = {
   production: false,
-  apiBaseUrl: 'http://localhost:3000',
+  apiBaseUrl: DevelopmentApiOrigin.LocalHttp,
 };

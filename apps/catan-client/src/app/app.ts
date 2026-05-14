@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { DefaultDisplayName, KnownLobbyId } from '@catan/api-interfaces';
 import { GameCanvasComponent } from './game-canvas/game-canvas';
-import { GameSocketService } from './game-socket.service';
+import { GameStateResource } from './game/game-state.resource';
 
 @Component({
   selector: 'app-root',
@@ -11,10 +12,9 @@ import { GameSocketService } from './game-socket.service';
   styleUrl: './app.scss',
 })
 export class App {
-  private readonly gameSocket = inject(GameSocketService);
+  private readonly gameState = inject(GameStateResource);
 
   constructor() {
-    this.gameSocket.connect();
-    this.gameSocket.joinLobby('demo', 'Spieler');
+    this.gameState.connectToLobby(KnownLobbyId.DemoClient, DefaultDisplayName.PlayerDe);
   }
 }

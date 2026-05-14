@@ -1,4 +1,5 @@
-import { Injectable, OnDestroy } from '@angular/core';
+import { Injectable, OnDestroy, inject } from '@angular/core';
+import { Subject } from 'rxjs';
 import { io, Socket } from 'socket.io-client';
 import {
   ActionRejectedPayload,
@@ -8,28 +9,49 @@ import {
   JoinLobbyPayload,
   LobbyFullStatePayload,
   SessionBoundPayload,
+  SocketAuthPayloadKey,
+  SocketIoTransportName,
+  SocketIoUrlPathSegment,
 } from '@catan/api-interfaces';
 import { environment } from '../environments/environment';
-
-const STORAGE_KEY = 'catan.sessionToken';
+import { SessionTokenService } from './http/session-token.service';
 
 @Injectable({ providedIn: 'root' })
 export class GameSocketService implements OnDestroy {
+  private readonly sessionTokens = inject(SessionTokenService);
+
+  private readonly fullStateSubject = new Subject<LobbyFullStatePayload>();
+  private readonly gameDeltaSubject = new Subject<GameDeltaPayload>();
+  private readonly actionRejectedSubject = new Subject<ActionRejectedPayload>();
+
+  public readonly fullState$ = this.fullStateSubject.asObservable();
+  public readonly gameDelta$ = this.gameDeltaSubject.asObservable();
+  public readonly actionRejected$ = this.actionRejectedSubject.asObservable();
+
   private socket: Socket | null = null;
 
   public connect(): void {
     if (this.socket?.connected) {
       return;
     }
-    const sessionToken = this.readOrCreateSessionToken();
-    const url = `${environment.apiBaseUrl}/game`;
+    const sessionToken = this.sessionTokens.ensureToken();
+    const url = `${environment.apiBaseUrl}/${SocketIoUrlPathSegment.GameNamespace}`;
     this.socket = io(url, {
-      transports: ['websocket'],
+      transports: [SocketIoTransportName.WebSocket],
       autoConnect: true,
-      auth: { sessionToken },
+      auth: { [SocketAuthPayloadKey.SessionToken]: sessionToken },
     });
     this.socket.on(GameSocketServerEvent.SessionBound, (payload: SessionBoundPayload) => {
-      localStorage.setItem(STORAGE_KEY, payload.sessionToken);
+      this.sessionTokens.setTokenFromServer(payload.sessionToken);
+    });
+    this.socket.on(GameSocketServerEvent.FullState, (payload: LobbyFullStatePayload) => {
+      this.fullStateSubject.next(payload);
+    });
+    this.socket.on(GameSocketServerEvent.GameDelta, (payload: GameDeltaPayload) => {
+      this.gameDeltaSubject.next(payload);
+    });
+    this.socket.on(GameSocketServerEvent.ActionRejected, (payload: ActionRejectedPayload) => {
+      this.actionRejectedSubject.next(payload);
     });
   }
 
@@ -41,27 +63,5 @@ export class GameSocketService implements OnDestroy {
   public joinLobby(lobbyId: string, displayName: string): void {
     const payload: JoinLobbyPayload = { lobbyId, displayName };
     this.socket?.emit(GameSocketClientEvent.JoinLobby, payload);
-  }
-
-  public onFullState(handler: (state: LobbyFullStatePayload) => void): void {
-    this.socket?.on(GameSocketServerEvent.FullState, handler);
-  }
-
-  public onGameDelta(handler: (delta: GameDeltaPayload) => void): void {
-    this.socket?.on(GameSocketServerEvent.GameDelta, handler);
-  }
-
-  public onActionRejected(handler: (payload: ActionRejectedPayload) => void): void {
-    this.socket?.on(GameSocketServerEvent.ActionRejected, handler);
-  }
-
-  private readOrCreateSessionToken(): string {
-    const existing = localStorage.getItem(STORAGE_KEY);
-    if (existing && /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(existing)) {
-      return existing;
-    }
-    const created = crypto.randomUUID();
-    localStorage.setItem(STORAGE_KEY, created);
-    return created;
   }
 }

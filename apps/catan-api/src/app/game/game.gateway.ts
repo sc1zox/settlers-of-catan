@@ -3,17 +3,24 @@ import {
   ActionRejectCode,
   ActionRejectedPayload,
   BuildSettlementPayload,
+  DefaultDisplayName,
+  formatSocketIoLobbyRoomId,
   GameSocketClientEvent,
   GameSocketServerEvent,
+  HttpHeaderNameLowercase,
   JoinLobbyPayload,
+  KnownLobbyId,
   LobbyJoinedPayload,
   ResourceType,
   SessionBoundPayload,
+  SocketAuthPayloadKey,
+  SocketGatewayNamespace,
   TradeAcceptPayload,
   TradeProposePayload,
   TradeRejectPayload,
   TradeStatus,
   TradeUpdatedPayload,
+  parseAuthorizationBearerFromUnknown,
 } from '@catan/api-interfaces';
 import {
   ConnectedSocket,
@@ -25,7 +32,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { GameService, lobbyRoomName } from './game.service';
+import { GameService } from './game.service';
 import type { LobbyPlayerSlot } from './lobby-runtime';
 import { SocketConnectionRegistry } from './socket-connection.registry';
 import { TradeService } from './trade.service';
@@ -33,7 +40,7 @@ import { isUuid } from './uuid.util';
 
 @WebSocketGateway({
   cors: { origin: true, credentials: true },
-  namespace: '/game',
+  namespace: SocketGatewayNamespace.Game,
 })
 export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -47,7 +54,15 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   public handleConnection(client: Socket): void {
     const raw = client.handshake.auth as Record<string, unknown>;
-    let token = typeof raw['sessionToken'] === 'string' ? raw['sessionToken'] : '';
+    const authKey = SocketAuthPayloadKey.SessionToken;
+    const rawToken = raw[authKey];
+    let token = typeof rawToken === 'string' ? rawToken : '';
+    const headerRaw = client.handshake.headers[HttpHeaderNameLowercase.Authorization];
+    const headerValue = Array.isArray(headerRaw) ? headerRaw[0] : headerRaw;
+    const fromBearer = parseAuthorizationBearerFromUnknown(headerValue);
+    if (!isUuid(token) && fromBearer !== undefined && isUuid(fromBearer)) {
+      token = fromBearer;
+    }
     if (!isUuid(token)) {
       token = randomUUID();
       const payload: SessionBoundPayload = { sessionToken: token };
@@ -73,15 +88,16 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (!sessionToken) {
         return;
       }
-      const lobbyId = payload.lobbyId.trim() || 'default';
-      const displayName = payload.displayName.trim() || 'Player';
+      const lobbyId = payload.lobbyId.trim() || KnownLobbyId.ServerDefault;
+      const displayName =
+        payload.displayName.trim() || DefaultDisplayName.PlayerEn;
       const { lobby, joined } = this.gameService.joinLobby(
         lobbyId,
         sessionToken,
         displayName,
         client.id,
       );
-      await client.join(lobbyRoomName(lobby.lobbyId));
+      await client.join(formatSocketIoLobbyRoomId(lobby.lobbyId));
       const joinedPayload: LobbyJoinedPayload = joined;
       client.emit(GameSocketServerEvent.LobbyJoined, joinedPayload);
       this.gameService.broadcastFullState(this.server, lobby);
@@ -132,7 +148,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
       const trade = this.tradeService.createOpenOffer(lobby, from, payload);
       const body: TradeUpdatedPayload = { lobbyId: lobby.lobbyId, trade };
-      this.server.to(lobbyRoomName(lobby.lobbyId)).emit(GameSocketServerEvent.TradeUpdated, body);
+      this.server.to(formatSocketIoLobbyRoomId(lobby.lobbyId)).emit(GameSocketServerEvent.TradeUpdated, body);
     } catch (e) {
       this.emitRejected(client, e);
     }
@@ -176,7 +192,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const updated = this.tradeService.setStatus(offer.id, TradeStatus.Accepted);
       if (updated) {
         const body: TradeUpdatedPayload = { lobbyId: lobby.lobbyId, trade: updated };
-        this.server.to(lobbyRoomName(lobby.lobbyId)).emit(GameSocketServerEvent.TradeUpdated, body);
+        this.server.to(formatSocketIoLobbyRoomId(lobby.lobbyId)).emit(GameSocketServerEvent.TradeUpdated, body);
       }
       this.gameService.broadcastFullState(this.server, lobby);
     } catch (e) {
@@ -212,7 +228,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const updated = this.tradeService.setStatus(offer.id, TradeStatus.Rejected);
       if (updated) {
         const body: TradeUpdatedPayload = { lobbyId: lobby.lobbyId, trade: updated };
-        this.server.to(lobbyRoomName(lobby.lobbyId)).emit(GameSocketServerEvent.TradeUpdated, body);
+        this.server.to(formatSocketIoLobbyRoomId(lobby.lobbyId)).emit(GameSocketServerEvent.TradeUpdated, body);
       }
     } catch (e) {
       this.emitRejected(client, e);

@@ -1,14 +1,27 @@
-import { Logger } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { IoAdapter } from '@nestjs/platform-socket.io';
+import {
+  ApiGlobalPathPrefix,
+  ProcessEnvKey,
+  SwaggerUiPath,
+} from '@catan/api-interfaces';
 import { AppModule } from './app/app.module';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    }),
+  );
   app.enableCors({ origin: true, credentials: true });
   app.useWebSocketAdapter(new IoAdapter(app));
-  const globalPrefix = 'api';
+  const globalPrefix = ApiGlobalPathPrefix.Rest;
   app.setGlobalPrefix(globalPrefix);
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Settlers of Catan API')
@@ -17,11 +30,11 @@ async function bootstrap(): Promise<void> {
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('docs', app, document);
-  const port = Number(process.env['PORT']) || 3000;
+  SwaggerModule.setup(SwaggerUiPath.Docs, app, document);
+  const port = Number(process.env[ProcessEnvKey.Port]) || 3000;
   await app.listen(port);
   Logger.log(`HTTP API: http://localhost:${port}/${globalPrefix}`);
-  Logger.log(`Swagger UI: http://localhost:${port}/docs`);
+  Logger.log(`Swagger UI: http://localhost:${port}/${SwaggerUiPath.Docs}`);
 }
 
 void bootstrap();

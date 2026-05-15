@@ -1,5 +1,5 @@
-import { Group, MeshStandardMaterial, Object3D, Quaternion, Vector3 } from 'three';
-import { BuildKind, SceneObjectKind, SceneUserDataKey } from '@catan/api-interfaces';
+import { Euler, Group, MeshStandardMaterial, Object3D, Quaternion, Vector3 } from 'three';
+import { AvatarKind, BuildKind, SceneObjectKind, SceneUserDataKey } from '@catan/api-interfaces';
 import { Card } from '../cards/card';
 import { createCostCard } from '../cards/cost-card';
 import {
@@ -19,6 +19,7 @@ import {
   makeSettlement,
   PlayerFigureMaterials,
 } from './figures';
+import { AvatarSeat } from './avatar-seat';
 
 export interface PlayerAreaInfo {
   readonly seat: number;
@@ -56,6 +57,19 @@ const RESOURCE_DISPLAY_ORDER: readonly ResourceKind[] = [
 const DEAL_DROP_HEIGHT = 1.7;
 const DEAL_LATERAL_JITTER = 0.45;
 
+/** How far above its arsenal slot an "activated" build figure floats. */
+const ARSENAL_LIFT_HEIGHT = 1.15;
+/** Size multiplier reached at full lift, so the picked figure reads clearly. */
+const ARSENAL_LIFT_SCALE = 1.3;
+/** Vertical bob amplitude of a floating figure. */
+const ARSENAL_BOB_AMPLITUDE = 0.06;
+/** Peak sway angle (radians) of the dangling figure. */
+const ARSENAL_SWAY_ANGLE = 0.16;
+/** Seconds an arsenal figure takes to fly from the stash onto the board. */
+const ARSENAL_FLIGHT_DURATION = 0.6;
+/** Peak height of the lob arc the flying figure follows. */
+const ARSENAL_FLIGHT_ARC = 1.4;
+
 export class PlayerArea {
   readonly group: Group = new Group();
   readonly info: PlayerAreaInfo;
@@ -69,6 +83,7 @@ export class PlayerArea {
   private readonly tableY: number;
   private readonly cardRowZ: number;
   private readonly costCard: Card;
+  private readonly avatarSeat: AvatarSeat;
   private handCards: Card[] = [];
   private _cards: Card[];
   /** Arsenal figures tagged as clickable build triggers (`SceneObjectKind.Arsenal`). */
@@ -76,6 +91,31 @@ export class PlayerArea {
 
   private resourceCounts: Record<ResourceKind, number> = this.emptyResourceCounts();
   private devCount = 0;
+
+  /** Arsenal figure currently lifted into the air for build mode, if any. */
+  private activatedFigure: Object3D | null = null;
+  private readonly activatedBasePos = new Vector3();
+  private readonly activatedBaseRot = new Euler();
+  private readonly activatedBaseScale = new Vector3();
+  /** Target lift state (1 lifted, 0 resting) the animation eases towards. */
+  private activatedTarget = 0;
+  /** Eased lift progress, 0..1. */
+  private activatedT = 0;
+  /** Time accumulator driving the bob + sway. */
+  private activatedSwayT = 0;
+
+  /** Arsenal figure currently flying onto the board, if any. */
+  private flyingFigure: Object3D | null = null;
+  private flying = false;
+  private flightT = 0;
+  private readonly flightStartPos = new Vector3();
+  private readonly flightStartQuat = new Quaternion();
+  private readonly flightStartScale = new Vector3();
+  private readonly flightTargetPos = new Vector3();
+  private readonly flightTargetQuat = new Quaternion();
+  private readonly flightTargetScale = new Vector3();
+  private readonly flightScratchQuat = new Quaternion();
+  private flightOnArrive: (() => void) | null = null;
 
   constructor(options: PlayerAreaOptions) {
     this.info = {
@@ -116,6 +156,11 @@ export class PlayerArea {
     this.costCard = cost.card;
 
     this._cards = [this.costCard];
+    this.avatarSeat = new AvatarSeat({
+      tableTopY: this.tableY,
+      outerEdgeZ: outerZ,
+    });
+    this.group.add(this.avatarSeat.group);
 
     // Seed the hand from the demo options; subsequent updates come from
     // lobby state via setHand().
@@ -127,6 +172,23 @@ export class PlayerArea {
     return this._cards;
   }
 
+  public getCostCard(): Card {
+    return this.costCard;
+  }
+
+  public ownsHandCard(card: Card): boolean {
+    for (let i = 0; i < this.handCards.length; i += 1) {
+      if (this.handCards[i] === card) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public setAvatar(kind: AvatarKind): void {
+    this.avatarSeat.setAvatar(kind);
+  }
+
   /**
    * Arsenal figures (roads / settlements / cities) the hover system raycasts
    * against to open build mode. Only the local player's set should be wired
@@ -134,6 +196,85 @@ export class PlayerArea {
    */
   get arsenal(): readonly Object3D[] {
     return this.arsenalFigures;
+  }
+
+  /**
+   * Lift an arsenal figure into the air and let it dangle while it is the
+   * "activated" build piece; pass `null` to settle the current one back into
+   * its slot. Switching directly between figures snaps the previous one home.
+   */
+  setActivatedArsenalFigure(figure: Object3D | null): void {
+    if (figure === null) {
+      this.activatedTarget = 0;
+      return;
+    }
+    // A figure mid-flight is owned by the flight animation — never re-activate it.
+    if (figure === this.flyingFigure) {
+      return;
+    }
+    if (figure === this.activatedFigure) {
+      this.activatedTarget = 1;
+      return;
+    }
+    if (this.activatedFigure !== null) {
+      this.restoreActivatedFigure();
+    }
+    this.activatedFigure = figure;
+    this.activatedBasePos.copy(figure.position);
+    this.activatedBaseRot.copy(figure.rotation);
+    this.activatedBaseScale.copy(figure.scale);
+    this.activatedT = 0;
+    this.activatedSwayT = 0;
+    this.activatedTarget = 1;
+  }
+
+  /** True while an activated arsenal figure of `kind` is available to fly in. */
+  hasActivatedArsenalFigure(kind: BuildKind): boolean {
+    return (
+      this.activatedFigure !== null &&
+      this.activatedFigure.userData[SceneUserDataKey.BuildKind] === kind
+    );
+  }
+
+  /**
+   * Launch the currently activated arsenal figure on a lob arc towards a
+   * world-space target pose (the board build spot). On arrival the figure is
+   * hidden — it has been "spent" — and `onArrive` fires so the board piece can
+   * play its pop-in. The dangle slot is freed immediately so the next pick can
+   * activate while this one is still in the air.
+   */
+  flyActivatedFigureToWorld(
+    worldPosition: Vector3,
+    worldQuaternion: Quaternion,
+    worldScale: Vector3,
+    onArrive: () => void,
+  ): void {
+    const figure = this.activatedFigure;
+    if (figure === null) {
+      onArrive();
+      return;
+    }
+    this.flyingFigure = figure;
+    this.activatedFigure = null;
+    this.activatedTarget = 0;
+    this.activatedT = 0;
+
+    this.flightStartPos.copy(figure.position);
+    this.flightStartQuat.copy(figure.quaternion);
+    this.flightStartScale.copy(figure.scale);
+
+    // Convert the world-space target into this seat-rotated group's local space.
+    this.group.updateWorldMatrix(true, false);
+    this.flightTargetPos.copy(worldPosition);
+    this.group.worldToLocal(this.flightTargetPos);
+    this.group.getWorldQuaternion(this.flightScratchQuat).invert();
+    this.flightTargetQuat.copy(this.flightScratchQuat).multiply(worldQuaternion);
+    // The group carries no scale, so world scale maps straight to local scale.
+    this.flightTargetScale.copy(worldScale);
+
+    this.flightT = 0;
+    this.flying = true;
+    this.flightOnArrive = onArrive;
   }
 
   /**
@@ -197,6 +338,83 @@ export class PlayerArea {
     for (let i = 0; i < this.handCards.length; i += 1) {
       this.handCards[i].update(dt);
     }
+    this.updateActivatedFigure(dt);
+    this.updateFlight(dt);
+  }
+
+  private updateFlight(dt: number): void {
+    const figure = this.flyingFigure;
+    if (!this.flying || figure === null) return;
+
+    this.flightT = Math.min(1, this.flightT + dt / ARSENAL_FLIGHT_DURATION);
+    const t = this.flightT;
+    // easeInOutQuad — gentle launch and a soft landing on the board.
+    const eased = t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) * (-2 * t + 2)) / 2;
+
+    figure.position.lerpVectors(this.flightStartPos, this.flightTargetPos, eased);
+    // Lob along a shallow arc so it reads as a throw onto the board.
+    figure.position.y += Math.sin(t * Math.PI) * ARSENAL_FLIGHT_ARC;
+    figure.quaternion.slerpQuaternions(this.flightStartQuat, this.flightTargetQuat, eased);
+    figure.scale.lerpVectors(this.flightStartScale, this.flightTargetScale, eased);
+
+    if (t >= 1) {
+      figure.position.copy(this.flightTargetPos);
+      figure.quaternion.copy(this.flightTargetQuat);
+      figure.scale.copy(this.flightTargetScale);
+      figure.visible = false;
+      this.flying = false;
+      this.flyingFigure = null;
+      const onArrive = this.flightOnArrive;
+      this.flightOnArrive = null;
+      onArrive?.();
+    }
+  }
+
+  private restoreActivatedFigure(): void {
+    const figure = this.activatedFigure;
+    if (figure === null) return;
+    figure.position.copy(this.activatedBasePos);
+    figure.rotation.copy(this.activatedBaseRot);
+    figure.scale.copy(this.activatedBaseScale);
+  }
+
+  private updateActivatedFigure(dt: number): void {
+    const figure = this.activatedFigure;
+    if (figure === null) return;
+
+    this.activatedT += (this.activatedTarget - this.activatedT) * Math.min(1, dt * 9);
+    this.activatedSwayT += dt;
+
+    // Fully settled back home — drop the reference so it stops animating.
+    if (this.activatedTarget === 0 && this.activatedT < 0.002) {
+      this.restoreActivatedFigure();
+      this.activatedFigure = null;
+      return;
+    }
+
+    const e = this.activatedT;
+    // easeOutQuad so the lift settles softly instead of arriving linearly.
+    const lift = 1 - (1 - e) * (1 - e);
+    const swayT = this.activatedSwayT;
+
+    const bob = Math.sin(swayT * 2.3) * ARSENAL_BOB_AMPLITUDE * e;
+    figure.position.set(
+      this.activatedBasePos.x,
+      this.activatedBasePos.y + ARSENAL_LIFT_HEIGHT * lift + bob,
+      this.activatedBasePos.z,
+    );
+    // Pendulum-style dangle: sway on X and Z, with a slow yaw drift.
+    figure.rotation.set(
+      this.activatedBaseRot.x + Math.sin(swayT * 1.7) * ARSENAL_SWAY_ANGLE * e,
+      this.activatedBaseRot.y + Math.sin(swayT * 0.8) * ARSENAL_SWAY_ANGLE * 0.9 * e,
+      this.activatedBaseRot.z + Math.cos(swayT * 1.3) * ARSENAL_SWAY_ANGLE * e,
+    );
+    const scale = 1 + (ARSENAL_LIFT_SCALE - 1) * e;
+    figure.scale.set(
+      this.activatedBaseScale.x * scale,
+      this.activatedBaseScale.y * scale,
+      this.activatedBaseScale.z * scale,
+    );
   }
 
   dispose(): void {
@@ -207,6 +425,7 @@ export class PlayerArea {
     }
     this.disposeHandMaterials();
     this.costCard.dispose();
+    this.avatarSeat.dispose();
     for (let i = 0; i < this.handCards.length; i += 1) {
       this.handCards[i].dispose();
     }

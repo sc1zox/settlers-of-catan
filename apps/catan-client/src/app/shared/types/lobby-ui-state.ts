@@ -2,6 +2,7 @@ import { GamePhase, PlayerSeat } from '@catan/api-interfaces';
 
 export enum LobbyUiStep {
   SignIn = 'SIGN_IN',
+  AvatarWardrobe = 'AVATAR_WARDROBE',
   JoinLobby = 'JOIN_LOBBY',
   Lobby = 'LOBBY',
   InGame = 'IN_GAME',

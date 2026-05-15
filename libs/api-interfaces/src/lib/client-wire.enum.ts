@@ -4,6 +4,7 @@ export enum ClientStorageKey {
   AccessToken = 'catan.accessToken',
   RefreshToken = 'catan.refreshToken',
   UiLocale = 'catan.uiLocale',
+  AvatarKind = 'catan.avatarKind',
 }
 
 export enum UiLocale {

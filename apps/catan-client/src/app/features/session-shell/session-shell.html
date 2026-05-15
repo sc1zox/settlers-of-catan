@@ -6,6 +6,7 @@
     [robberMode]="robberMode()"
     [diceRollClickEnabled]="lobbyGameUi.canRollDice() && !spectatorCamService.mode()"
     [uiChromeHidden]="spectatorCamService.mode()"
+    [selectedAvatar]="selectedAvatar()"
     (arsenalBuild)="onArsenalBuild($event)"
     (buildSpotPicked)="onBuildSpotPicked($event)"
     (robberTilePicked)="onRobberTilePicked($event)"
@@ -41,8 +42,52 @@
             @if (sessionForm.controls.displayName.invalid && sessionForm.controls.displayName.touched) {
               <p class="status">{{ 'shell.validationDisplayName' | translate }}</p>
             }
-            <button type="submit">{{ 'shell.buttonStartSession' | translate }}</button>
+            <div class="button-row">
+              <button type="button" class="button--ghost" (click)="openAvatarWardrobe()">
+                {{ 'shell.buttonOpenWardrobe' | translate }}
+              </button>
+              <button type="submit">{{ 'shell.buttonStartSession' | translate }}</button>
+            </div>
+            <p class="wardrobe-selection">
+              {{ 'shell.avatarCurrent' | translate: { avatar: ('shell.avatar.' + selectedAvatar()) | translate } }}
+            </p>
           </form>
+        }
+
+        @if (uiStep() === lobbyUiStep.AvatarWardrobe) {
+          <section class="wardrobe-block">
+            <h2>{{ 'shell.wardrobeTitle' | translate }}</h2>
+            <p class="wardrobe-subtitle">{{ 'shell.wardrobeSubtitle' | translate }}</p>
+            <div class="avatar-grid">
+              @for (avatar of selectableAvatars; track avatar) {
+                <button
+                  type="button"
+                  class="avatar-option"
+                  [class.avatar-option--active]="avatarSelectionDraft() === avatar"
+                  (click)="chooseAvatar(avatar)"
+                >
+                  <span class="avatar-option__stick" aria-hidden="true">
+                    @if (avatar === 'SCOUT') {
+                      o/
+                    } @else if (avatar === 'SAILOR') {
+                      o-
+                    } @else {
+                      o|
+                    }
+                  </span>
+                  <span>{{ ('shell.avatar.' + avatar) | translate }}</span>
+                </button>
+              }
+            </div>
+            <div class="button-row">
+              <button type="button" class="button--ghost" (click)="backToSignInFromWardrobe()">
+                {{ 'shell.buttonWardrobeBack' | translate }}
+              </button>
+              <button type="button" (click)="confirmAvatarSelection()">
+                {{ 'shell.buttonWardrobeConfirm' | translate }}
+              </button>
+            </div>
+          </section>
         }
 
         @if (uiStep() === lobbyUiStep.JoinLobby) {

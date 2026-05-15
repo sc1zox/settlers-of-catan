@@ -14,6 +14,7 @@ import {
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
+  AvatarKind,
   BuildKind,
   GamePhase,
   PlayerSeat,
@@ -22,7 +23,8 @@ import {
   type LobbyFullStatePayload,
 } from '@catan/api-interfaces';
 import { Board } from './board/board';
-import { BoardBuildings } from './board/buildings';
+import { BoardBuildings, type SpawnedBuildPiece } from './board/buildings';
+import { RobberFigure } from './board/robber-figure';
 import { BuildPreview } from './board/build-preview';
 import { HEX_SIZE } from './board/hex';
 import { Card } from './cards/card';
@@ -139,6 +141,7 @@ export class GameEngine {
   private readonly players: readonly PlayerArea[];
   private readonly diceTray: DiceTray;
   private readonly buildings: BoardBuildings;
+  private readonly robberFigure: RobberFigure;
   private readonly buildPreview: BuildPreview;
   private readonly hover: HoverSystem;
   private readonly resizeObserver: ResizeObserver;
@@ -162,6 +165,12 @@ export class GameEngine {
   /** When true, road ghosts come from the cost-free road-building dev-card list. */
   private buildModeFreeRoad = false;
   private arsenalBuildHandler: ArsenalBuildHandler | null = null;
+  /** Last arsenal figure the player clicked — lifted into the air in build mode. */
+  private pendingArsenalFigure: Object3D | null = null;
+  /** Scratch transforms for handing a board piece's world pose to the fly-in. */
+  private readonly flyInScratchPos = new Vector3();
+  private readonly flyInScratchQuat = new Quaternion();
+  private readonly flyInScratchScale = new Vector3();
   private buildSpotPickHandler: BuildSpotPickHandler | null = null;
   private robberTilePickHandler: RobberTilePickHandler | null = null;
   private buildModeCancelHandler: BuildModeCancelHandler | null = null;
@@ -169,6 +178,7 @@ export class GameEngine {
   /** Fired when the player clicks a physical die — Angular forwards it to the server. */
   private diceRollRequestHandler: (() => void) | null = null;
   private diceRollClickEnabled = false;
+  private preferredSelfAvatar: AvatarKind = AvatarKind.Scout;
   private spectatorCameraActive = false;
   private orbitLimitsBackup: {
     minDistance: number;
@@ -258,6 +268,8 @@ export class GameEngine {
     // Server-authoritative board overlay (settlements / roads / cities).
     this.buildings = new BoardBuildings();
     this.scene.add(this.buildings.group);
+    this.robberFigure = new RobberFigure(this.buildings.group);
+    this.scene.add(this.robberFigure.group);
 
     // Translucent ghost figures shown while the player is in build mode.
     this.buildPreview = new BuildPreview();
@@ -283,7 +295,10 @@ export class GameEngine {
     this.hover.setBuildSpotHoverHandler((figure) => this.buildPreview.setHovered(figure));
     this.hover.setArsenalClickHandler((figure) => {
       const kind = figure.userData[SceneUserDataKey.BuildKind] as BuildKind | undefined;
-      if (kind !== undefined) this.arsenalBuildHandler?.(kind);
+      if (kind !== undefined) {
+        this.pendingArsenalFigure = figure;
+        this.arsenalBuildHandler?.(kind);
+      }
     });
     this.hover.setBuildSpotClickHandler((figure, screenX, screenY) => {
       const kind = figure.userData[SceneUserDataKey.BuildKind] as BuildKind | undefined;
@@ -335,6 +350,10 @@ export class GameEngine {
 
   public setDiceRollClickEnabled(enabled: boolean): void {
     this.diceRollClickEnabled = enabled;
+  }
+
+  public setPreferredSelfAvatar(kind: AvatarKind): void {
+    this.preferredSelfAvatar = kind;
   }
 
   /** Tumble the dice towards the server-authoritative roll. */
@@ -416,7 +435,47 @@ export class GameEngine {
     } else {
       this.buildPreview.show(kind, this.legalIdsForKind(kind), this.selfColor());
     }
+    this.updateActivatedArsenalFigure();
     this.hover.setHoverables(this.collectHoverables());
+  }
+
+  /**
+   * Lift the picked arsenal figure into the air while ordinary build mode is
+   * active (the road-building dev card has no stash figure, so it never lifts).
+   */
+  private updateActivatedArsenalFigure(): void {
+    if (this.selfSeat === null) return;
+    const selfArea = this.players[this.selfSeat];
+    if (!selfArea) return;
+    const figure =
+      this.buildMode !== null && !this.buildModeFreeRoad ? this.pendingArsenalFigure : null;
+    selfArea.setActivatedArsenalFigure(figure);
+  }
+
+  /**
+   * A freshly placed piece should be flown in from the arsenal only when it is
+   * the local player's and they have an activated stash figure of that kind.
+   */
+  private canFlyInArsenalFigure(kind: BuildKind, seat: PlayerSeat): boolean {
+    if (this.selfSeat === null || seat !== this.selfSeat) return false;
+    return this.players[this.selfSeat]?.hasActivatedArsenalFigure(kind) ?? false;
+  }
+
+  /** Fly the activated arsenal figure into a board piece spawned hidden by the diff. */
+  private startArsenalFlyIn(piece: SpawnedBuildPiece): void {
+    if (this.selfSeat === null) return;
+    const selfArea = this.players[this.selfSeat];
+    if (!selfArea) return;
+    piece.figure.updateWorldMatrix(true, false);
+    piece.figure.getWorldPosition(this.flyInScratchPos);
+    piece.figure.getWorldQuaternion(this.flyInScratchQuat);
+    piece.figure.getWorldScale(this.flyInScratchScale);
+    selfArea.flyActivatedFigureToWorld(
+      this.flyInScratchPos,
+      this.flyInScratchQuat,
+      this.flyInScratchScale,
+      () => this.buildings.revealPiece(piece.kind, piece.id),
+    );
   }
 
   /** Toggle robber placement: when active, clicking a tile reports its coord. */
@@ -465,6 +524,7 @@ export class GameEngine {
     this.sunShafts.dispose();
     this.clouds.dispose();
     this.diceTray.dispose();
+    this.robberFigure.dispose();
     this.buildings.dispose();
     this.buildPreview.dispose();
     for (const p of this.players) p.dispose();
@@ -486,7 +546,9 @@ export class GameEngine {
     if (state.phase === GamePhase.LobbyWaiting) {
       this.hasFramedBoardForActiveMatch = false;
     }
+    let boardJustRebuilt = false;
     if (state.seed !== this.currentSeed) {
+      boardJustRebuilt = true;
       this.rebuildBoard(state.seed);
       this.currentSeed = state.seed;
       this.hasFramedBoardForActiveMatch = false;
@@ -497,7 +559,18 @@ export class GameEngine {
     this.legalRoadEdgeIds = state.legalRoadEdgeIds;
     this.legalCityVertexIds = state.legalCityVertexIds;
     this.legalRoadBuildingEdgeIds = state.legalRoadBuildingEdgeIds;
-    this.buildings.syncToState(state.settlements, state.roads);
+    const flyIns = this.buildings.syncToState(
+      state.settlements,
+      state.roads,
+      (kind, seat) => this.canFlyInArsenalFigure(kind, seat),
+    );
+    for (let i = 0; i < flyIns.length; i += 1) {
+      this.startArsenalFlyIn(flyIns[i]);
+    }
+    this.robberFigure.syncCoord(state.robberCoord.q, state.robberCoord.r, boardJustRebuilt);
+    for (let i = 0; i < this.players.length; i += 1) {
+      this.players[i].setAvatar(this.fallbackAvatarForSeat(i));
+    }
     for (const playerState of state.players) {
       const area = this.players[playerState.seat];
       if (!area) continue;
@@ -505,6 +578,7 @@ export class GameEngine {
         expandResourceHand(playerState.resources),
         playerState.devCardsInHand,
       );
+      area.setAvatar(this.resolveAvatarKind(playerState));
     }
     // Re-render ghost figures against the freshly-arrived legal-move lists.
     if (this.buildMode !== null) {
@@ -571,8 +645,14 @@ export class GameEngine {
         if (this.selfSeat === null || player.info.seat !== this.selfSeat) {
           continue;
         }
+        for (const card of player.cards) hoverables.push(card.mesh);
+        continue;
       }
-      for (const card of player.cards) hoverables.push(card.mesh);
+      if (this.selfSeat !== null && player.info.seat === this.selfSeat) {
+        for (const card of player.cards) hoverables.push(card.mesh);
+      } else {
+        hoverables.push(player.getCostCard().mesh);
+      }
     }
     if (!this.spectatorCameraActive) {
       for (const die of this.diceTray.dice) hoverables.push(die.mesh);
@@ -587,6 +667,24 @@ export class GameEngine {
       }
     }
     return hoverables;
+  }
+
+  private cardIsInspectable(card: Card): boolean {
+    if (this.spectatorCameraActive) {
+      if (this.selfSeat === null) {
+        return false;
+      }
+      return this.players[this.selfSeat]?.cards.includes(card) ?? false;
+    }
+    for (let i = 0; i < this.players.length; i += 1) {
+      if (this.players[i].getCostCard() === card) {
+        return true;
+      }
+    }
+    if (this.selfSeat === null) {
+      return false;
+    }
+    return this.players[this.selfSeat]?.ownsHandCard(card) ?? false;
   }
 
   private createPlayers(): readonly PlayerArea[] {
@@ -621,6 +719,9 @@ export class GameEngine {
   }
 
   private handleCardClick(card: Card): void {
+    if (!this.cardIsInspectable(card)) {
+      return;
+    }
     // Clicking one of the local player's own dev cards opens the play modal
     // instead of the focus-fan used for resource cards.
     const info = card.getHoverInfo();
@@ -775,6 +876,7 @@ export class GameEngine {
     this.clouds.update(dt, t);
     this.diceTray.update(dt);
     this.buildings.update(dt);
+    this.robberFigure.update(dt);
     this.buildPreview.update(dt);
     this.controls.update();
     this.clampOrbitTarget();
@@ -791,5 +893,20 @@ export class GameEngine {
     this.camera.aspect = clientWidth / clientHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(clientWidth, clientHeight, false);
+  }
+
+  private resolveAvatarKind(player: LobbyFullStatePayload['players'][number]): AvatarKind {
+    if (player.isBot) {
+      return AvatarKind.Robot;
+    }
+    if (player.isSelf) {
+      return this.preferredSelfAvatar;
+    }
+    return this.fallbackAvatarForSeat(player.seat);
+  }
+
+  private fallbackAvatarForSeat(seat: number): AvatarKind {
+    const fallback: readonly AvatarKind[] = [AvatarKind.Scout, AvatarKind.Sailor, AvatarKind.Builder];
+    return fallback[seat % fallback.length] ?? AvatarKind.Scout;
   }
 }

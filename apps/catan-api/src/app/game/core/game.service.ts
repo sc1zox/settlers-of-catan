@@ -4,6 +4,7 @@ import {
   DescribeErrorMessage,
   DiceRolledPayload,
   GameSocketServerEvent,
+  KnownLobbyId,
   PlayerSeat,
   ResourceType,
   formatSocketIoLobbyRoomId,
@@ -64,33 +65,41 @@ export class GameService {
 
   public broadcastFullState(server: Server, lobby: LobbyRuntime): void {
     this.lobby.broadcastFullState(server, lobby);
-    this.demoBots.afterLobbyBroadcast(lobby.lobbyId, server, {
-      getLobby: (lobbyId: string) => this.lobby.getLobby(lobbyId),
-      rollDice: (lobbyId, sessionToken, srv) => {
-        this.rollDice(lobbyId, sessionToken, srv);
-      },
-      finishTrading: (lobbyId, sessionToken, srv) => {
-        this.finishTrading(lobbyId, sessionToken, srv);
-      },
-      endTurn: (lobbyId, sessionToken, srv) => {
-        this.endTurn(lobbyId, sessionToken, srv);
-      },
-      submitRobberDiscard: (lobbyId, sessionToken, discard, srv) => {
-        this.submitRobberDiscard(lobbyId, sessionToken, discard, srv);
-      },
-      moveRobber: (lobbyId, sessionToken, q, r, victimSeat, srv) => {
-        this.moveRobber(lobbyId, sessionToken, q, r, victimSeat, srv);
-      },
-      buildSettlement: (lobbyId, sessionToken, vertexId, srv) => {
-        this.buildSettlement(lobbyId, sessionToken, vertexId, srv);
-      },
-      buildRoad: (lobbyId, sessionToken, edgeId, srv) => {
-        this.buildRoad(lobbyId, sessionToken, edgeId, srv);
-      },
-      buildCity: (lobbyId, sessionToken, vertexId, srv) => {
-        this.buildCity(lobbyId, sessionToken, vertexId, srv);
-      },
-    });
+    const lobbyId = lobby.lobbyId;
+    const runDemoDrain = (): void => {
+      this.demoBots.afterLobbyBroadcast(lobbyId, server, {
+        getLobby: (id: string) => this.lobby.getLobby(id),
+        rollDice: (id, sessionToken, srv) => {
+          this.rollDice(id, sessionToken, srv);
+        },
+        finishTrading: (id, sessionToken, srv) => {
+          this.finishTrading(id, sessionToken, srv);
+        },
+        endTurn: (id, sessionToken, srv) => {
+          this.endTurn(id, sessionToken, srv);
+        },
+        submitRobberDiscard: (id, sessionToken, discard, srv) => {
+          this.submitRobberDiscard(id, sessionToken, discard, srv);
+        },
+        moveRobber: (id, sessionToken, q, r, victimSeat, srv) => {
+          this.moveRobber(id, sessionToken, q, r, victimSeat, srv);
+        },
+        buildSettlement: (id, sessionToken, vertexId, srv) => {
+          this.buildSettlement(id, sessionToken, vertexId, srv);
+        },
+        buildRoad: (id, sessionToken, edgeId, srv) => {
+          this.buildRoad(id, sessionToken, edgeId, srv);
+        },
+        buildCity: (id, sessionToken, vertexId, srv) => {
+          this.buildCity(id, sessionToken, vertexId, srv);
+        },
+      });
+    };
+    if (lobbyId === KnownLobbyId.DemoClient) {
+      setImmediate(runDemoDrain);
+    } else {
+      runDemoDrain();
+    }
   }
 
   public onDisconnect(sessionToken: string, server: Server): void {

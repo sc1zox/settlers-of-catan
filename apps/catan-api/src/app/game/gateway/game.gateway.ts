@@ -42,6 +42,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { GameService } from '../core/game.service';
+import { DemoBotService } from '../demo-bot/demo-bot.service';
 import type { LobbyRuntime } from '../lobby/lobby-runtime';
 import { SocketConnectionRegistry } from './socket-connection.registry';
 import { TradeActionsService } from '../trade/trade-actions.service';
@@ -63,6 +64,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly gameService: GameService,
     private readonly registry: SocketConnectionRegistry,
     private readonly tradeActions: TradeActionsService,
+    private readonly demoBots: DemoBotService,
     private readonly playerJwt: PlayerSessionJwtService,
   ) {}
 
@@ -426,9 +428,32 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         throw new Error(ActionRejectCode.PlayerNotInLobby);
       }
       const body = this.tradeActions.proposeTrade(this.tradeActionContext(), sessionToken, payload);
-      this.server
-        .to(formatSocketIoLobbyRoomId(body.lobbyId))
-        .emit(GameSocketServerEvent.TradeUpdated, body);
+      const roomId = formatSocketIoLobbyRoomId(body.lobbyId);
+      this.server.to(roomId).emit(GameSocketServerEvent.TradeUpdated, body);
+      const botSession = this.demoBots.resolveDemoBotTradeAcceptorSessionToken(
+        this.gameService.getLobby(payload.lobbyId),
+        body.trade.toSeat,
+      );
+      if (botSession !== null) {
+        const ctx = this.tradeActionContext();
+        try {
+          const accepted = this.tradeActions.acceptTrade(ctx, botSession, {
+            lobbyId: payload.lobbyId,
+            tradeId: body.trade.id,
+          });
+          if (accepted.tradeUpdated !== null) {
+            this.server.to(roomId).emit(GameSocketServerEvent.TradeUpdated, accepted.tradeUpdated);
+          }
+        } catch {
+          const rejected = this.tradeActions.rejectTrade(ctx, botSession, {
+            lobbyId: payload.lobbyId,
+            tradeId: body.trade.id,
+          });
+          if (rejected.tradeUpdated !== null) {
+            this.server.to(roomId).emit(GameSocketServerEvent.TradeUpdated, rejected.tradeUpdated);
+          }
+        }
+      }
     } catch (e) {
       this.emitRejected(client, e);
     }

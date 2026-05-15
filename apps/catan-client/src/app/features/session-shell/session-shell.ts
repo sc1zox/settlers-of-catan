@@ -1,7 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
+  AvatarKind,
   BuildKind,
+  ClientStorageKey,
   DefaultDisplayName,
   GamePhase,
   KnownLobbyId,
@@ -33,6 +35,11 @@ import { totalResourceCards } from '../../shared/helper/lobby-game-ui/resource-c
 import { ShellFeedbackService } from '../shell-feedback/shell-feedback.service';
 import { SpectatorCameraService } from '../spectator-camera/spectator-camera.service';
 import { SpectatorCameraToggle } from '../spectator-camera/spectator-camera-toggle';
+import {
+  DEFAULT_AVATAR_KIND,
+  normalizeSelectableAvatarKind,
+  SELECTABLE_AVATARS,
+} from '../../shared/helper/avatar/avatar-options';
 
 @Component({
   selector: 'app-session-shell',
@@ -84,6 +91,9 @@ export class SessionShell {
   public readonly robberVictim = signal<RobberVictimModel | null>(null);
   public readonly tradeOpen = signal<boolean>(false);
   public readonly devCardOpen = signal<boolean>(false);
+  public readonly selectedAvatar = signal<AvatarKind>(DEFAULT_AVATAR_KIND);
+  public readonly avatarSelectionDraft = signal<AvatarKind>(DEFAULT_AVATAR_KIND);
+  public readonly selectableAvatars = SELECTABLE_AVATARS;
 
   public readonly isJoinInProgress = computed<boolean>(() => this.joinInProgress());
 
@@ -134,6 +144,10 @@ export class SessionShell {
 
   public constructor() {
     this.lobbyGameUi.attachUiStep(this.uiStep);
+    const storedAvatar = localStorage.getItem(ClientStorageKey.AvatarKind);
+    const avatarKind = normalizeSelectableAvatarKind(storedAvatar);
+    this.selectedAvatar.set(avatarKind);
+    this.avatarSelectionDraft.set(avatarKind);
   }
 
   public readonly lobbyUiStep = LobbyUiStep;
@@ -165,6 +179,31 @@ export class SessionShell {
       return;
     }
     void this.runJoinLobby();
+  }
+
+  public openAvatarWardrobe(): void {
+    this.avatarSelectionDraft.set(this.selectedAvatar());
+    this.uiStep.set(LobbyUiStep.AvatarWardrobe);
+  }
+
+  public backToSignInFromWardrobe(): void {
+    this.avatarSelectionDraft.set(this.selectedAvatar());
+    this.uiStep.set(LobbyUiStep.SignIn);
+  }
+
+  public chooseAvatar(kind: AvatarKind): void {
+    this.avatarSelectionDraft.set(kind);
+  }
+
+  public confirmAvatarSelection(): void {
+    const chosenAvatar = this.avatarSelectionDraft();
+    this.selectedAvatar.set(chosenAvatar);
+    localStorage.setItem(ClientStorageKey.AvatarKind, chosenAvatar);
+    this.uiStep.set(LobbyUiStep.SignIn);
+    this.shellFeedback.setFeedback(
+      UiFeedbackTone.Success,
+      this.translate.instant(marker('shell.avatarSaved')),
+    );
   }
 
   public backToSignIn(): void {

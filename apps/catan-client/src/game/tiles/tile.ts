@@ -8,6 +8,7 @@ import {
   Line,
   LineBasicMaterial,
   Mesh,
+  MeshBasicMaterial,
   MeshStandardMaterial,
   Sprite,
   SpriteMaterial,
@@ -27,14 +28,21 @@ export interface TileInit {
 /** Land tiles sit thick like an island slab so the cliff face is visible. */
 export const TILE_HEIGHT = 1.0;
 /** Orbital height of the number-chip balloons — sits well above any decoration. */
-export const CHIP_FLOAT_Y = TILE_HEIGHT + 3.3;
+export const CHIP_FLOAT_Y = TILE_HEIGHT + 4.45;
 /** World Y at which the water surface sits (lower than tile top → visible cliff). */
 export const WATER_LEVEL_Y = -0.4;
 
-const CHIP_BASE_SCALE = 0.55;
-const CHIP_HOVER_SCALE = 1.15;
-const CHIP_BASE_OPACITY = 0.4;
-const CHIP_HOVER_OPACITY = 0.95;
+const CHIP_BALLOON_REF_BASE_SCALE = 0.55;
+const CHIP_BALLOON_REF_HOVER_SCALE = 1.15;
+const CHIP_BALLOON_REF_BASE_OPACITY = 0.4;
+const CHIP_BALLOON_REF_HOVER_OPACITY = 0.95;
+const CHIP_BALLOON_VISUAL_UPSCALE = 1.52;
+
+const CHIP_BASE_SCALE = CHIP_BALLOON_REF_BASE_SCALE * CHIP_BALLOON_VISUAL_UPSCALE;
+const CHIP_HOVER_SCALE =
+  CHIP_BASE_SCALE * (CHIP_BALLOON_REF_HOVER_SCALE / CHIP_BALLOON_REF_BASE_SCALE);
+const CHIP_BASE_OPACITY = CHIP_BALLOON_REF_BASE_OPACITY;
+const CHIP_HOVER_OPACITY = CHIP_BALLOON_REF_HOVER_OPACITY;
 
 /**
  * Base for one hex on the board. Subclasses add decorations and animation,
@@ -49,8 +57,8 @@ export abstract class Tile {
   settled = false;
 
   private chipSprite: Sprite | null = null;
-  private chipBeam: Line | null = null;
-  private chipBeamMaterial: LineBasicMaterial | null = null;
+  private chipBeam: Mesh | null = null;
+  private chipBeamMaterial: MeshBasicMaterial | null = null;
   private chipPhase = 0;
   private chipHoverT = 0;
 
@@ -115,22 +123,23 @@ export abstract class Tile {
     this.chipSprite = sprite;
     this.chipPhase = (this.coord.q * 0.9 + this.coord.r * 1.7) % (Math.PI * 2);
 
-    // Faint projection beam from the tile centre up to the orbital chip.
-    const beamGeom = new BufferGeometry();
-    beamGeom.setAttribute(
-      'position',
-      new Float32BufferAttribute([0, TILE_HEIGHT + 0.05, 0, 0, CHIP_FLOAT_Y - 0.2, 0], 3),
-    );
-    const beamMat = new LineBasicMaterial({
-      color: value === 6 || value === 8 ? 0xff9070 : 0x96e6ff,
+    const beamBottomY = TILE_HEIGHT + 0.02;
+    const beamTopY = CHIP_FLOAT_Y - 0.06;
+    const beamHeight = beamTopY - beamBottomY;
+    const beamRadius = 0.048;
+    const beamGeom = new CylinderGeometry(beamRadius, beamRadius, beamHeight, 10, 1);
+    const beamMat = new MeshBasicMaterial({
+      color: value === 6 || value === 8 ? 0xffc8b8 : 0xc8e8f2,
       transparent: true,
-      opacity: 0.12,
+      opacity: 0.18,
       depthWrite: false,
       blending: AdditiveBlending,
     });
-    this.chipBeam = new Line(beamGeom, beamMat);
+    const beamMesh = new Mesh(beamGeom, beamMat);
+    beamMesh.position.y = beamBottomY + beamHeight / 2;
+    this.chipBeam = beamMesh;
     this.chipBeamMaterial = beamMat;
-    this.group.add(this.chipBeam);
+    this.group.add(beamMesh);
   }
 
   /** Sprite for raycast hover detection. */
@@ -158,7 +167,7 @@ export abstract class Tile {
       this.chipSprite.material.opacity =
         CHIP_BASE_OPACITY + (CHIP_HOVER_OPACITY - CHIP_BASE_OPACITY) * eased;
       if (this.chipBeamMaterial) {
-        this.chipBeamMaterial.opacity = 0.1 + 0.5 * eased;
+        this.chipBeamMaterial.opacity = 0.14 + 0.32 * eased;
       }
       // Decay hover unless refreshed by the hover system this frame.
       this.chipHoverT = Math.max(0, this.chipHoverT - dt * 4);
@@ -183,10 +192,6 @@ export abstract class Tile {
       this.chipSprite.material.map?.dispose();
       this.chipSprite.material.dispose();
     }
-    if (this.chipBeam) {
-      this.chipBeam.geometry.dispose();
-      this.chipBeamMaterial?.dispose();
-    }
   }
 }
 
@@ -195,35 +200,43 @@ function easeOutCubic(t: number): number {
 }
 
 function makeChipTexture(value: number): CanvasTexture {
-  const size = 256;
+  const size = 512;
+  const mid = size / 2;
+  const ringRadius = (size / 2) * (92 / 128);
+  const fontPx = Math.round(148 * (size / 256));
+  const ringLineWidth = 3.5 * (size / 256);
+  const digitStrokeWidth = Math.max(2, 2.25 * (size / 256));
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Failed to obtain 2D canvas context for chip texture.');
 
-  // Minimal hologram: a thin ring + the number. Glow stays soft for the orbital look.
   const hot = value === 6 || value === 8;
-  const accent = hot ? 'rgba(255, 140, 110, 1)' : 'rgba(170, 235, 255, 1)';
-  const glow = hot ? 'rgba(255, 170, 130, 0.6)' : 'rgba(180, 240, 255, 0.6)';
+  const accent = hot ? 'rgba(255, 165, 135, 1)' : 'rgba(200, 248, 255, 1)';
+  const glow = hot ? 'rgba(255, 190, 155, 0.88)' : 'rgba(200, 248, 255, 0.88)';
 
-  ctx.shadowBlur = 6;
+  ctx.shadowBlur = 12 * (size / 256);
   ctx.shadowColor = glow;
   ctx.strokeStyle = accent;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = ringLineWidth;
   ctx.beginPath();
-  ctx.arc(size / 2, size / 2, 92, 0, Math.PI * 2);
+  ctx.arc(mid, mid, ringRadius, 0, Math.PI * 2);
   ctx.stroke();
 
-  ctx.shadowBlur = 14;
-  ctx.fillStyle = accent;
-  ctx.font = '600 130px "Inter", "Segoe UI", sans-serif';
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = 'rgba(0, 0, 0, 0)';
+  ctx.font = `700 ${fontPx}px "Inter", "Segoe UI", sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(String(value), size / 2, size / 2);
+  ctx.lineWidth = digitStrokeWidth;
+  ctx.strokeStyle = hot ? 'rgba(90, 35, 28, 0.45)' : 'rgba(35, 55, 62, 0.42)';
+  ctx.strokeText(String(value), mid, mid);
+  ctx.fillStyle = accent;
+  ctx.fillText(String(value), mid, mid);
 
   const tex = new CanvasTexture(canvas);
-  tex.anisotropy = 4;
+  tex.anisotropy = 8;
   tex.needsUpdate = true;
   return tex;
 }

@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { BuildKind, SceneObjectKind } from '@catan/api-interfaces';
+import { AvatarKind, BuildKind, SceneObjectKind } from '@catan/api-interfaces';
 import { GameEngine } from '../../game/engine';
 import { setGameTranslateFn } from '../../game/i18n-bridge';
 import { GameStateResource } from '../core/game/game-state.resource';
@@ -74,6 +74,8 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
   readonly diceRollClickEnabled = input<boolean>(false);
   /** When true, DOM overlays tied to the match HUD are suppressed (e.g. free camera). */
   readonly uiChromeHidden = input<boolean>(false);
+  /** Preferred avatar for the local human player. */
+  readonly selectedAvatar = input<AvatarKind>(AvatarKind.Scout);
 
   readonly arsenalBuild = output<BuildKind>();
   readonly buildSpotPicked = output<BuildConfirmModel>();
@@ -130,6 +132,10 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
     this.engine?.setDiceRollClickEnabled(this.diceRollClickEnabled());
   });
 
+  private readonly selectedAvatarSync = effect(() => {
+    this.engine?.setPreferredSelfAvatar(this.selectedAvatar());
+  });
+
   private readonly uiChromeClear = effect(() => {
     if (!this.uiChromeHidden()) {
       return;
@@ -182,6 +188,7 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
     this.engine.setRobberMode(this.robberMode());
     this.engine.setSpectatorCameraMode(this.spectatorCam.mode());
     this.engine.setDiceRollClickEnabled(this.diceRollClickEnabled());
+    this.engine.setPreferredSelfAvatar(this.selectedAvatar());
   }
 
   public ngOnDestroy(): void {

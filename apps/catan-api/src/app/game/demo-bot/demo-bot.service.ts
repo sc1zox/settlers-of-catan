@@ -115,7 +115,7 @@ export class DemoBotService {
       if (lobby.findPlayerByToken(botSessionToken)) {
         break;
       }
-      lobby.addPlayer(botSessionToken, this.getDemoBotDisplayName(nextSeat), null);
+      lobby.addPlayer(botSessionToken, this.getDemoBotDisplayName(nextSeat), null, true);
       nextSeat = lobby.nextFreeSeat();
     }
   }
@@ -138,6 +138,20 @@ export class DemoBotService {
       return 1;
     }
     return 2;
+  }
+
+  public resolveDemoBotTradeAcceptorSessionToken(
+    lobby: LobbyRuntime | undefined,
+    toSeat: PlayerSeat,
+  ): string | null {
+    if (lobby === undefined) {
+      return null;
+    }
+    const target = lobby.findPlayerBySeat(toSeat);
+    if (!target || !this.isDemoBotSessionToken(target.sessionToken)) {
+      return null;
+    }
+    return target.sessionToken;
   }
 
   public runDemoSetupAutoplay(

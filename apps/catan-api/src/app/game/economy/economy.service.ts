@@ -113,19 +113,21 @@ export class EconomyService {
     giveAmount: number,
     receiveResource: ResourceType,
   ): void {
+    const giveN = Math.floor(Number(giveAmount));
     const rates = resolveHarborRates(lobby, player.seat);
     const expectedGive = rates[giveResource];
     if (
-      giveAmount !== expectedGive ||
-      giveAmount <= 0 ||
+      !Number.isFinite(giveN) ||
+      giveN !== expectedGive ||
+      giveN <= 0 ||
       receiveResource === giveResource
     ) {
       throw new Error(ActionRejectCode.InvalidBankTrade);
     }
-    if ((player.resources[giveResource] ?? 0) < giveAmount) {
+    if ((player.resources[giveResource] ?? 0) < giveN) {
       throw new Error(ActionRejectCode.InsufficientResources);
     }
-    player.resources[giveResource] = (player.resources[giveResource] ?? 0) - giveAmount;
+    player.resources[giveResource] = (player.resources[giveResource] ?? 0) - giveN;
     player.resources[receiveResource] = (player.resources[receiveResource] ?? 0) + 1;
   }
 

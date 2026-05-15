@@ -4,8 +4,6 @@ import { HEX_SIZE } from '../board/hex';
 import { Tile, TileInit, TILE_HEIGHT } from './tile';
 
 export class DesertTile extends Tile {
-  private readonly robber: Mesh;
-
   constructor(init: TileInit) {
     super(init);
     const rng = createRng((this.coord.q * 3010349) ^ (this.coord.r * 999983));
@@ -24,12 +22,5 @@ export class DesertTile extends Tile {
       arm.rotation.z = Math.PI / 2.4;
       this.group.add(arm);
     }
-
-    // Robber (placed on desert by default).
-    const robberMat = new MeshStandardMaterial({ color: 0x202428, flatShading: true });
-    this.robber = new Mesh(new CylinderGeometry(0.05, 0.13, 0.4, 8), robberMat);
-    this.robber.position.set(0, TILE_HEIGHT + 0.2, 0);
-    this.robber.castShadow = true;
-    this.group.add(this.robber);
   }
 }

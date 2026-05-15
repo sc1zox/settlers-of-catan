@@ -62,7 +62,7 @@ export class LobbyService {
     if (!player) {
       let seat;
       try {
-        seat = lobby.addPlayer(sessionToken, displayName, socketId);
+        seat = lobby.addPlayer(sessionToken, displayName, socketId, false);
         if (lobby.adminSessionToken === null) {
           lobby.adminSessionToken = sessionToken;
         }
@@ -103,6 +103,7 @@ export class LobbyService {
     const players = lobby.players.map((p) => ({
       seat: p.seat,
       displayName: p.displayName,
+      isBot: p.isBot,
       isConnected: p.socketId !== null,
       isSelf: p.sessionToken === viewerSessionToken,
       resources: { ...p.resources },

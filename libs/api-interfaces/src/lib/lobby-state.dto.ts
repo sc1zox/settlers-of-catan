@@ -26,6 +26,7 @@ export type GameDeltaPayload = SettlementBuiltDelta | RoadBuiltDelta;
 export interface LobbyPlayerPublicDto {
   readonly seat: PlayerSeat;
   readonly displayName: string;
+  readonly isBot: boolean;
   readonly isConnected: boolean;
   readonly isSelf: boolean;
   readonly resources: Readonly<Record<ResourceType, number>>;

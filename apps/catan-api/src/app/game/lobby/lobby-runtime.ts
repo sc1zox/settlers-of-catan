@@ -26,6 +26,7 @@ export const CLOCKWISE_SEATS: readonly PlayerSeat[] = [
 export interface LobbyPlayerSlot {
   sessionToken: string;
   displayName: string;
+  isBot: boolean;
   seat: PlayerSeat;
   socketId: string | null;
   resources: Record<ResourceType, number>;
@@ -143,7 +144,12 @@ export class LobbyRuntime {
     };
   }
 
-  public addPlayer(sessionToken: string, displayName: string, socketId: string | null): PlayerSeat {
+  public addPlayer(
+    sessionToken: string,
+    displayName: string,
+    socketId: string | null,
+    isBot: boolean,
+  ): PlayerSeat {
     const seat = this.nextFreeSeat();
     if (seat === undefined) {
       throw new Error(ActionRejectCode.LobbyFull);
@@ -152,6 +158,7 @@ export class LobbyRuntime {
     this.players.push({
       sessionToken,
       displayName,
+      isBot,
       seat,
       socketId,
       resources,

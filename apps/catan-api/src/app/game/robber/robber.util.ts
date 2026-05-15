@@ -18,19 +18,21 @@ export function applyRobberMove(
   if (oldQ === q && oldR === r) {
     throw new Error(ActionRejectCode.IllegalPlacement);
   }
-  lobby.robberCoord = { q, r };
   const eligibleVictims = collectRobberVictims(lobby, actor.seat, q, r);
-  if (eligibleVictims.length === 0) {
-    return;
+  let stealVictim: LobbyPlayerSlot | undefined;
+  if (eligibleVictims.length > 0) {
+    if (victimSeat === undefined) {
+      throw new Error(ActionRejectCode.VictimRequired);
+    }
+    stealVictim = eligibleVictims.find((candidate) => candidate.seat === victimSeat);
+    if (!stealVictim) {
+      throw new Error(ActionRejectCode.IllegalPlacement);
+    }
   }
-  if (victimSeat === undefined) {
-    throw new Error(ActionRejectCode.VictimRequired);
+  lobby.robberCoord = { q, r };
+  if (stealVictim !== undefined) {
+    stealRandomResource(stealVictim, actor);
   }
-  const victim = eligibleVictims.find((candidate) => candidate.seat === victimSeat);
-  if (!victim) {
-    throw new Error(ActionRejectCode.IllegalPlacement);
-  }
-  stealRandomResource(victim, actor);
 }
 
 function collectRobberVictims(

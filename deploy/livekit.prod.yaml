@@ -1,0 +1,18 @@
+port: 7880
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50100
+  turn_servers:
+    - host: turn
+      port: 3478
+      protocol: udp
+      username: catan
+      credential: changeme-strong-turn-password
+    - host: turn
+      port: 3478
+      protocol: tcp
+      username: catan
+      credential: changeme-strong-turn-password
+keys:
+  changeme-livekit-api-key-name: changeme-livekit-api-secret-lengthy

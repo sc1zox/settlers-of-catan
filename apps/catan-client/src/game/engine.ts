@@ -1,15 +1,15 @@
 import {
-  Clock,
   Color,
   Fog,
   Matrix4,
   Object3D,
-  PCFSoftShadowMap,
   PerspectiveCamera,
   Quaternion,
   Scene,
+  Timer,
   Vector2,
   Vector3,
+  VSMShadowMap,
   WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -131,7 +131,7 @@ export class GameEngine {
   private readonly camera: PerspectiveCamera;
   private readonly renderer: WebGLRenderer;
   private readonly controls: OrbitControls;
-  private readonly clock: Clock;
+  private timer: Timer | null = null;
   private board: Board;
   private readonly world: World;
   private readonly harbors: HarborSystem;
@@ -221,7 +221,7 @@ export class GameEngine {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(clientWidth, clientHeight, false);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = PCFSoftShadowMap;
+    this.renderer.shadowMap.type = VSMShadowMap;
     container.appendChild(this.renderer.domElement);
 
     this.controls = createControls(this.camera, this.renderer.domElement);
@@ -308,8 +308,6 @@ export class GameEngine {
       }
     });
 
-    this.clock = new Clock(false);
-
     this.resizeObserver = new ResizeObserver(() => this.handleResize());
     this.resizeObserver.observe(container);
   }
@@ -317,8 +315,10 @@ export class GameEngine {
   start(): void {
     if (this.running) return;
     this.running = true;
-    this.clock.start();
-    this.loop();
+    const timer = new Timer();
+    timer.connect(this.container.ownerDocument);
+    this.timer = timer;
+    this.loop(performance.now());
   }
 
   stop(): void {
@@ -327,7 +327,8 @@ export class GameEngine {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
     }
-    this.clock.stop();
+    this.timer?.dispose();
+    this.timer = null;
   }
 
   setHoverHandler(handler: HoverHandler | null): void {
@@ -866,10 +867,11 @@ export class GameEngine {
     }
   }
 
-  private readonly loop = (): void => {
-    if (!this.running) return;
-    const dt = this.clock.getDelta();
-    const t = this.clock.elapsedTime;
+  private readonly loop = (time: number): void => {
+    if (!this.running || this.timer === null) return;
+    this.timer.update(time);
+    const dt = this.timer.getDelta();
+    const t = this.timer.getElapsed();
     this.board.update(dt, t);
     this.world.update(dt, t);
     this.sunShafts.update(dt, t);

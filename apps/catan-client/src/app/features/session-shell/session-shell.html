@@ -272,9 +272,9 @@
                     {{ 'shell.buttonFinishTrade' | translate }}
                   </button>
                 }
-                @if (lobbyGameUi.canBuyDevCard()) {
+                @if (devCards.canBuyDevCard()) {
                   <button type="button" (click)="buyDevCard()">
-                    {{ 'shell.buttonBuyDevCard' | translate }}
+                    {{ 'shell.buttonBuyDevCard' | translate }} ({{ devCards.devDeckCount() }})
                   </button>
                 }
                 @if (lobbyGameUi.canEndTurn()) {

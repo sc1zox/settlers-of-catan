@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
   ActionRejectCode,
-  DevCardType,
   DiceRollDto,
   GamePhase,
   PlayerSeat,
@@ -14,7 +13,6 @@ import { GameActionValidationService } from '../validation/game-action-validatio
 import type { LobbyPlayerSlot } from '../lobby/lobby-runtime';
 import { LobbyRuntime } from '../lobby/lobby-runtime';
 import { RobberService } from '../robber/robber.service';
-import { applyPostActionScoring, consumeDevCard } from '../utils/scoring.util';
 
 @Injectable()
 export class EconomyService {
@@ -67,33 +65,6 @@ export class EconomyService {
     }
   }
 
-  public buyDevCardAsCurrentTurn(lobby: LobbyRuntime, sessionToken: string): void {
-    this.validation.assertPhase(lobby, [GamePhase.Building]);
-    const player = this.validation.assertCurrentPlayer(lobby, sessionToken);
-    this.buyDevCard(lobby, player);
-  }
-
-  public playMonopolyAsCurrentTurn(
-    lobby: LobbyRuntime,
-    sessionToken: string,
-    resource: ResourceType,
-  ): void {
-    this.validation.assertPhase(lobby, [GamePhase.Trading, GamePhase.Building]);
-    const player = this.validation.assertCurrentPlayer(lobby, sessionToken);
-    this.playMonopoly(lobby, player, resource);
-  }
-
-  public playYearOfPlentyAsCurrentTurn(
-    lobby: LobbyRuntime,
-    sessionToken: string,
-    first: ResourceType,
-    second: ResourceType,
-  ): void {
-    this.validation.assertPhase(lobby, [GamePhase.Trading, GamePhase.Building]);
-    const player = this.validation.assertCurrentPlayer(lobby, sessionToken);
-    this.playYearOfPlenty(player, first, second);
-  }
-
   public bankTradeAsCurrentTurn(
     lobby: LobbyRuntime,
     sessionToken: string,
@@ -129,49 +100,6 @@ export class EconomyService {
     }
     player.resources[giveResource] = (player.resources[giveResource] ?? 0) - giveN;
     player.resources[receiveResource] = (player.resources[receiveResource] ?? 0) + 1;
-  }
-
-  public playMonopoly(lobby: LobbyRuntime, player: LobbyPlayerSlot, resource: ResourceType): void {
-    if (!consumeDevCard(player, DevCardType.Monopoly)) {
-      throw new Error(ActionRejectCode.DevCardNotOwned);
-    }
-    for (let i = 0; i < lobby.players.length; i += 1) {
-      const other = lobby.players[i];
-      if (other.seat === player.seat) {
-        continue;
-      }
-      const amount = other.resources[resource] ?? 0;
-      if (amount > 0) {
-        other.resources[resource] = 0;
-        player.resources[resource] = (player.resources[resource] ?? 0) + amount;
-      }
-    }
-  }
-
-  public playYearOfPlenty(
-    player: LobbyPlayerSlot,
-    first: ResourceType,
-    second: ResourceType,
-  ): void {
-    if (!consumeDevCard(player, DevCardType.YearOfPlenty)) {
-      throw new Error(ActionRejectCode.DevCardNotOwned);
-    }
-    player.resources[first] = (player.resources[first] ?? 0) + 1;
-    player.resources[second] = (player.resources[second] ?? 0) + 1;
-  }
-
-  public buyDevCard(lobby: LobbyRuntime, player: LobbyPlayerSlot): void {
-    if (lobby.devDeck.length === 0) {
-      throw new Error(ActionRejectCode.NoDevCardAvailable);
-    }
-    this.validation.assertDevCardCost(player);
-    this.validation.deductDevCardCost(player);
-    const topCard = lobby.devDeck.pop();
-    if (!topCard) {
-      throw new Error(ActionRejectCode.NoDevCardAvailable);
-    }
-    player.devCards.push(topCard);
-    applyPostActionScoring(lobby);
   }
 
   private randomDie(): number {

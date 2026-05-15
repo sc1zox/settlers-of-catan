@@ -11,7 +11,10 @@ export enum ActionRejectCode {
   TradeNotOpen = 'trade_not_open',
   NoDevCardAvailable = 'no_dev_card_available',
   DevCardNotOwned = 'dev_card_not_owned',
+  DevCardAlreadyPlayed = 'dev_card_already_played',
+  DevCardBoughtThisTurn = 'dev_card_bought_this_turn',
   InvalidBankTrade = 'invalid_bank_trade',
   VictimRequired = 'victim_required',
+  RobberSameTile = 'robber_same_tile',
   GameFinished = 'game_finished',
 }

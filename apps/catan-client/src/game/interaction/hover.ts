@@ -147,6 +147,7 @@ export class HoverSystem {
     for (let i = 0; i < hits.length; i++) {
       const obj = walkToKind(hits[i].object);
       if (!obj) continue;
+      if (!isVisibleInHierarchy(obj)) continue;
       const kind = obj.userData[SceneUserDataKey.Kind] as SceneObjectKind | undefined;
       if (kind === SceneObjectKind.BuildSpot) {
         this.setHoveredBuildSpot(obj);
@@ -299,6 +300,7 @@ export class HoverSystem {
     for (const hit of hits) {
       const obj = walkToKind(hit.object);
       if (!obj) continue;
+      if (!isVisibleInHierarchy(obj)) continue;
       const kind = obj.userData[SceneUserDataKey.Kind] as SceneObjectKind | undefined;
       if (kind === SceneObjectKind.BuildSpot) {
         this.buildSpotClickHandler?.(obj, ev.clientX, ev.clientY);
@@ -353,6 +355,7 @@ export class HoverSystem {
     for (let i = startIndex + 1; i < hits.length; i++) {
       const candidate = walkToKind(hits[i].object);
       if (!candidate) continue;
+      if (!isVisibleInHierarchy(candidate)) continue;
       const candidateKind = candidate.userData[SceneUserDataKey.Kind] as SceneObjectKind | undefined;
       if (candidateKind !== SceneObjectKind.Card && candidateKind !== SceneObjectKind.Die) continue;
       if (candidate.renderOrder > topObj.renderOrder) {
@@ -370,4 +373,15 @@ function walkToKind(obj: Object3D): Object3D | null {
     current = current.parent;
   }
   return null;
+}
+
+function isVisibleInHierarchy(obj: Object3D): boolean {
+  let current: Object3D | null = obj;
+  while (current) {
+    if (!current.visible) {
+      return false;
+    }
+    current = current.parent;
+  }
+  return true;
 }

@@ -144,10 +144,16 @@ export class EnumTranslate {
         return 'reject.noDevCardAvailable';
       case ActionRejectCode.DevCardNotOwned:
         return 'reject.devCardNotOwned';
+      case ActionRejectCode.DevCardAlreadyPlayed:
+        return 'reject.devCardAlreadyPlayed';
+      case ActionRejectCode.DevCardBoughtThisTurn:
+        return 'reject.devCardBoughtThisTurn';
       case ActionRejectCode.InvalidBankTrade:
         return 'reject.invalidBankTrade';
       case ActionRejectCode.VictimRequired:
         return 'reject.victimRequired';
+      case ActionRejectCode.RobberSameTile:
+        return 'reject.robberSameTile';
       case ActionRejectCode.GameFinished:
         return 'reject.gameFinished';
     }

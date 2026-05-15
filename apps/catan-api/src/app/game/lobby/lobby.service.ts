@@ -108,6 +108,8 @@ export class LobbyService {
       isSelf: p.sessionToken === viewerSessionToken,
       resources: { ...p.resources },
       devCardsInHand: p.devCards.length,
+      devCardsBoughtThisTurn: p.devCardsBoughtThisTurn.length,
+      hasPlayedDevCardThisTurn: p.hasPlayedDevCardThisTurn,
       playedKnights: p.playedKnights,
       visibleVictoryPoints: p.visibleVictoryPoints,
       totalVictoryPoints: getTotalVictoryPoints(p),

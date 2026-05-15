@@ -14,7 +14,7 @@ import {
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { AvatarKind, BuildKind, SceneObjectKind } from '@catan/api-interfaces';
-import { GameEngine } from '../../game/engine';
+import { GameEngine, PerformanceSnapshot } from '../../game/engine';
 import { setGameTranslateFn } from '../../game/i18n-bridge';
 import { GameStateResource } from '../core/game/game-state.resource';
 import { SpectatorCameraService } from '../features/spectator-camera/spectator-camera.service';
@@ -53,6 +53,46 @@ export interface RobberTilePick {
     @if (!uiChromeHidden()) {
       <app-dice-overlay [model]="diceOverlay()" (dismiss)="dismissDice()" />
     }
+    @if (performanceStats(); as stats) {
+      <section class="perf-dock">
+        @if (performancePanelOpen()) {
+          <aside id="perf-panel" class="perf-panel" aria-label="Performance">
+            <div class="perf-row"><span>FPS</span><strong>{{ formatNumber(stats.fps, 1) }}</strong></div>
+            <div class="perf-row">
+              <span>Frame</span><strong>{{ formatNumber(stats.frameMs, 2) }} ms</strong>
+            </div>
+            <div class="perf-row"><span>Draw Calls</span><strong>{{ stats.drawCalls }}</strong></div>
+            <div class="perf-row"><span>Triangles</span><strong>{{ stats.triangles }}</strong></div>
+            <div class="perf-row"><span>Geometries</span><strong>{{ stats.geometries }}</strong></div>
+            <div class="perf-row"><span>Textures</span><strong>{{ stats.textures }}</strong></div>
+            <div class="perf-row">
+              <span>Tiles</span><strong>{{ stats.visibleTiles }}/{{ stats.totalTiles }}</strong>
+            </div>
+            <div class="perf-row">
+              <span>Harbors</span><strong>{{ stats.visibleHarbors }}/{{ stats.totalHarbors }}</strong>
+            </div>
+            <div class="perf-row">
+              <span>Players</span><strong>{{ stats.visiblePlayers }}/{{ stats.totalPlayers }}</strong>
+            </div>
+            <div class="perf-row">
+              <span>Board Overlay</span><strong>{{ stats.boardOverlayVisible ? 'on' : 'off' }}</strong>
+            </div>
+            <div class="perf-row">
+              <span>Dice</span><strong>{{ stats.diceVisible ? 'on' : 'off' }}</strong>
+            </div>
+          </aside>
+        }
+        <button
+          class="perf-toggle"
+          type="button"
+          [attr.aria-expanded]="performancePanelOpen()"
+          aria-controls="perf-panel"
+          (click)="togglePerformancePanel()"
+        >
+          {{ performancePanelOpen() ? 'Performance ausblenden' : 'Performance anzeigen' }}
+        </button>
+      </section>
+    }
   `,
   styleUrl: './game-canvas.scss',
 })
@@ -88,6 +128,8 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
   readonly cardTooltip = signal<CardTooltipModel | null>(null);
   readonly diceOverlay = signal<DiceOverlayModel | null>(null);
   readonly cardFocused = signal<boolean>(false);
+  readonly performanceStats = signal<PerformanceSnapshot | null>(null);
+  readonly performancePanelOpen = signal<boolean>(false);
 
   private readonly diceOverlayAutoDismiss = effect((onCleanup) => {
     const overlay = this.diceOverlay();
@@ -178,6 +220,7 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
     this.engine.setBuildModeCancelHandler(() => this.buildModeCancelled.emit());
     this.engine.setDevCardClickHandler(() => this.devCardClicked.emit());
     this.engine.setDiceRollRequestHandler(() => this.rollDiceRequested.emit());
+    this.engine.setPerformanceStatsHandler((stats) => this.performanceStats.set(stats));
     this.engine.start();
     // Catch state / mode that arrived before the engine existed.
     const current = this.gameState.lobby.value();
@@ -195,6 +238,7 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
     setGameTranslateFn(null);
     this.engine?.dispose();
     this.engine = null;
+    this.performanceStats.set(null);
   }
 
   public dismissDice(): void {
@@ -203,6 +247,14 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
 
   public dismissFocusedCard(): void {
     this.engine?.clearFocusedCard();
+  }
+
+  public togglePerformancePanel(): void {
+    this.performancePanelOpen.update((open) => !open);
+  }
+
+  public formatNumber(value: number, digits: number): string {
+    return value.toFixed(digits);
   }
 
   private handleHover(state: HoverState | null): void {

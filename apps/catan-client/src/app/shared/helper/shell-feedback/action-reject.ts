@@ -15,8 +15,11 @@ const REJECT_KEY: Record<ActionRejectCode, string> = {
   [ActionRejectCode.TradeNotOpen]: 'reject.tradeNotOpen',
   [ActionRejectCode.NoDevCardAvailable]: 'reject.noDevCardAvailable',
   [ActionRejectCode.DevCardNotOwned]: 'reject.devCardNotOwned',
+  [ActionRejectCode.DevCardAlreadyPlayed]: 'reject.devCardAlreadyPlayed',
+  [ActionRejectCode.DevCardBoughtThisTurn]: 'reject.devCardBoughtThisTurn',
   [ActionRejectCode.InvalidBankTrade]: 'reject.invalidBankTrade',
   [ActionRejectCode.VictimRequired]: 'reject.victimRequired',
+  [ActionRejectCode.RobberSameTile]: 'reject.robberSameTile',
   [ActionRejectCode.GameFinished]: 'reject.gameFinished',
 };
 

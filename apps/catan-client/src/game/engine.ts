@@ -1,11 +1,13 @@
 import {
   Color,
   Fog,
+  Frustum,
   Matrix4,
   Object3D,
   PerspectiveCamera,
   Quaternion,
   Scene,
+  Sphere,
   Timer,
   Vector2,
   Vector3,
@@ -47,6 +49,23 @@ export interface EngineOptions {
   readonly seed?: number;
 }
 
+export interface PerformanceSnapshot {
+  readonly fps: number;
+  readonly frameMs: number;
+  readonly drawCalls: number;
+  readonly triangles: number;
+  readonly geometries: number;
+  readonly textures: number;
+  readonly visibleTiles: number;
+  readonly totalTiles: number;
+  readonly visibleHarbors: number;
+  readonly totalHarbors: number;
+  readonly visiblePlayers: number;
+  readonly totalPlayers: number;
+  readonly boardOverlayVisible: boolean;
+  readonly diceVisible: boolean;
+}
+
 /** Engine-level callback signatures for the build / robber interaction flows. */
 export type ArsenalBuildHandler = (kind: BuildKind) => void;
 export type BuildSpotPickHandler = (
@@ -62,6 +81,7 @@ export type RobberTilePickHandler = (
   screenY: number,
 ) => void;
 export type BuildModeCancelHandler = () => void;
+export type PerformanceStatsHandler = (snapshot: PerformanceSnapshot) => void;
 
 const TABLE_TOP_Y = -3.5;
 const TABLE_SIZE = 44;
@@ -99,6 +119,10 @@ const SPECTATOR_ORBIT_MIN_DISTANCE = 4;
 const SPECTATOR_ORBIT_MAX_DISTANCE = 145;
 const SPECTATOR_ORBIT_MIN_POLAR = 0.04;
 const SPECTATOR_ORBIT_MAX_POLAR = Math.PI * 0.49;
+const TILE_UPDATE_BOUNDS_RADIUS = HEX_SIZE * 1.65;
+const PLAYER_UPDATE_BOUNDS_RADIUS = 9.2;
+const DICE_UPDATE_BOUNDS_RADIUS = 3.6;
+const BOARD_OVERLAY_UPDATE_BOUNDS_RADIUS = HEX_SIZE * 4.9;
 
 /** Wire resource enum → procedural card texture kind. */
 const RESOURCE_TYPE_TO_KIND: Readonly<Record<ResourceType, ResourceKind>> = {
@@ -203,6 +227,19 @@ export class GameEngine {
   private readonly worldCardQuat = new Quaternion();
   private readonly fanRollQuat = new Quaternion();
   private readonly orbitClampDelta = new Vector3();
+  private readonly viewFrustum = new Frustum();
+  private readonly viewProjectionMatrix = new Matrix4();
+  private readonly cullCenter = new Vector3();
+  private readonly cullSphere = new Sphere();
+  private perfHandler: PerformanceStatsHandler | null = null;
+  private perfAccumFrames = 0;
+  private perfAccumSeconds = 0;
+  private perfAccumFrameMs = 0;
+  private perfLastVisibleTiles = 0;
+  private perfLastVisibleHarbors = 0;
+  private perfLastVisiblePlayers = 0;
+  private perfLastBoardOverlayVisible = true;
+  private perfLastDiceVisible = true;
 
   constructor(container: HTMLElement, options: EngineOptions = {}) {
     this.container = container;
@@ -385,6 +422,10 @@ export class GameEngine {
   /** Fired when the local player clicks one of their own dev cards. */
   setDevCardClickHandler(handler: (() => void) | null): void {
     this.devCardClickHandler = handler;
+  }
+
+  setPerformanceStatsHandler(handler: PerformanceStatsHandler | null): void {
+    this.perfHandler = handler;
   }
 
   public setSpectatorCameraMode(active: boolean): void {
@@ -872,22 +913,123 @@ export class GameEngine {
     this.timer.update(time);
     const dt = this.timer.getDelta();
     const t = this.timer.getElapsed();
-    this.board.update(dt, t);
+    this.updateViewFrustum();
+    let visibleTiles = 0;
+    for (let i = 0; i < this.board.tiles.length; i += 1) {
+      const tile = this.board.tiles[i];
+      const visible = this.isVisibleInFrustum(tile.group, TILE_UPDATE_BOUNDS_RADIUS);
+      tile.group.visible = visible;
+      if (visible) {
+        visibleTiles += 1;
+        tile.update(dt, t);
+      }
+    }
     this.world.update(dt, t);
     this.sunShafts.update(dt, t);
     this.clouds.update(dt, t);
-    this.diceTray.update(dt);
-    this.buildings.update(dt);
-    this.robberFigure.update(dt);
-    this.buildPreview.update(dt);
+    const boardOverlayVisible = this.isVisibleAtOrigin(BOARD_OVERLAY_UPDATE_BOUNDS_RADIUS);
+    this.buildings.group.visible = boardOverlayVisible;
+    this.robberFigure.group.visible = boardOverlayVisible;
+    this.buildPreview.group.visible = boardOverlayVisible;
+    if (boardOverlayVisible) {
+      this.buildings.update(dt);
+      this.robberFigure.update(dt);
+      this.buildPreview.update(dt);
+    }
+    const diceVisible = this.isVisibleInFrustum(this.diceTray.group, DICE_UPDATE_BOUNDS_RADIUS);
+    this.diceTray.group.visible = diceVisible;
+    if (diceVisible) {
+      this.diceTray.update(dt);
+    }
+    let visibleHarbors = 0;
+    for (let i = 0; i < this.harbors.harbors.length; i += 1) {
+      const harbor = this.harbors.harbors[i];
+      const visible = this.isVisibleInFrustum(harbor.group, TILE_UPDATE_BOUNDS_RADIUS);
+      harbor.group.visible = visible;
+      if (visible) {
+        visibleHarbors += 1;
+      }
+    }
     this.controls.update();
     this.clampOrbitTarget();
     this.updateFocusedCards();
-    for (const player of this.players) player.update(dt);
+    let visiblePlayers = 0;
+    for (let i = 0; i < this.players.length; i += 1) {
+      const player = this.players[i];
+      const visible = this.isVisibleInFrustum(player.group, PLAYER_UPDATE_BOUNDS_RADIUS);
+      player.group.visible = visible;
+      if (visible) {
+        visiblePlayers += 1;
+        player.update(dt);
+      }
+    }
     this.hover.update();
     this.renderer.render(this.scene, this.camera);
+    this.perfLastVisibleTiles = visibleTiles;
+    this.perfLastVisibleHarbors = visibleHarbors;
+    this.perfLastVisiblePlayers = visiblePlayers;
+    this.perfLastBoardOverlayVisible = boardOverlayVisible;
+    this.perfLastDiceVisible = diceVisible;
+    this.collectPerformanceStats(dt);
     this.rafId = requestAnimationFrame(this.loop);
   };
+
+  private collectPerformanceStats(dt: number): void {
+    if (this.perfHandler === null) {
+      this.perfAccumFrames = 0;
+      this.perfAccumSeconds = 0;
+      this.perfAccumFrameMs = 0;
+      return;
+    }
+    this.perfAccumFrames += 1;
+    this.perfAccumSeconds += dt;
+    this.perfAccumFrameMs += dt * 1000;
+    if (this.perfAccumSeconds < 0.5) {
+      return;
+    }
+    const fps = this.perfAccumSeconds > 0 ? this.perfAccumFrames / this.perfAccumSeconds : 0;
+    const frameMs = this.perfAccumFrames > 0 ? this.perfAccumFrameMs / this.perfAccumFrames : 0;
+    const renderInfo = this.renderer.info.render;
+    const memoryInfo = this.renderer.info.memory;
+    this.perfHandler({
+      fps,
+      frameMs,
+      drawCalls: renderInfo.calls,
+      triangles: renderInfo.triangles,
+      geometries: memoryInfo.geometries,
+      textures: memoryInfo.textures,
+      visibleTiles: this.perfLastVisibleTiles,
+      totalTiles: this.board.tiles.length,
+      visibleHarbors: this.perfLastVisibleHarbors,
+      totalHarbors: this.harbors.harbors.length,
+      visiblePlayers: this.perfLastVisiblePlayers,
+      totalPlayers: this.players.length,
+      boardOverlayVisible: this.perfLastBoardOverlayVisible,
+      diceVisible: this.perfLastDiceVisible,
+    });
+    this.perfAccumFrames = 0;
+    this.perfAccumSeconds = 0;
+    this.perfAccumFrameMs = 0;
+  }
+
+  private updateViewFrustum(): void {
+    this.camera.updateMatrixWorld();
+    this.viewProjectionMatrix.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
+    this.viewFrustum.setFromProjectionMatrix(this.viewProjectionMatrix);
+  }
+
+  private isVisibleInFrustum(object: Object3D, radius: number): boolean {
+    object.getWorldPosition(this.cullCenter);
+    this.cullSphere.center.copy(this.cullCenter);
+    this.cullSphere.radius = radius;
+    return this.viewFrustum.intersectsSphere(this.cullSphere);
+  }
+
+  private isVisibleAtOrigin(radius: number): boolean {
+    this.cullSphere.center.set(0, 0, 0);
+    this.cullSphere.radius = radius;
+    return this.viewFrustum.intersectsSphere(this.cullSphere);
+  }
 
   private handleResize(): void {
     const { clientWidth, clientHeight } = this.container;

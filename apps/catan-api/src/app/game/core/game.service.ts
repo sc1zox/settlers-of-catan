@@ -15,6 +15,7 @@ import {
 import { Server } from 'socket.io';
 import { BuildActionService } from '../build/build-action.service';
 import { DemoBotService } from '../demo-bot/demo-bot.service';
+import { DevCardsService } from '../dev-cards/dev-cards.service';
 import { EconomyService } from '../economy/economy.service';
 import { LobbyRuntime } from '../lobby/lobby-runtime';
 import { LobbyService } from '../lobby/lobby.service';
@@ -39,6 +40,7 @@ export class GameService {
     private readonly buildActions: BuildActionService,
     private readonly economy: EconomyService,
     private readonly robber: RobberService,
+    private readonly devCards: DevCardsService,
     private readonly demoBots: DemoBotService,
   ) {}
 
@@ -239,7 +241,7 @@ export class GameService {
   public buyDevCard(lobbyId: string, sessionToken: string, server: Server): void {
     const lobby = this.lobby.requireLobby(lobbyId);
     this.lobby.assertLobbyOpen(lobby);
-    this.economy.buyDevCardAsCurrentTurn(lobby, sessionToken);
+    this.devCards.buyDevCardAsCurrentTurn(lobby, sessionToken);
     this.broadcastFullState(server, lobby);
   }
 
@@ -253,7 +255,7 @@ export class GameService {
   ): void {
     const lobby = this.lobby.requireLobby(lobbyId);
     this.lobby.assertLobbyOpen(lobby);
-    this.robber.playKnightDevCardAsCurrentTurn(lobby, sessionToken, q, r, victimSeat);
+    this.devCards.playKnightAsCurrentTurn(lobby, sessionToken, q, r, victimSeat);
     this.broadcastFullState(server, lobby);
   }
 
@@ -265,7 +267,7 @@ export class GameService {
   ): void {
     const lobby = this.lobby.requireLobby(lobbyId);
     this.lobby.assertLobbyOpen(lobby);
-    this.economy.playMonopolyAsCurrentTurn(lobby, sessionToken, resource);
+    this.devCards.playMonopolyAsCurrentTurn(lobby, sessionToken, resource);
     this.broadcastFullState(server, lobby);
   }
 
@@ -278,7 +280,7 @@ export class GameService {
   ): void {
     const lobby = this.lobby.requireLobby(lobbyId);
     this.lobby.assertLobbyOpen(lobby);
-    this.economy.playYearOfPlentyAsCurrentTurn(lobby, sessionToken, first, second);
+    this.devCards.playYearOfPlentyAsCurrentTurn(lobby, sessionToken, first, second);
     this.broadcastFullState(server, lobby);
   }
 
@@ -291,7 +293,7 @@ export class GameService {
   ): void {
     const lobby = this.lobby.requireLobby(lobbyId);
     this.lobby.assertLobbyOpen(lobby);
-    this.buildActions.playRoadBuilding(lobby, sessionToken, firstEdgeId, secondEdgeId);
+    this.devCards.playRoadBuildingAsCurrentTurn(lobby, sessionToken, firstEdgeId, secondEdgeId);
     this.broadcastFullState(server, lobby);
   }
 

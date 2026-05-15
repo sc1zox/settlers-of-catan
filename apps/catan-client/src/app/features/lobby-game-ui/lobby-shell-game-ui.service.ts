@@ -204,13 +204,6 @@ export class LobbyShellGameUiService {
     () => this.isSelfTurn() && this.lobbyUiState()?.phase === GamePhase.Trading,
   );
 
-  public readonly canBuyDevCard = computed<boolean>(() => this.canEndTurn());
-
-  public readonly canPlayDevCard = computed<boolean>(() => {
-    const phase = this.lobbyUiState()?.phase;
-    return this.isSelfTurn() && (phase === GamePhase.Trading || phase === GamePhase.Building);
-  });
-
   public readonly canMoveRobber = computed<boolean>(
     () => this.isSelfTurn() && this.lobbyUiState()?.phase === GamePhase.RobberMove,
   );

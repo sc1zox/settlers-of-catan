@@ -12,8 +12,11 @@
     "tradeNotOpen": "Auf dieses Angebot kann nicht reagiert werden — es ist nicht mehr offen.",
     "noDevCardAvailable": "Im Stapel liegen keine Entwicklungskarten mehr.",
     "devCardNotOwned": "Du hast diese Entwicklungskarte nicht (oder sie wurde schon gespielt).",
+    "devCardAlreadyPlayed": "Du hast in diesem Zug bereits eine Entwicklungskarte gespielt — pro Zug ist nur eine erlaubt.",
+    "devCardBoughtThisTurn": "Diese Entwicklungskarte hast du in diesem Zug gekauft — sie kann erst im naechsten Zug gespielt werden.",
     "invalidBankTrade": "Bank- oder Hafenhandel ungueltig: pruefe Verhaeltnis (3:1, 2:1 am Hafen) und ob du genug gleiche Karten abgibst.",
     "victimRequired": "Raeuber: Waehle ein Opfer mit mindestens einer Karte auf dem angrenzenden Knoten — oder bestaetige „Kein Opfer“, falls niemand passt.",
+    "robberSameTile": "Der Raeuber darf nicht auf dasselbe Feld gesetzt werden — waehle ein anderes Hex.",
     "gameFinished": "Das Spiel ist beendet — keine Spielaktionen mehr moeglich."
   },
   "shell": {

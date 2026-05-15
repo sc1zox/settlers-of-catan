@@ -14,6 +14,7 @@ import {
   type BoardVertexRuntime,
   type TilePlacement,
 } from '@catan/shared-game-field';
+import { createShuffledDevDeck } from '../dev-cards/dev-deck.util';
 import { TurnStateMachine } from '../turn/turn-state-machine';
 
 export const CLOCKWISE_SEATS: readonly PlayerSeat[] = [
@@ -31,6 +32,8 @@ export interface LobbyPlayerSlot {
   socketId: string | null;
   resources: Record<ResourceType, number>;
   devCards: DevCardType[];
+  devCardsBoughtThisTurn: DevCardType[];
+  hasPlayedDevCardThisTurn: boolean;
   playedKnights: number;
   visibleVictoryPoints: number;
   longestRoadLength: number;
@@ -87,7 +90,7 @@ export class LobbyRuntime {
       ? { q: desert.coord.q, r: desert.coord.r }
       : { q: 0, r: 0 };
     this.setupPlacementsBySeat = this.createSeatCounter();
-    this.devDeck = this.createDevDeck();
+    this.devDeck = createShuffledDevDeck();
   }
 
   public findPlayerBySeat(seat: PlayerSeat): LobbyPlayerSlot | undefined {
@@ -163,6 +166,8 @@ export class LobbyRuntime {
       socketId,
       resources,
       devCards: [],
+      devCardsBoughtThisTurn: [],
+      hasPlayedDevCardThisTurn: false,
       playedKnights: 0,
       visibleVictoryPoints: 0,
       longestRoadLength: 0,
@@ -217,27 +222,5 @@ export class LobbyRuntime {
       [PlayerSeat.South]: initialValue,
       [PlayerSeat.West]: initialValue,
     };
-  }
-
-  private createDevDeck(): DevCardType[] {
-    const cards: DevCardType[] = [];
-    for (let i = 0; i < 14; i += 1) {
-      cards.push(DevCardType.Knight);
-    }
-    for (let i = 0; i < 5; i += 1) {
-      cards.push(DevCardType.VictoryPoint);
-    }
-    for (let i = 0; i < 2; i += 1) {
-      cards.push(DevCardType.Monopoly);
-      cards.push(DevCardType.YearOfPlenty);
-      cards.push(DevCardType.RoadBuilding);
-    }
-    for (let i = cards.length - 1; i > 0; i -= 1) {
-      const j = randomInt(0, i + 1);
-      const temp = cards[i];
-      cards[i] = cards[j];
-      cards[j] = temp;
-    }
-    return cards;
   }
 }

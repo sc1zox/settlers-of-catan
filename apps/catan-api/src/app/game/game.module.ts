@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BuildActionsModule } from './build/build-actions.module';
 import { DemoBotModule } from './demo-bot/demo-bot.module';
+import { DevCardsModule } from './dev-cards/dev-cards.module';
 import { EconomyModule } from './economy/economy.module';
 import { GameActionValidationModule } from './validation/game-action-validation.module';
 import { GameGateway } from './gateway/game.gateway';
@@ -18,6 +19,7 @@ import { TurnFlowModule } from './turn/turn-flow.module';
     MatchFlowModule,
     RobberModule,
     DemoBotModule,
+    DevCardsModule,
     GameActionValidationModule,
     TradeModule,
     TurnFlowModule,

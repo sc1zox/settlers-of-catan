@@ -31,6 +31,8 @@ export interface LobbyPlayerPublicDto {
   readonly isSelf: boolean;
   readonly resources: Readonly<Record<ResourceType, number>>;
   readonly devCardsInHand: number;
+  readonly devCardsBoughtThisTurn: number;
+  readonly hasPlayedDevCardThisTurn: boolean;
   readonly playedKnights: number;
   readonly visibleVictoryPoints: number;
   readonly totalVictoryPoints: number;

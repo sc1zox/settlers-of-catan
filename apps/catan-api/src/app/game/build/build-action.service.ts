@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
   ActionRejectCode,
-  DevCardType,
   GameDeltaType,
   GamePhase,
   type GameDeltaPayload,
@@ -9,7 +8,7 @@ import {
 import { EconomyService } from '../economy/economy.service';
 import { GameActionValidationService } from '../validation/game-action-validation.service';
 import { LobbyRuntime } from '../lobby/lobby-runtime';
-import { applyPostActionScoring, consumeDevCard } from '../utils/scoring.util';
+import { applyPostActionScoring } from '../utils/scoring.util';
 import { TurnFlowService } from '../turn/turn-flow.service';
 
 @Injectable()
@@ -136,23 +135,4 @@ export class BuildActionService {
     applyPostActionScoring(lobby);
   }
 
-  public playRoadBuilding(
-    lobby: LobbyRuntime,
-    sessionToken: string,
-    firstEdgeId: string,
-    secondEdgeId: string | undefined,
-  ): void {
-    this.validation.assertPhase(lobby, [GamePhase.Trading, GamePhase.Building]);
-    const player = this.validation.assertCurrentPlayer(lobby, sessionToken);
-    if (!consumeDevCard(player, DevCardType.RoadBuilding)) {
-      throw new Error(ActionRejectCode.DevCardNotOwned);
-    }
-    this.validation.assertLegalRoadEdge(lobby, player, firstEdgeId);
-    lobby.roads.push({ seat: player.seat, edgeId: firstEdgeId });
-    if (secondEdgeId !== undefined && secondEdgeId.length > 0) {
-      this.validation.assertLegalRoadEdge(lobby, player, secondEdgeId);
-      lobby.roads.push({ seat: player.seat, edgeId: secondEdgeId });
-    }
-    applyPostActionScoring(lobby);
-  }
 }

@@ -17,7 +17,8 @@ import { GameStateResource } from '../../core/game/game-state.resource';
 import { PlayerSessionService } from '../../core/session/player-session.service';
 import { BuildConfirmModel, BuildConfirmPopoverComponent } from '../../game-canvas/build-confirm-popover';
 import { DiscardModalComponent } from '../../game-canvas/discard-modal';
-import { DevCardModalComponent, YearOfPlentyPick } from '../../game-canvas/dev-card-modal';
+import { DevCardModalComponent, YearOfPlentyPick } from '../dev-cards/dev-card-modal';
+import { DevCardsService } from '../dev-cards/dev-cards.service';
 import { GameCanvasComponent, RobberTilePick } from '../../game-canvas/game-canvas';
 import {
   RobberVictimCandidate,
@@ -63,6 +64,7 @@ export class SessionShell {
   private readonly fb = inject(FormBuilder);
   private readonly gameState = inject(GameStateResource);
   public readonly lobbyGameUi = inject(LobbyShellGameUiService);
+  public readonly devCards = inject(DevCardsService);
   public readonly shellFeedback = inject(ShellFeedbackService);
   private readonly playerSession = inject(PlayerSessionService);
   public readonly spectatorCamService = inject(SpectatorCameraService);
@@ -322,8 +324,19 @@ export class SessionShell {
   }
 
   public onRobberTilePicked(pick: RobberTilePick): void {
-    this.pendingRobberCoord.set({ q: pick.q, r: pick.r });
     const payload = this.lobbyGameUi.rawLobbyState();
+    if (
+      payload !== undefined &&
+      payload.robberCoord.q === pick.q &&
+      payload.robberCoord.r === pick.r
+    ) {
+      this.shellFeedback.setFeedback(
+        UiFeedbackTone.Error,
+        this.translate.instant(marker('reject.robberSameTile')),
+      );
+      return;
+    }
+    this.pendingRobberCoord.set({ q: pick.q, r: pick.r });
     const selfSeat = this.lobbyGameUi.selfSeat();
     let candidates: RobberVictimCandidate[] = [];
     if (payload !== undefined && selfSeat !== null) {
@@ -388,7 +401,7 @@ export class SessionShell {
   }
 
   public onDevCardClicked(): void {
-    if (this.lobbyGameUi.canPlayDevCard()) {
+    if (this.devCards.canPlayDevCard()) {
       this.devCardOpen.set(true);
     }
   }

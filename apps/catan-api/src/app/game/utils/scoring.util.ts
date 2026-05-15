@@ -1,15 +1,6 @@
 import { DevCardType, PlayerSeat } from '@catan/api-interfaces';
 import { LobbyPlayerSlot, LobbyRuntime } from '../lobby/lobby-runtime';
 
-export function consumeDevCard(player: LobbyPlayerSlot, card: DevCardType): boolean {
-  const cardIndex = player.devCards.indexOf(card);
-  if (cardIndex < 0) {
-    return false;
-  }
-  player.devCards.splice(cardIndex, 1);
-  return true;
-}
-
 export function getTotalVictoryPoints(player: LobbyPlayerSlot): number {
   let hiddenVictoryCards = 0;
   for (let i = 0; i < player.devCards.length; i += 1) {

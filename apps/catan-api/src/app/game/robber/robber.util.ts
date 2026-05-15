@@ -16,7 +16,7 @@ export function applyRobberMove(
   const oldQ = lobby.robberCoord.q;
   const oldR = lobby.robberCoord.r;
   if (oldQ === q && oldR === r) {
-    throw new Error(ActionRejectCode.IllegalPlacement);
+    throw new Error(ActionRejectCode.RobberSameTile);
   }
   const eligibleVictims = collectRobberVictims(lobby, actor.seat, q, r);
   let stealVictim: LobbyPlayerSlot | undefined;

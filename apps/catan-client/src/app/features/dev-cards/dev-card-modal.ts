@@ -10,8 +10,8 @@ import {
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { ResourceType } from '@catan/api-interfaces';
-import { TranslateInstantFn } from '../../shared/i18n/translate-instant-fn';
-import { RESOURCE_TYPE_ORDER, resourceTypeLabel } from '../shared/resource-labels';
+import { TranslateInstantFn } from '../../../shared/i18n/translate-instant-fn';
+import { RESOURCE_TYPE_ORDER, resourceTypeLabel } from '../../shared/resource-labels';
 
 export interface YearOfPlentyPick {
   readonly first: ResourceType;

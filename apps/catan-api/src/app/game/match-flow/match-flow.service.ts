@@ -10,6 +10,7 @@ import {
 import { Server } from 'socket.io';
 import { DemoBotService } from '../demo-bot/demo-bot.service';
 import { EconomyService } from '../economy/economy.service';
+import { resetTurnDevCardState } from '../dev-cards/dev-cards.runtime';
 import { GameActionValidationService } from '../validation/game-action-validation.service';
 import { LobbyRuntime } from '../lobby/lobby-runtime';
 import { TradeService } from '../trade/trade.service';
@@ -60,6 +61,7 @@ export class MatchFlowService {
     lobby.currentSeat = this.turnFlow.nextSeat(lobby, lobby.currentSeat);
     lobby.lastDiceRoll = null;
     lobby.pendingRobberDiscardSeats = [];
+    resetTurnDevCardState(lobby);
     lobby.fsm.onTurnEnded();
   }
 

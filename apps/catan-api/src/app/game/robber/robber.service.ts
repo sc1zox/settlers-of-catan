@@ -1,16 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import {
   ActionRejectCode,
-  DevCardType,
   GamePhase,
   PlayerSeat,
   ResourceType,
 } from '@catan/api-interfaces';
 import { GameActionValidationService } from '../validation/game-action-validation.service';
-import type { LobbyPlayerSlot } from '../lobby/lobby-runtime';
 import { LobbyRuntime } from '../lobby/lobby-runtime';
 import { applyRobberMove } from './robber.util';
-import { applyPostActionScoring, consumeDevCard } from '../utils/scoring.util';
 
 @Injectable()
 export class RobberService {
@@ -83,32 +80,5 @@ export class RobberService {
     const actor = this.validation.assertCurrentPlayer(lobby, sessionToken);
     applyRobberMove(lobby, actor, q, r, victimSeat);
     lobby.fsm.onRobberMoved();
-  }
-
-  public playKnightDevCard(
-    lobby: LobbyRuntime,
-    player: LobbyPlayerSlot,
-    q: number,
-    r: number,
-    victimSeat: PlayerSeat | undefined,
-  ): void {
-    if (!consumeDevCard(player, DevCardType.Knight)) {
-      throw new Error(ActionRejectCode.DevCardNotOwned);
-    }
-    player.playedKnights += 1;
-    applyRobberMove(lobby, player, q, r, victimSeat);
-    applyPostActionScoring(lobby);
-  }
-
-  public playKnightDevCardAsCurrentTurn(
-    lobby: LobbyRuntime,
-    sessionToken: string,
-    q: number,
-    r: number,
-    victimSeat: PlayerSeat | undefined,
-  ): void {
-    this.validation.assertPhase(lobby, [GamePhase.Trading, GamePhase.Building]);
-    const player = this.validation.assertCurrentPlayer(lobby, sessionToken);
-    this.playKnightDevCard(lobby, player, q, r, victimSeat);
   }
 }

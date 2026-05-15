@@ -234,6 +234,7 @@ export class GameEngine {
   private readonly cullCenter = new Vector3();
   private readonly cullSphere = new Sphere();
   private readonly handSignatureBySeat: string[] = ['', '', '', ''];
+  private readonly playerAreaActiveAtTable: boolean[] = [false, false, false, false];
   private perfHandler: PerformanceStatsHandler | null = null;
   private perfAccumFrames = 0;
   private perfAccumSeconds = 0;
@@ -241,6 +242,7 @@ export class GameEngine {
   private perfLastVisibleTiles = 0;
   private perfLastVisibleHarbors = 0;
   private perfLastVisiblePlayers = 0;
+  private perfLastActivePlayersTotal = 0;
   private perfLastBoardOverlayVisible = true;
   private perfLastDiceVisible = true;
 
@@ -619,6 +621,21 @@ export class GameEngine {
    * deal cards in with a drop animation.
    */
   applyLobbyState(state: LobbyFullStatePayload): void {
+    for (let s = 0; s < this.playerAreaActiveAtTable.length; s += 1) {
+      this.playerAreaActiveAtTable[s] = false;
+    }
+    for (let i = 0; i < state.players.length; i += 1) {
+      const seat = state.players[i].seat;
+      if (seat >= 0 && seat < this.playerAreaActiveAtTable.length) {
+        this.playerAreaActiveAtTable[seat] = true;
+      }
+    }
+    for (let s = 0; s < this.players.length; s += 1) {
+      if (!this.playerAreaActiveAtTable[s]) {
+        this.players[s].setHeadVideo(null);
+      }
+    }
+    this.buildings.setLobbySeatMask(this.playerAreaActiveAtTable);
     if (state.phase === GamePhase.LobbyWaiting) {
       this.hasFramedBoardForActiveMatch = false;
     }
@@ -646,7 +663,7 @@ export class GameEngine {
     this.robberFigure.syncCoord(state.robberCoord.q, state.robberCoord.r, boardJustRebuilt);
     for (const playerState of state.players) {
       const area = this.players[playerState.seat];
-      if (!area) continue;
+      if (!area || !this.playerAreaActiveAtTable[playerState.seat]) continue;
       const handSignature = this.computeHandSignature(
         playerState.resources,
         playerState.devCardsInHand,
@@ -720,6 +737,9 @@ export class GameEngine {
     }
     for (const harbor of this.harbors.harbors) hoverables.push(harbor.pickMesh);
     for (const player of this.players) {
+      if (!this.playerAreaActiveAtTable[player.info.seat]) {
+        continue;
+      }
       if (this.spectatorCameraActive) {
         if (this.selfSeat === null || player.info.seat !== this.selfSeat) {
           continue;
@@ -739,7 +759,7 @@ export class GameEngine {
     if (!this.spectatorCameraActive) {
       for (const figure of this.buildPreview.hoverables()) hoverables.push(figure);
     }
-    if (this.selfSeat !== null) {
+    if (this.selfSeat !== null && this.playerAreaActiveAtTable[this.selfSeat]) {
       const selfArea = this.players[this.selfSeat];
       if (selfArea) {
         for (const figure of selfArea.arsenal) hoverables.push(figure);
@@ -756,6 +776,9 @@ export class GameEngine {
       return this.players[this.selfSeat]?.cards.includes(card) ?? false;
     }
     for (let i = 0; i < this.players.length; i += 1) {
+      if (!this.playerAreaActiveAtTable[i]) {
+        continue;
+      }
       if (this.players[i].getCostCard() === card) {
         return true;
       }
@@ -840,6 +863,9 @@ export class GameEngine {
     if (key === null) return [card];
     const out: Card[] = [];
     for (const player of this.players) {
+      if (!this.playerAreaActiveAtTable[player.info.seat]) {
+        continue;
+      }
       for (const c of player.cards) {
         if (c.getGroupKey() === key) out.push(c);
       }
@@ -991,9 +1017,15 @@ export class GameEngine {
     this.clampOrbitTarget();
     this.updateFocusedCards();
     let visiblePlayers = 0;
+    let activePlayersTotal = 0;
     for (let i = 0; i < this.players.length; i += 1) {
       const player = this.players[i];
-      const visible = this.isVisibleInFrustum(player.group, PLAYER_UPDATE_BOUNDS_RADIUS);
+      if (this.playerAreaActiveAtTable[i]) {
+        activePlayersTotal += 1;
+      }
+      const visible =
+        this.playerAreaActiveAtTable[i] &&
+        this.isVisibleInFrustum(player.group, PLAYER_UPDATE_BOUNDS_RADIUS);
       player.group.visible = visible;
       if (visible) {
         visiblePlayers += 1;
@@ -1005,6 +1037,7 @@ export class GameEngine {
     this.perfLastVisibleTiles = visibleTiles;
     this.perfLastVisibleHarbors = visibleHarbors;
     this.perfLastVisiblePlayers = visiblePlayers;
+    this.perfLastActivePlayersTotal = activePlayersTotal;
     this.perfLastBoardOverlayVisible = boardOverlayVisible;
     this.perfLastDiceVisible = diceVisible;
     this.collectPerformanceStats(dt);
@@ -1040,7 +1073,7 @@ export class GameEngine {
       visibleHarbors: this.perfLastVisibleHarbors,
       totalHarbors: this.harbors.harbors.length,
       visiblePlayers: this.perfLastVisiblePlayers,
-      totalPlayers: this.players.length,
+      totalPlayers: this.perfLastActivePlayersTotal,
       boardOverlayVisible: this.perfLastBoardOverlayVisible,
       diceVisible: this.perfLastDiceVisible,
     });

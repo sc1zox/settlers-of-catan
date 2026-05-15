@@ -36,11 +36,7 @@ services:
       - turn
 
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
-      target: api
-    image: ${CATAN_API_IMAGE:-catan-prod-local:api}
+    image: ${CATAN_WEB_IMAGE:-ghcr.io/sc1zox/settlers-of-catan:web}
     expose:
       - "${API_CONTAINER_PORT:-3000}"
     environment:
@@ -59,11 +55,7 @@ services:
       - livekit
 
   web:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
-      target: web
-    image: ${CATAN_WEB_IMAGE:-catan-prod-local:web}
+    image: ${CATAN_WEB_IMAGE:-ghcr.io/sc1zox/settlers-of-catan:web}
     ports:
       - "${PUBLIC_WEB_PORT:-80}:${WEB_INTERNAL_PORT:-80}"
     environment:

@@ -41,6 +41,9 @@ export class AvatarSeat {
   private videoTexture: VideoTexture | null = null;
   private attachedVideo: HTMLVideoElement | null = null;
   private videoDisplayGamma = DEFAULT_VIDEO_DISPLAY_GAMMA;
+  private readonly onVideoFrameGeometryReady = (): void => {
+    this.ensureVideoTextureFromAttached();
+  };
 
   public constructor(options: AvatarSeatOptions) {
     const seatY = options.tableTopY - 2.05;
@@ -55,6 +58,7 @@ export class AvatarSeat {
     const limbMat = this.createMaterial(0xeff6ff, 0.8);
     this.screenMaterial = new MeshBasicMaterial({
       color: new Color(DEFAULT_VIDEO_DISPLAY_GAMMA, DEFAULT_VIDEO_DISPLAY_GAMMA, DEFAULT_VIDEO_DISPLAY_GAMMA),
+      toneMapped: false,
     });
     this.buildMinimalBody(bodyMat, limbMat);
     this.buildSquareHead();
@@ -69,7 +73,8 @@ export class AvatarSeat {
     if (this.attachedVideo === video) {
       return;
     }
-    this.clearVideoTexture();
+    this.teardownVideoListeners();
+    this.disposeVideoTextureOnly();
     this.attachedVideo = video;
     if (video === null || this.headMesh === null) {
       this.screenMaterial.map = null;
@@ -77,24 +82,30 @@ export class AvatarSeat {
       this.screenMaterial.needsUpdate = true;
       return;
     }
-    const texture = new VideoTexture(video);
-    texture.colorSpace = SRGBColorSpace;
-    texture.wrapS = ClampToEdgeWrapping;
-    texture.wrapT = ClampToEdgeWrapping;
-    texture.flipY = true;
-    this.videoTexture = texture;
-    this.screenMaterial.map = texture;
-    this.applyVideoDisplayGamma();
+    video.addEventListener('loadedmetadata', this.onVideoFrameGeometryReady);
+    video.addEventListener('resize', this.onVideoFrameGeometryReady);
+    video.addEventListener('playing', this.onVideoFrameGeometryReady);
+    this.screenMaterial.map = null;
+    this.screenMaterial.color.setHex(0x2a3344);
+    this.screenMaterial.needsUpdate = true;
+    this.ensureVideoTextureFromAttached();
   }
 
   public update(): void {
-    if (this.videoTexture !== null) {
+    if (
+      this.videoTexture !== null &&
+      this.attachedVideo !== null &&
+      this.attachedVideo.videoWidth > 0 &&
+      this.attachedVideo.videoHeight > 0
+    ) {
       this.videoTexture.needsUpdate = true;
     }
   }
 
   public dispose(): void {
-    this.clearVideoTexture();
+    this.teardownVideoListeners();
+    this.disposeVideoTextureOnly();
+    this.attachedVideo = null;
     this.screenMaterial.dispose();
     if (this.headMesh !== null) {
       this.headMesh.geometry.dispose();
@@ -110,13 +121,43 @@ export class AvatarSeat {
     this.screenMaterial.needsUpdate = true;
   }
 
-  private clearVideoTexture(): void {
+  private teardownVideoListeners(): void {
+    const video = this.attachedVideo;
+    if (video === null) {
+      return;
+    }
+    video.removeEventListener('loadedmetadata', this.onVideoFrameGeometryReady);
+    video.removeEventListener('resize', this.onVideoFrameGeometryReady);
+    video.removeEventListener('playing', this.onVideoFrameGeometryReady);
+  }
+
+  private disposeVideoTextureOnly(): void {
     if (this.videoTexture !== null) {
       this.videoTexture.dispose();
       this.videoTexture = null;
     }
-    this.attachedVideo = null;
     this.screenMaterial.map = null;
+  }
+
+  private ensureVideoTextureFromAttached(): void {
+    const video = this.attachedVideo;
+    if (video === null || this.headMesh === null) {
+      return;
+    }
+    if (video.videoWidth <= 0 || video.videoHeight <= 0) {
+      return;
+    }
+    if (this.videoTexture !== null) {
+      return;
+    }
+    const texture = new VideoTexture(video);
+    texture.colorSpace = SRGBColorSpace;
+    texture.wrapS = ClampToEdgeWrapping;
+    texture.wrapT = ClampToEdgeWrapping;
+    texture.flipY = true;
+    this.videoTexture = texture;
+    this.screenMaterial.map = texture;
+    this.applyVideoDisplayGamma();
   }
 
   private buildMinimalBody(body: MeshStandardMaterial, limb: MeshStandardMaterial): void {

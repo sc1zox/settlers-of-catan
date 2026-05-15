@@ -2,7 +2,7 @@
   "reject": {
     "wrongPhase": "Diese Aktion passt nicht zur aktuellen Spielphase (z. B. wuerfeln nur in der Wuerfelphase, bauen nur nach dem Wurf).",
     "notYourTurn": "Du bist nicht am Zug — warte, bis du in der HUD als aktiver Sitz angezeigt wirst.",
-    "lobbyNotEnoughPlayers": "Zum Start sind mindestens zwei aktive Spieler in der Lobby noetig. Lade einen Mitspieler ein, oder nutze den Lobby-Code „demo“ fuer Einzelspieler mit Bots.",
+    "lobbyNotEnoughPlayers": "Zum Start sind mindestens drei aktive Spieler in der Lobby noetig. Lade Mitspieler ein, oder nutze den Lobby-Code „demo“ fuer Einzelspieler mit Bots.",
     "insufficientResources": "Dir fehlen Rohstoffe auf der Hand: Die Aktion kostet mehr, als du gerade hast (Siedlung, Stadt, Strasse, Entwicklungskarte oder Spielerhandel).",
     "illegalPlacement": "Ungueltiger Bauplatz: nur markierte Geisterpositionen, kein Bebauen auf fremde Gueter oder ausserhalb der erlaubten Liste.",
     "invalidPayload": "Die Aktion konnte serverseitig nicht verarbeitet werden (ungueltige Daten). Bitte Seite neu laden und erneut versuchen.",

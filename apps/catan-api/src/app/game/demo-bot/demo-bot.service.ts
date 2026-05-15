@@ -137,7 +137,7 @@ export class DemoBotService {
     if (this.isDemoLobby(lobby)) {
       return 1;
     }
-    return 2;
+    return 3;
   }
 
   public resolveDemoBotTradeAcceptorSessionToken(

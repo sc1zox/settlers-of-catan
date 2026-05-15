@@ -9,8 +9,10 @@ import {
   Room,
   RoomEvent,
   Track,
+  VideoPresets,
   createLocalVideoTrack,
 } from 'livekit-client';
+import type { VideoCaptureOptions } from 'livekit-client';
 import { GameSettingsService } from '../game-settings/game-settings.service';
 import { webcamQualityPreset } from '../../shared/helper/webcam/webcam-quality-preset';
 
@@ -20,6 +22,7 @@ interface LiveKitParticipantMetadata {
 
 const POST_CONNECT_PUBLISH_DELAY_MS = 120;
 const CAMERA_PUBLISH_TIMEOUT_MS = 15_000;
+const LIVEKIT_PEER_CONNECT_TIMEOUT_MS = 120_000;
 
 @Injectable({ providedIn: 'root' })
 export class LobbyLiveKitService implements OnDestroy {
@@ -47,10 +50,7 @@ export class LobbyLiveKitService implements OnDestroy {
     const preset = webcamQualityPreset(this.gameSettings.webcamQuality());
     this.primedLocalVideo = (async (): Promise<LocalVideoTrack | null> => {
       try {
-        return await createLocalVideoTrack({
-          resolution: { width: preset.width, height: preset.height, frameRate: preset.frameRate },
-          facingMode: 'user',
-        });
+        return await this.createCameraTrackForPreset(preset.width, preset.height, preset.frameRate);
       } catch {
         return null;
       }
@@ -73,6 +73,12 @@ export class LobbyLiveKitService implements OnDestroy {
       adaptiveStream: false,
       dynacast: false,
       webAudioMix: false,
+      singlePeerConnection: !LobbyLiveKitService.isFirefoxUserAgent(),
+      publishDefaults: {
+        simulcast: false,
+        videoCodec: 'vp8',
+        backupCodec: false,
+      },
     });
     this.room = room;
 
@@ -114,7 +120,7 @@ export class LobbyLiveKitService implements OnDestroy {
     try {
       await room.connect(credentials.serverUrl, credentials.token, {
         autoSubscribe: false,
-        peerConnectionTimeout: 60_000,
+        peerConnectionTimeout: LIVEKIT_PEER_CONNECT_TIMEOUT_MS,
         websocketTimeout: 30_000,
       });
       if (this.connectGeneration !== generation || this.room !== room) {
@@ -133,7 +139,13 @@ export class LobbyLiveKitService implements OnDestroy {
         return;
       }
       if (this.gameSettings.webcamEnabled()) {
-        await this.publishCameraTrack(room, preset.width, preset.height, preset.frameRate);
+        try {
+          await this.publishCameraTrack(room, preset.width, preset.height, preset.frameRate);
+        } catch (publishError: unknown) {
+          console.error('LiveKit camera publish failed', publishError);
+          await this.abandonPrimedLocalVideoCapture();
+          this.localVideoElement.set(null);
+        }
       } else {
         await this.abandonPrimedLocalVideoCapture();
       }
@@ -219,10 +231,7 @@ export class LobbyLiveKitService implements OnDestroy {
     let videoTrack = await this.takePrimedLocalVideoTrack();
     if (videoTrack === null) {
       videoTrack = await Promise.race([
-        createLocalVideoTrack({
-          resolution: { width, height, frameRate },
-          facingMode: 'user',
-        }),
+        this.createCameraTrackForPreset(width, height, frameRate),
         this.rejectAfter(CAMERA_PUBLISH_TIMEOUT_MS, 'LiveKit camera publish timed out'),
       ]);
     }
@@ -284,6 +293,35 @@ export class LobbyLiveKitService implements OnDestroy {
     } catch {
       return null;
     }
+  }
+
+  private static isFirefoxUserAgent(): boolean {
+    const nav = typeof globalThis === 'undefined' ? undefined : globalThis.navigator;
+    if (nav === undefined || typeof nav.userAgent !== 'string') {
+      return false;
+    }
+    return /firefox/i.test(nav.userAgent);
+  }
+
+  private async createCameraTrackForPreset(
+    width: number,
+    height: number,
+    frameRate: number,
+  ): Promise<LocalVideoTrack> {
+    const attempts: VideoCaptureOptions[] = [
+      { resolution: { width, height, frameRate } },
+      { resolution: VideoPresets.h180.resolution },
+      { resolution: { width: 320, height: 240, frameRate: Math.min(frameRate, 15) } },
+    ];
+    let lastError: unknown;
+    for (let i = 0; i < attempts.length; i += 1) {
+      try {
+        return await createLocalVideoTrack(attempts[i]);
+      } catch (error: unknown) {
+        lastError = error;
+      }
+    }
+    throw lastError;
   }
 
   private delay(ms: number): Promise<void> {

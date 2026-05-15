@@ -29,6 +29,14 @@ const ROAD_EDGE_FILL = 0.74;
 interface PlacedSettlement {
   readonly group: Group;
   isCity: boolean;
+  readonly seat: PlayerSeat;
+  visibleIntent: boolean;
+}
+
+interface PlacedRoad {
+  readonly group: Group;
+  readonly seat: PlayerSeat;
+  visibleIntent: boolean;
 }
 
 /**
@@ -56,10 +64,11 @@ export class BoardBuildings {
   readonly group: Group = new Group();
 
   private readonly settlements = new Map<string, PlacedSettlement>();
-  private readonly roads = new Map<string, Group>();
+  private readonly roads = new Map<string, PlacedRoad>();
   private readonly animations: BuildAnimation[] = [];
   private readonly materialsBySeat = new Map<PlayerSeat, PlayerFigureMaterials>();
   private readonly trackedGeometries: BufferGeometry[] = [];
+  private readonly lobbySeatMask: boolean[] = [false, false, false, false];
 
   /**
    * Diff the lobby state against what is rendered; spawn pop-in animations for
@@ -100,16 +109,44 @@ export class BoardBuildings {
     return flyIns;
   }
 
+  public setLobbySeatMask(activeAtSeat: readonly boolean[]): void {
+    for (let i = 0; i < 4; i += 1) {
+      this.lobbySeatMask[i] = activeAtSeat[i] ?? false;
+    }
+    for (const placed of this.settlements.values()) {
+      placed.group.visible = this.effectivePieceVisible(placed.seat, placed.visibleIntent);
+    }
+    for (const placed of this.roads.values()) {
+      placed.group.visible = this.effectivePieceVisible(placed.seat, placed.visibleIntent);
+    }
+  }
+
   /**
    * Make a piece spawned hidden by `syncToState` visible, playing the standard
    * construction pop-in (and dust) as it appears.
    */
   revealPiece(kind: BuildKind, id: string): void {
-    const figure =
-      kind === BuildKind.Road ? this.roads.get(id) : this.settlements.get(id)?.group;
-    if (!figure) return;
-    figure.visible = true;
-    this.spawnBuildAnimation(figure);
+    if (kind === BuildKind.Road) {
+      const placed = this.roads.get(id);
+      if (!placed) {
+        return;
+      }
+      placed.visibleIntent = true;
+      placed.group.visible = this.effectivePieceVisible(placed.seat, true);
+      if (placed.group.visible) {
+        this.spawnBuildAnimation(placed.group);
+      }
+      return;
+    }
+    const placed = this.settlements.get(id);
+    if (!placed) {
+      return;
+    }
+    placed.visibleIntent = true;
+    placed.group.visible = this.effectivePieceVisible(placed.seat, true);
+    if (placed.group.visible) {
+      this.spawnBuildAnimation(placed.group);
+    }
   }
 
   update(dt: number): void {
@@ -146,8 +183,14 @@ export class BoardBuildings {
     const world = vertexIdToWorld(dto.vertexId);
     figure.position.set(world.x, TILE_HEIGHT, world.z);
     figure.scale.setScalar(SETTLEMENT_SCALE);
-    this.placePiece(figure, fly);
-    this.settlements.set(dto.vertexId, { group: figure, isCity: false });
+    const visibleIntent = !fly;
+    this.placePiece(figure, visibleIntent, dto.seat);
+    this.settlements.set(dto.vertexId, {
+      group: figure,
+      isCity: false,
+      seat: dto.seat,
+      visibleIntent,
+    });
     return figure;
   }
 
@@ -162,8 +205,14 @@ export class BoardBuildings {
     const world = vertexIdToWorld(dto.vertexId);
     figure.position.set(world.x, TILE_HEIGHT, world.z);
     figure.scale.setScalar(CITY_SCALE);
-    this.placePiece(figure, fly);
-    this.settlements.set(dto.vertexId, { group: figure, isCity: true });
+    const visibleIntent = !fly;
+    this.placePiece(figure, visibleIntent, dto.seat);
+    this.settlements.set(dto.vertexId, {
+      group: figure,
+      isCity: true,
+      seat: dto.seat,
+      visibleIntent,
+    });
     return figure;
   }
 
@@ -177,8 +226,9 @@ export class BoardBuildings {
       ROAD_WIDTH_SCALE,
       ROAD_WIDTH_SCALE,
     );
-    this.placePiece(figure, fly);
-    this.roads.set(dto.edgeId, figure);
+    const visibleIntent = !fly;
+    this.placePiece(figure, visibleIntent, dto.seat);
+    this.roads.set(dto.edgeId, { group: figure, seat: dto.seat, visibleIntent });
     return figure;
   }
 
@@ -186,14 +236,18 @@ export class BoardBuildings {
    * Add a piece to the scene. A fly-in piece is parked hidden with no pop-in —
    * `revealPiece` plays the animation once the arsenal figure has landed.
    */
-  private placePiece(figure: Group, fly: boolean): void {
+  private placePiece(figure: Group, visibleIntent: boolean, seat: PlayerSeat): void {
     this.trackGeometries(figure);
     this.group.add(figure);
-    if (fly) {
-      figure.visible = false;
-    } else {
+    const effective = this.effectivePieceVisible(seat, visibleIntent);
+    figure.visible = effective;
+    if (effective && visibleIntent) {
       this.spawnBuildAnimation(figure);
     }
+  }
+
+  private effectivePieceVisible(seat: PlayerSeat, visibleIntent: boolean): boolean {
+    return visibleIntent && !!this.lobbySeatMask[seat];
   }
 
   private spawnBuildAnimation(figure: Group): void {

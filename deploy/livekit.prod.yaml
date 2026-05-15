@@ -1,15 +1,18 @@
 port: 7880
 rtc:
   tcp_port: 7881
+  udp_port: 7882
   port_range_start: 50000
   port_range_end: 50100
+  use_external_ip: false
+  node_ip: 192.168.178.167
   turn_servers:
-    - host: turn
+    - host: 192.168.178.167
       port: 3478
       protocol: udp
       username: catan
       credential: changeme-strong-turn-password
-    - host: turn
+    - host: 192.168.178.167
       port: 3478
       protocol: tcp
       username: catan

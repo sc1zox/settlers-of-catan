@@ -5,14 +5,13 @@ services:
 
   turn:
     image: coturn/coturn:latest
-    ports:
-      - "${TURN_LISTEN_PORT:-3478}:${TURN_LISTEN_PORT:-3478}/udp"
-      - "${TURN_LISTEN_PORT:-3478}:${TURN_LISTEN_PORT:-3478}/tcp"
-      - "${TURN_RTC_UDP_RANGE_PUBLISH:-49160-49200}:${TURN_RTC_UDP_RANGE_PUBLISH:-49160-49200}/udp"
+    network_mode: host
     command:
       - "-n"
       - "--log-file=stdout"
       - "--listening-port=${TURN_LISTEN_PORT:-3478}"
+      - "--listening-ip=192.168.178.167"
+      - "--external-ip=192.168.178.167"
       - "--min-port=${TURN_RTC_MIN_PORT:-49160}"
       - "--max-port=${TURN_RTC_MAX_PORT:-49200}"
       - "--fingerprint"
@@ -24,14 +23,10 @@ services:
 
   livekit:
     image: livekit/livekit-server:latest
+    network_mode: host
     volumes:
       - ${LIVEKIT_CONFIG_HOST_PATH:-./deploy/livekit.prod.yaml}:/etc/livekit.yaml:ro
     command: ["--config", "/etc/livekit.yaml"]
-    ports:
-      - "${LIVEKIT_PUBLISH_HTTP:-7880}:7880"
-      - "${LIVEKIT_PUBLISH_RTC_TCP:-7881}:7881"
-      - "${LIVEKIT_PUBLISH_UDP_PRIMARY:-7882}:7882/udp"
-      - "${LIVEKIT_PUBLISH_UDP_RANGE:-50000-50100}:50000-50100/udp"
     depends_on:
       - turn
 
@@ -39,6 +34,8 @@ services:
     image: ${CATAN_WEB_IMAGE:-ghcr.io/sc1zox/settlers-of-catan:web}
     expose:
       - "${API_CONTAINER_PORT:-3000}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       PORT: ${API_CONTAINER_PORT:-3000}
       NODE_ENV: production
@@ -49,7 +46,7 @@ services:
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
       LIVEKIT_PUBLIC_URL: ${LIVEKIT_PUBLIC_URL}
-      LIVEKIT_HTTP_URL: ${LIVEKIT_HTTP_URL:-http://livekit:7880}
+      LIVEKIT_HTTP_URL: ${LIVEKIT_HTTP_URL:-http://host.docker.internal:7880}
     depends_on:
       - redis
       - livekit

@@ -13,10 +13,18 @@ import {
 } from '@angular/core';
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { AvatarKind, BuildKind, SceneObjectKind } from '@catan/api-interfaces';
-import { GameEngine, PerformanceSnapshot } from '../../game/engine';
+import {
+  BuildKind,
+  SceneObjectKind,
+  WEBCAM_MEDIA_SCOPE,
+  WebcamMediaScopeKey,
+  type LobbyFullStatePayload,
+} from '@catan/api-interfaces';
+import { GameEngine } from '../../game/engine';
 import { setGameTranslateFn } from '../../game/i18n-bridge';
 import { GameStateResource } from '../core/game/game-state.resource';
+import { GameSettingsService } from '../features/game-settings/game-settings.service';
+import { LobbyLiveKitService } from '../features/webcam-head/lobby-livekit.service';
 import { SpectatorCameraService } from '../features/spectator-camera/spectator-camera.service';
 import { HoverState } from '../../game/interaction/hover';
 import { BuildConfirmModel } from './build-confirm-popover';
@@ -53,69 +61,24 @@ export interface RobberTilePick {
     @if (!uiChromeHidden()) {
       <app-dice-overlay [model]="diceOverlay()" (dismiss)="dismissDice()" />
     }
-    @if (performanceStats(); as stats) {
-      <section class="perf-dock">
-        @if (performancePanelOpen()) {
-          <aside id="perf-panel" class="perf-panel" aria-label="Performance">
-            <div class="perf-row"><span>FPS</span><strong>{{ formatNumber(stats.fps, 1) }}</strong></div>
-            <div class="perf-row">
-              <span>Frame</span><strong>{{ formatNumber(stats.frameMs, 2) }} ms</strong>
-            </div>
-            <div class="perf-row"><span>Draw Calls</span><strong>{{ stats.drawCalls }}</strong></div>
-            <div class="perf-row"><span>Triangles</span><strong>{{ stats.triangles }}</strong></div>
-            <div class="perf-row"><span>Geometries</span><strong>{{ stats.geometries }}</strong></div>
-            <div class="perf-row"><span>Textures</span><strong>{{ stats.textures }}</strong></div>
-            <div class="perf-row">
-              <span>Tiles</span><strong>{{ stats.visibleTiles }}/{{ stats.totalTiles }}</strong>
-            </div>
-            <div class="perf-row">
-              <span>Harbors</span><strong>{{ stats.visibleHarbors }}/{{ stats.totalHarbors }}</strong>
-            </div>
-            <div class="perf-row">
-              <span>Players</span><strong>{{ stats.visiblePlayers }}/{{ stats.totalPlayers }}</strong>
-            </div>
-            <div class="perf-row">
-              <span>Board Overlay</span><strong>{{ stats.boardOverlayVisible ? 'on' : 'off' }}</strong>
-            </div>
-            <div class="perf-row">
-              <span>Dice</span><strong>{{ stats.diceVisible ? 'on' : 'off' }}</strong>
-            </div>
-          </aside>
-        }
-        <button
-          class="perf-toggle"
-          type="button"
-          [attr.aria-expanded]="performancePanelOpen()"
-          aria-controls="perf-panel"
-          (click)="togglePerformancePanel()"
-        >
-          {{ performancePanelOpen() ? 'Performance ausblenden' : 'Performance anzeigen' }}
-        </button>
-      </section>
-    }
   `,
   styleUrl: './game-canvas.scss',
 })
 export class GameCanvasComponent implements AfterViewInit, OnDestroy {
-    @ViewChild('host', { static: true }) private hostRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('host', { static: true }) private hostRef!: ElementRef<HTMLDivElement>;
   private readonly gameState = inject(GameStateResource);
+  private readonly gameSettings = inject(GameSettingsService);
+  private readonly liveKit = inject(LobbyLiveKitService);
   private readonly spectatorCam = inject(SpectatorCameraService);
   private readonly translate = inject(TranslateService);
   private engine: GameEngine | null = null;
   private diceNonce = 0;
 
-  /** Active build kind (drives the ghost figures); `null` leaves build mode. */
   readonly buildMode = input<BuildKind | null>(null);
-  /** Switches road ghosts to the cost-free road-building dev-card list. */
   readonly freeRoadMode = input<boolean>(false);
-  /** Activates robber placement (tile clicks report their coordinate). */
   readonly robberMode = input<boolean>(false);
-  /** When true, 3D die clicks request a roll (must match server-side legality). */
   readonly diceRollClickEnabled = input<boolean>(false);
-  /** When true, DOM overlays tied to the match HUD are suppressed (e.g. free camera). */
   readonly uiChromeHidden = input<boolean>(false);
-  /** Preferred avatar for the local human player. */
-  readonly selectedAvatar = input<AvatarKind>(AvatarKind.Scout);
 
   readonly arsenalBuild = output<BuildKind>();
   readonly buildSpotPicked = output<BuildConfirmModel>();
@@ -128,8 +91,6 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
   readonly cardTooltip = signal<CardTooltipModel | null>(null);
   readonly diceOverlay = signal<DiceOverlayModel | null>(null);
   readonly cardFocused = signal<boolean>(false);
-  readonly performanceStats = signal<PerformanceSnapshot | null>(null);
-  readonly performancePanelOpen = signal<boolean>(false);
 
   private readonly diceOverlayAutoDismiss = effect((onCleanup) => {
     const overlay = this.diceOverlay();
@@ -144,14 +105,22 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
     });
   });
 
-  // Pushes every lobby-state update into the Three.js scene. Registered in the
-  // injection context; the engine may not exist on the first run (before
-  // ngAfterViewInit) so the guard skips until it does.
   private readonly lobbyStateSync = effect(() => {
     const state = this.gameState.lobby.value();
     if (state && this.engine) {
       this.engine.applyLobbyState(state);
+      this.syncHeadVideos(state);
     }
+  });
+
+  private readonly headVideoSync = effect(() => {
+    this.liveKit.localVideoElement();
+    this.liveKit.remoteVideoRevision();
+    const state = this.gameState.lobby.value();
+    if (!this.engine || state === undefined) {
+      return;
+    }
+    this.syncHeadVideos(state);
   });
 
   private readonly buildModeSync = effect(() => {
@@ -174,8 +143,33 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
     this.engine?.setDiceRollClickEnabled(this.diceRollClickEnabled());
   });
 
-  private readonly selectedAvatarSync = effect(() => {
-    this.engine?.setPreferredSelfAvatar(this.selectedAvatar());
+  private readonly shadowQualitySync = effect(() => {
+    const quality = this.gameSettings.shadowQuality();
+    this.engine?.setShadowQuality(quality);
+  });
+
+  private readonly sceneBrightnessSync = effect(() => {
+    const brightness = this.gameSettings.sceneBrightness();
+    this.engine?.setSceneBrightness(brightness);
+  });
+
+  private readonly headVideoGammaSync = effect(() => {
+    const gamma = WEBCAM_MEDIA_SCOPE[WebcamMediaScopeKey.HeadDisplayGamma];
+    this.engine?.setHeadVideoDisplayGamma(gamma);
+  });
+
+  private readonly performanceSamplingSync = effect(() => {
+    const enabled = this.gameSettings.performanceSamplingEnabled();
+    if (!this.engine) {
+      return;
+    }
+    if (enabled) {
+      this.engine.setPerformanceStatsHandler((stats) => {
+        this.gameSettings.handlePerformanceStats(stats);
+      });
+      return;
+    }
+    this.engine.setPerformanceStatsHandler(null);
   });
 
   private readonly uiChromeClear = effect(() => {
@@ -187,8 +181,6 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
     this.diceOverlay.set(null);
   });
 
-  // The server roll is authoritative — drive the dice-tray animation with its
-  // values so the menu roll button and a die click both tumble the 3D dice.
   private readonly diceRollSync = effect(() => {
     const rolled = this.gameState.diceRolled.value();
     if (rolled && this.engine) {
@@ -220,25 +212,30 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
     this.engine.setBuildModeCancelHandler(() => this.buildModeCancelled.emit());
     this.engine.setDevCardClickHandler(() => this.devCardClicked.emit());
     this.engine.setDiceRollRequestHandler(() => this.rollDiceRequested.emit());
-    this.engine.setPerformanceStatsHandler((stats) => this.performanceStats.set(stats));
+    this.engine.setShadowQuality(this.gameSettings.shadowQuality());
+    this.engine.setSceneBrightness(this.gameSettings.sceneBrightness());
+    this.engine.setHeadVideoDisplayGamma(WEBCAM_MEDIA_SCOPE[WebcamMediaScopeKey.HeadDisplayGamma]);
+    if (this.gameSettings.performanceSamplingEnabled()) {
+      this.engine.setPerformanceStatsHandler((stats) => {
+        this.gameSettings.handlePerformanceStats(stats);
+      });
+    }
     this.engine.start();
-    // Catch state / mode that arrived before the engine existed.
     const current = this.gameState.lobby.value();
     if (current) {
       this.engine.applyLobbyState(current);
+      this.syncHeadVideos(current);
     }
     this.engine.showBuildSpots(this.buildMode(), this.freeRoadMode());
     this.engine.setRobberMode(this.robberMode());
     this.engine.setSpectatorCameraMode(this.spectatorCam.mode());
     this.engine.setDiceRollClickEnabled(this.diceRollClickEnabled());
-    this.engine.setPreferredSelfAvatar(this.selectedAvatar());
   }
 
   public ngOnDestroy(): void {
     setGameTranslateFn(null);
     this.engine?.dispose();
     this.engine = null;
-    this.performanceStats.set(null);
   }
 
   public dismissDice(): void {
@@ -249,12 +246,22 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
     this.engine?.clearFocusedCard();
   }
 
-  public togglePerformancePanel(): void {
-    this.performancePanelOpen.update((open) => !open);
-  }
-
-  public formatNumber(value: number, digits: number): string {
-    return value.toFixed(digits);
+  private syncHeadVideos(state: LobbyFullStatePayload): void {
+    if (!this.engine) {
+      return;
+    }
+    for (let i = 0; i < state.players.length; i += 1) {
+      const player = state.players[i];
+      if (player.isBot) {
+        this.engine.setHeadVideoForSeat(player.seat, null);
+        continue;
+      }
+      if (player.isSelf) {
+        this.engine.setHeadVideoForSeat(player.seat, this.liveKit.localVideoElement());
+        continue;
+      }
+      this.engine.setHeadVideoForSeat(player.seat, this.liveKit.getRemoteVideoForSeat(player.seat));
+    }
   }
 
   private handleHover(state: HoverState | null): void {

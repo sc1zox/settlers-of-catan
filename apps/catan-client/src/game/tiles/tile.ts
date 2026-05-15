@@ -61,6 +61,7 @@ export abstract class Tile {
   private chipBeamMaterial: MeshBasicMaterial | null = null;
   private chipPhase = 0;
   private chipHoverT = 0;
+  private chipPointerHovered = false;
 
   constructor(init: TileInit) {
     this.coord = init.coord;
@@ -149,9 +150,7 @@ export abstract class Tile {
 
   /** Called by the hover system. */
   setChipHovered(hovered: boolean): void {
-    this.chipHoverT = hovered
-      ? Math.min(1, this.chipHoverT + 0.1)
-      : Math.max(0, this.chipHoverT - 0.1);
+    this.chipPointerHovered = hovered;
   }
 
   /** Subclasses must call super.update(dt, t). */
@@ -169,8 +168,11 @@ export abstract class Tile {
       if (this.chipBeamMaterial) {
         this.chipBeamMaterial.opacity = 0.14 + 0.32 * eased;
       }
-      // Decay hover unless refreshed by the hover system this frame.
-      this.chipHoverT = Math.max(0, this.chipHoverT - dt * 4);
+      if (this.chipPointerHovered) {
+        this.chipHoverT = Math.min(1, this.chipHoverT + dt * 8);
+      } else {
+        this.chipHoverT = Math.max(0, this.chipHoverT - dt * 4);
+      }
     }
   }
 

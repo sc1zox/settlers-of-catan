@@ -11,12 +11,14 @@ import {
   Timer,
   Vector2,
   Vector3,
+  DirectionalLight,
   VSMShadowMap,
   WebGLRenderer,
 } from 'three';
+import { shadowQualityPreset } from './scene/shadow-quality-preset';
+import { ShadowQuality } from './scene/shadow-quality.enum';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
-  AvatarKind,
   BuildKind,
   GamePhase,
   PlayerSeat,
@@ -155,6 +157,7 @@ export class GameEngine {
   private readonly camera: PerspectiveCamera;
   private readonly renderer: WebGLRenderer;
   private readonly controls: OrbitControls;
+  private readonly sunLight: DirectionalLight;
   private timer: Timer | null = null;
   private board: Board;
   private readonly world: World;
@@ -202,7 +205,6 @@ export class GameEngine {
   /** Fired when the player clicks a physical die — Angular forwards it to the server. */
   private diceRollRequestHandler: (() => void) | null = null;
   private diceRollClickEnabled = false;
-  private preferredSelfAvatar: AvatarKind = AvatarKind.Scout;
   private spectatorCameraActive = false;
   private orbitLimitsBackup: {
     minDistance: number;
@@ -231,6 +233,7 @@ export class GameEngine {
   private readonly viewProjectionMatrix = new Matrix4();
   private readonly cullCenter = new Vector3();
   private readonly cullSphere = new Sphere();
+  private readonly handSignatureBySeat: string[] = ['', '', '', ''];
   private perfHandler: PerformanceStatsHandler | null = null;
   private perfAccumFrames = 0;
   private perfAccumSeconds = 0;
@@ -263,7 +266,8 @@ export class GameEngine {
 
     this.controls = createControls(this.camera, this.renderer.domElement);
 
-    addLighting(this.scene, this.renderer);
+    const lighting = addLighting(this.scene, this.renderer);
+    this.sunLight = lighting.sun;
 
     // Warm light shafts streaming down onto the table.
     this.sunShafts = new SunShafts();
@@ -390,8 +394,22 @@ export class GameEngine {
     this.diceRollClickEnabled = enabled;
   }
 
-  public setPreferredSelfAvatar(kind: AvatarKind): void {
-    this.preferredSelfAvatar = kind;
+  public setHeadVideoForSeat(seat: PlayerSeat, video: HTMLVideoElement | null): void {
+    const area = this.players[seat];
+    if (!area) {
+      return;
+    }
+    area.setHeadVideo(video);
+  }
+
+  public setHeadVideoDisplayGamma(gamma: number): void {
+    for (let i = 0; i < this.players.length; i += 1) {
+      this.players[i].setHeadVideoDisplayGamma(gamma);
+    }
+  }
+
+  public setSceneBrightness(brightness: number): void {
+    this.renderer.toneMappingExposure = brightness;
   }
 
   /** Tumble the dice towards the server-authoritative roll. */
@@ -426,6 +444,22 @@ export class GameEngine {
 
   setPerformanceStatsHandler(handler: PerformanceStatsHandler | null): void {
     this.perfHandler = handler;
+  }
+
+  public setShadowQuality(quality: ShadowQuality): void {
+    const preset = shadowQualityPreset(quality);
+    this.renderer.shadowMap.enabled = preset.shadowsEnabled;
+    this.sunLight.castShadow = preset.shadowsEnabled;
+    if (!preset.shadowsEnabled) {
+      return;
+    }
+    this.renderer.shadowMap.type = preset.shadowMapType;
+    this.sunLight.shadow.mapSize.set(preset.mapSize, preset.mapSize);
+    this.sunLight.shadow.radius = preset.shadowRadius;
+    if (this.sunLight.shadow.map !== null) {
+      this.sunLight.shadow.map.dispose();
+      this.sunLight.shadow.map = null;
+    }
   }
 
   public setSpectatorCameraMode(active: boolean): void {
@@ -610,17 +644,20 @@ export class GameEngine {
       this.startArsenalFlyIn(flyIns[i]);
     }
     this.robberFigure.syncCoord(state.robberCoord.q, state.robberCoord.r, boardJustRebuilt);
-    for (let i = 0; i < this.players.length; i += 1) {
-      this.players[i].setAvatar(this.fallbackAvatarForSeat(i));
-    }
     for (const playerState of state.players) {
       const area = this.players[playerState.seat];
       if (!area) continue;
-      area.setHand(
-        expandResourceHand(playerState.resources),
+      const handSignature = this.computeHandSignature(
+        playerState.resources,
         playerState.devCardsInHand,
       );
-      area.setAvatar(this.resolveAvatarKind(playerState));
+      if (this.handSignatureBySeat[playerState.seat] !== handSignature) {
+        area.setHand(
+          expandResourceHand(playerState.resources),
+          playerState.devCardsInHand,
+        );
+        this.handSignatureBySeat[playerState.seat] = handSignature;
+      }
     }
     // Re-render ghost figures against the freshly-arrived legal-move lists.
     if (this.buildMode !== null) {
@@ -950,7 +987,7 @@ export class GameEngine {
         visibleHarbors += 1;
       }
     }
-    this.controls.update();
+    const cameraChanged = this.controls.update();
     this.clampOrbitTarget();
     this.updateFocusedCards();
     let visiblePlayers = 0;
@@ -963,7 +1000,7 @@ export class GameEngine {
         player.update(dt);
       }
     }
-    this.hover.update();
+    this.hover.update(cameraChanged);
     this.renderer.render(this.scene, this.camera);
     this.perfLastVisibleTiles = visibleTiles;
     this.perfLastVisibleHarbors = visibleHarbors;
@@ -1039,18 +1076,16 @@ export class GameEngine {
     this.renderer.setSize(clientWidth, clientHeight, false);
   }
 
-  private resolveAvatarKind(player: LobbyFullStatePayload['players'][number]): AvatarKind {
-    if (player.isBot) {
-      return AvatarKind.Robot;
+  private computeHandSignature(
+    resources: Readonly<Record<ResourceType, number>>,
+    devCardsInHand: number,
+  ): string {
+    const keys = Object.keys(RESOURCE_TYPE_TO_KIND) as ResourceType[];
+    let signature = `${devCardsInHand}`;
+    for (let i = 0; i < keys.length; i += 1) {
+      const key = keys[i];
+      signature += `|${resources[key] ?? 0}`;
     }
-    if (player.isSelf) {
-      return this.preferredSelfAvatar;
-    }
-    return this.fallbackAvatarForSeat(player.seat);
-  }
-
-  private fallbackAvatarForSeat(seat: number): AvatarKind {
-    const fallback: readonly AvatarKind[] = [AvatarKind.Scout, AvatarKind.Sailor, AvatarKind.Builder];
-    return fallback[seat % fallback.length] ?? AvatarKind.Scout;
+    return signature;
   }
 }

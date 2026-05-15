@@ -116,11 +116,11 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (!sessionToken) {
         return;
       }
-      const lobbyId = payload.lobbyId.trim() || KnownLobbyId.ServerDefault;
+      const lobbyCode = payload.lobbyCode.trim() || KnownLobbyId.ServerDefault;
       const displayName =
         payload.displayName.trim() || DefaultDisplayName.PlayerEn;
-      const { lobby, joined } = this.gameService.joinLobby(
-        lobbyId,
+      const { lobby, joined } = await this.gameService.joinLobby(
+        lobbyCode,
         sessionToken,
         displayName,
         client.id,

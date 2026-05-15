@@ -52,7 +52,10 @@ export interface LobbyRoadDto {
 }
 
 export interface LobbyFullStatePayload {
+  /** Canonical id (UUID) used for LiveKit, Redis, and socket action payloads after join. */
   readonly lobbyId: string;
+  /** Human-entered lobby code (e.g. "XYZ"). */
+  readonly lobbyCode: string;
   readonly phase: GamePhase;
   readonly currentSeat: PlayerSeat;
   readonly adminSeat: PlayerSeat;

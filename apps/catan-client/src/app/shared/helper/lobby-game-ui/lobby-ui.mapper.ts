@@ -59,6 +59,7 @@ export function mapLobbyFullStateToUiState(
   }
   return {
     lobbyId: payload.lobbyId,
+    lobbyCode: payload.lobbyCode,
     phase: payload.phase,
     activeSeat: payload.currentSeat,
     adminSeat: payload.adminSeat,

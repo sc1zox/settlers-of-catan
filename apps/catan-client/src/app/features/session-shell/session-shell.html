@@ -6,7 +6,6 @@
     [robberMode]="robberMode()"
     [diceRollClickEnabled]="lobbyGameUi.canRollDice() && !spectatorCamService.mode()"
     [uiChromeHidden]="spectatorCamService.mode()"
-    [selectedAvatar]="selectedAvatar()"
     (arsenalBuild)="onArsenalBuild($event)"
     (buildSpotPicked)="onBuildSpotPicked($event)"
     (robberTilePicked)="onRobberTilePicked($event)"
@@ -42,52 +41,31 @@
             @if (sessionForm.controls.displayName.invalid && sessionForm.controls.displayName.touched) {
               <p class="status">{{ 'shell.validationDisplayName' | translate }}</p>
             }
+            <div class="webcam-option">
+              <div class="webcam-option__intro">
+                <span class="webcam-option__icon" aria-hidden="true"></span>
+                <div class="webcam-option__copy">
+                  <p class="webcam-option__title">{{ 'shell.webcamTitle' | translate }}</p>
+                  <p class="webcam-option__hint">{{ 'shell.webcamHint' | translate }}</p>
+                </div>
+              </div>
+              <label class="webcam-option__toggle">
+                <input
+                  type="checkbox"
+                  class="webcam-option__input"
+                  [checked]="gameSettings.webcamEnabled()"
+                  (change)="onWebcamEnabledChange($event)"
+                />
+                <span class="webcam-option__track" aria-hidden="true">
+                  <span class="webcam-option__thumb"></span>
+                </span>
+                <span class="webcam-option__label">{{ 'shell.webcamToggle' | translate }}</span>
+              </label>
+            </div>
             <div class="button-row">
-              <button type="button" class="button--ghost" (click)="openAvatarWardrobe()">
-                {{ 'shell.buttonOpenWardrobe' | translate }}
-              </button>
               <button type="submit">{{ 'shell.buttonStartSession' | translate }}</button>
             </div>
-            <p class="wardrobe-selection">
-              {{ 'shell.avatarCurrent' | translate: { avatar: ('shell.avatar.' + selectedAvatar()) | translate } }}
-            </p>
           </form>
-        }
-
-        @if (uiStep() === lobbyUiStep.AvatarWardrobe) {
-          <section class="wardrobe-block">
-            <h2>{{ 'shell.wardrobeTitle' | translate }}</h2>
-            <p class="wardrobe-subtitle">{{ 'shell.wardrobeSubtitle' | translate }}</p>
-            <div class="avatar-grid">
-              @for (avatar of selectableAvatars; track avatar) {
-                <button
-                  type="button"
-                  class="avatar-option"
-                  [class.avatar-option--active]="avatarSelectionDraft() === avatar"
-                  (click)="chooseAvatar(avatar)"
-                >
-                  <span class="avatar-option__stick" aria-hidden="true">
-                    @if (avatar === 'SCOUT') {
-                      o/
-                    } @else if (avatar === 'SAILOR') {
-                      o-
-                    } @else {
-                      o|
-                    }
-                  </span>
-                  <span>{{ ('shell.avatar.' + avatar) | translate }}</span>
-                </button>
-              }
-            </div>
-            <div class="button-row">
-              <button type="button" class="button--ghost" (click)="backToSignInFromWardrobe()">
-                {{ 'shell.buttonWardrobeBack' | translate }}
-              </button>
-              <button type="button" (click)="confirmAvatarSelection()">
-                {{ 'shell.buttonWardrobeConfirm' | translate }}
-              </button>
-            </div>
-          </section>
         }
 
         @if (uiStep() === lobbyUiStep.JoinLobby) {
@@ -95,10 +73,10 @@
             <p class="session-pill">
               {{ 'shell.sessionPill' | translate: { displayName: sessionState()?.displayName ?? '' } }}
             </p>
-            <label for="lobbyId">{{ 'shell.labelLobbyId' | translate }}</label>
-            <input id="lobbyId" type="text" autocomplete="off" formControlName="lobbyId" />
-            @if (lobbyForm.controls.lobbyId.invalid && lobbyForm.controls.lobbyId.touched) {
-              <p class="status">{{ 'shell.validationLobbyId' | translate }}</p>
+            <label for="lobbyCode">{{ 'shell.labelLobbyCode' | translate }}</label>
+            <input id="lobbyCode" type="text" autocomplete="off" formControlName="lobbyCode" />
+            @if (lobbyForm.controls.lobbyCode.invalid && lobbyForm.controls.lobbyCode.touched) {
+              <p class="status">{{ 'shell.validationLobbyCode' | translate }}</p>
             }
             <div class="button-row">
               <button
@@ -126,7 +104,7 @@
             <div class="lobby-meta">
               <p>
                 <span>{{ 'shell.metaLobby' | translate }}</span
-                ><strong>{{ lobbyGameUi.lobbyUiState()?.lobbyId ?? lobbyIdValue() }}</strong>
+                ><strong>{{ activeLobbyCode() }}</strong>
               </p>
               <p>
                 <span>{{ 'shell.metaActiveSeat' | translate }}</span
@@ -220,7 +198,7 @@
             <div class="hud__meta">
               <p>
                 <span>{{ 'shell.hudLobby' | translate }}</span
-                ><strong>{{ lobbyGameUi.lobbyUiState()?.lobbyId ?? lobbyIdValue() }}</strong>
+                ><strong>{{ activeLobbyCode() }}</strong>
               </p>
               <p>
                 <span>{{ 'shell.hudActiveSeat' | translate }}</span
@@ -320,6 +298,7 @@
   </section>
 
   <app-spectator-camera-toggle [visible]="true" />
+  <app-game-settings-toggle [visible]="uiStep() === lobbyUiStep.InGame" />
 
   @if (uiStep() === lobbyUiStep.InGame && !spectatorCamService.mode()) {
     <app-build-confirm-popover

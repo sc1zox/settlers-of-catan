@@ -44,20 +44,16 @@ export class GameService {
     private readonly demoBots: DemoBotService,
   ) {}
 
-  public getOrCreateLobby(lobbyId: string): LobbyRuntime {
-    return this.lobby.getOrCreateLobby(lobbyId);
-  }
-
   public getLobby(lobbyId: string): LobbyRuntime | undefined {
     return this.lobby.getLobby(lobbyId);
   }
 
-  public joinLobby(
+  public async joinLobby(
     lobbyId: string,
     sessionToken: string,
     displayName: string,
     socketId: string,
-  ): { lobby: LobbyRuntime; joined: LobbyJoinedPayload } {
+  ): Promise<{ lobby: LobbyRuntime; joined: LobbyJoinedPayload }> {
     return this.lobby.joinLobby(lobbyId, sessionToken, displayName, socketId);
   }
 

@@ -34,6 +34,7 @@ export interface LobbySeatUiState {
 
 export interface LobbyUiState {
   readonly lobbyId: string;
+  readonly lobbyCode: string;
   readonly phase: GamePhase;
   readonly activeSeat: PlayerSeat;
   readonly adminSeat: PlayerSeat;

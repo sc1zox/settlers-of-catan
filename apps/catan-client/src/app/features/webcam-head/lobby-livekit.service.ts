@@ -1,0 +1,250 @@
+import { Injectable, OnDestroy, inject, signal } from '@angular/core';
+import { LiveKitCredentialsPayload, PlayerSeat } from '@catan/api-interfaces';
+import {
+  ConnectionState,
+  LocalParticipant,
+  RemoteParticipant,
+  RemoteTrackPublication,
+  Room,
+  RoomEvent,
+  Track,
+  createLocalVideoTrack,
+} from 'livekit-client';
+import { GameSettingsService } from '../game-settings/game-settings.service';
+import { webcamQualityPreset } from '../../shared/helper/webcam/webcam-quality-preset';
+
+interface LiveKitParticipantMetadata {
+  readonly seat?: PlayerSeat;
+}
+
+const POST_CONNECT_PUBLISH_DELAY_MS = 120;
+const CAMERA_PUBLISH_TIMEOUT_MS = 15_000;
+
+@Injectable({ providedIn: 'root' })
+export class LobbyLiveKitService implements OnDestroy {
+  private readonly gameSettings = inject(GameSettingsService);
+  private room: Room | null = null;
+  private connectGeneration = 0;
+  private readonly remoteVideos = new Map<PlayerSeat, HTMLVideoElement>();
+
+  public readonly localVideoElement = signal<HTMLVideoElement | null>(null);
+  public readonly remoteVideoRevision = signal<number>(0);
+
+  public ngOnDestroy(): void {
+    void this.disconnect();
+  }
+
+  public async connect(credentials: LiveKitCredentialsPayload): Promise<void> {
+    await this.disconnect();
+    const generation = this.connectGeneration + 1;
+    this.connectGeneration = generation;
+    const preset = webcamQualityPreset(this.gameSettings.webcamQuality());
+    const room = new Room({
+      adaptiveStream: false,
+      dynacast: false,
+      webAudioMix: false,
+    });
+    this.room = room;
+
+    room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+      this.handleRemoteTrack(track, publication, participant);
+    });
+    room.on(RoomEvent.TrackUnsubscribed, (track, _publication, participant) => {
+      if (track.kind !== Track.Kind.Video) {
+        return;
+      }
+      const seat = this.resolveSeat(participant);
+      if (seat === null) {
+        return;
+      }
+      const video = this.remoteVideos.get(seat);
+      if (video !== undefined) {
+        track.detach(video);
+        this.remoteVideos.delete(seat);
+        this.remoteVideoRevision.update((value) => value + 1);
+      }
+    });
+    room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+      const seat = this.resolveSeat(participant);
+      if (seat === null) {
+        return;
+      }
+      this.remoteVideos.delete(seat);
+      this.remoteVideoRevision.update((value) => value + 1);
+    });
+    room.on(RoomEvent.TrackPublished, (publication, participant) => {
+      if (publication.kind === Track.Kind.Video) {
+        publication.setSubscribed(true);
+      }
+    });
+    room.on(RoomEvent.ParticipantConnected, (participant) => {
+      this.subscribeParticipantVideoOnly(participant);
+    });
+
+    try {
+      await room.connect(credentials.serverUrl, credentials.token, {
+        autoSubscribe: false,
+      });
+      if (this.connectGeneration !== generation || this.room !== room) {
+        await room.disconnect();
+        return;
+      }
+      await this.waitUntilConnected(room);
+      if (this.connectGeneration !== generation || this.room !== room) {
+        await room.disconnect();
+        return;
+      }
+      this.subscribeExistingRemoteVideo(room);
+      await this.delay(POST_CONNECT_PUBLISH_DELAY_MS);
+      if (this.connectGeneration !== generation || this.room !== room) {
+        await room.disconnect();
+        return;
+      }
+      if (this.gameSettings.webcamEnabled()) {
+        await this.publishCameraTrack(room, preset.width, preset.height, preset.frameRate);
+      }
+    } catch (error) {
+      if (this.room === room) {
+        this.room = null;
+      }
+      room.removeAllListeners();
+      await room.disconnect();
+      throw error;
+    }
+  }
+
+  public getRemoteVideoForSeat(seat: PlayerSeat): HTMLVideoElement | null {
+    return this.remoteVideos.get(seat) ?? null;
+  }
+
+  public async disconnect(): Promise<void> {
+    this.connectGeneration += 1;
+    this.localVideoElement.set(null);
+    this.remoteVideos.clear();
+    const room = this.room;
+    this.room = null;
+    if (room === null) {
+      return;
+    }
+    room.removeAllListeners();
+    await room.disconnect();
+  }
+
+  private subscribeExistingRemoteVideo(room: Room): void {
+    for (const participant of room.remoteParticipants.values()) {
+      this.subscribeParticipantVideoOnly(participant);
+    }
+  }
+
+  private subscribeParticipantVideoOnly(participant: RemoteParticipant): void {
+    for (const publication of participant.videoTrackPublications.values()) {
+      if (!publication.isSubscribed) {
+        publication.setSubscribed(true);
+      }
+    }
+  }
+
+  private async waitUntilConnected(room: Room): Promise<void> {
+    if (room.state === ConnectionState.Connected) {
+      return;
+    }
+    await new Promise<void>((resolve, reject) => {
+      const onConnected = (): void => {
+        cleanup();
+        resolve();
+      };
+      const onDisconnected = (): void => {
+        cleanup();
+        reject(new Error('LiveKit disconnected before ready'));
+      };
+      const cleanup = (): void => {
+        room.off(RoomEvent.Connected, onConnected);
+        room.off(RoomEvent.Disconnected, onDisconnected);
+      };
+      room.on(RoomEvent.Connected, onConnected);
+      room.on(RoomEvent.Disconnected, onDisconnected);
+    });
+  }
+
+  private async publishCameraTrack(
+    room: Room,
+    width: number,
+    height: number,
+    frameRate: number,
+  ): Promise<void> {
+    const videoTrack = await Promise.race([
+      createLocalVideoTrack({
+        resolution: { width, height, frameRate },
+        facingMode: 'user',
+      }),
+      this.rejectAfter(CAMERA_PUBLISH_TIMEOUT_MS, 'LiveKit camera publish timed out'),
+    ]);
+    const publication = await room.localParticipant.publishTrack(videoTrack, {
+      source: Track.Source.Camera,
+      simulcast: false,
+    });
+    if (publication.track === undefined) {
+      return;
+    }
+    const element = publication.track.attach() as HTMLVideoElement;
+    element.muted = true;
+    element.playsInline = true;
+    void element.play().catch(() => undefined);
+    this.localVideoElement.set(element);
+  }
+
+  private handleRemoteTrack(
+    track: Track,
+    _publication: RemoteTrackPublication,
+    participant: RemoteParticipant | LocalParticipant,
+  ): void {
+    if (track.kind !== Track.Kind.Video) {
+      return;
+    }
+    const seat = this.resolveSeat(participant);
+    if (seat === null) {
+      return;
+    }
+    let video = this.remoteVideos.get(seat);
+    if (video === undefined) {
+      video = document.createElement('video');
+      video.muted = true;
+      video.playsInline = true;
+      video.autoplay = true;
+      this.remoteVideos.set(seat, video);
+    }
+    track.attach(video);
+    void video.play().catch(() => undefined);
+    this.remoteVideoRevision.update((value) => value + 1);
+  }
+
+  private resolveSeat(participant: RemoteParticipant | LocalParticipant): PlayerSeat | null {
+    const metadata = participant.metadata;
+    if (metadata === undefined || metadata.length === 0) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(metadata) as LiveKitParticipantMetadata;
+      if (parsed.seat === undefined) {
+        return null;
+      }
+      return parsed.seat;
+    } catch {
+      return null;
+    }
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      setTimeout(resolve, ms);
+    });
+  }
+
+  private rejectAfter(ms: number, message: string): Promise<never> {
+    return new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(message));
+      }, ms);
+    });
+  }
+}

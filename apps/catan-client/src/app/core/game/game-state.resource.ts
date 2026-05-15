@@ -3,25 +3,28 @@ import { rxResource } from '@angular/core/rxjs-interop';
 import {
   PlayerSeat,
   ResourceType,
+  normalizeLobbyCode,
   type DiceRolledPayload,
   type LobbyFullStatePayload,
+  type LobbyJoinedPayload,
   type TradeUpdatedPayload,
 } from '@catan/api-interfaces';
-import { EMPTY } from 'rxjs';
-import { filter, takeUntil } from 'rxjs/operators';
+import { EMPTY, firstValueFrom } from 'rxjs';
+import { filter, take, takeUntil, timeout } from 'rxjs/operators';
 import { GameSocketService } from '../socket/game-socket.service';
 import { observeAbort } from '../../shared/helper/http/observe-abort';
+import { matchesLobbyConnection } from '../../shared/helper/lobby-game-ui/matches-lobby-connection';
+import type { LobbyConnectionParams } from '../../shared/types/lobby-connection-params';
 
-export interface LobbyConnectionParams {
-  readonly lobbyId: string;
-  readonly displayName: string;
-}
+export type { LobbyConnectionParams };
 
 @Injectable({ providedIn: 'root' })
 export class GameStateResource {
   private readonly sockets = inject(GameSocketService);
 
   private readonly lobbyParams = signal<LobbyConnectionParams | undefined>(undefined);
+
+  public readonly connection = this.lobbyParams.asReadonly();
 
   public readonly lobby = rxResource<
     LobbyFullStatePayload | undefined,
@@ -33,7 +36,9 @@ export class GameStateResource {
         return EMPTY;
       }
       return this.sockets.fullState$.pipe(
-        filter((state) => state.lobbyId === params.lobbyId),
+        filter((state) =>
+          matchesLobbyConnection(state.lobbyId, state.lobbyCode, params),
+        ),
         takeUntil(observeAbort(abortSignal)),
       );
     },
@@ -50,7 +55,7 @@ export class GameStateResource {
         return EMPTY;
       }
       return this.sockets.tradeUpdated$.pipe(
-        filter((state) => state.lobbyId === params.lobbyId),
+        filter((payload) => params.lobbyId.length > 0 && payload.lobbyId === params.lobbyId),
         takeUntil(observeAbort(abortSignal)),
       );
     },
@@ -67,17 +72,39 @@ export class GameStateResource {
         return EMPTY;
       }
       return this.sockets.diceRolled$.pipe(
-        filter((payload) => payload.lobbyId === params.lobbyId),
+        filter((payload) => params.lobbyId.length > 0 && payload.lobbyId === params.lobbyId),
         takeUntil(observeAbort(abortSignal)),
       );
     },
     defaultValue: undefined,
   });
 
-  public async connectToLobby(lobbyId: string, displayName: string): Promise<void> {
-    await this.sockets.connect();
-    this.lobbyParams.set({ lobbyId, displayName });
-    this.sockets.joinLobby(lobbyId, displayName);
+  public async connectToLobby(
+    lobbyCodeInput: string,
+    displayName: string,
+  ): Promise<LobbyJoinedPayload> {
+    const lobbyCode = normalizeLobbyCode(lobbyCodeInput);
+    try {
+      await this.sockets.connect();
+      this.lobbyParams.set({ lobbyId: '', lobbyCode, displayName });
+      this.sockets.joinLobby(lobbyCodeInput.trim(), displayName);
+      const joined = await firstValueFrom(
+        this.sockets.lobbyJoined$.pipe(
+          filter((payload) => payload.lobbyCode === lobbyCode),
+          take(1),
+          timeout(15_000),
+        ),
+      );
+      this.lobbyParams.set({
+        lobbyId: joined.lobbyId,
+        lobbyCode: joined.lobbyCode,
+        displayName,
+      });
+      return joined;
+    } catch (error) {
+      this.lobbyParams.set(undefined);
+      throw error;
+    }
   }
 
   public startLobby(): void {

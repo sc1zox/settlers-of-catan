@@ -55,6 +55,7 @@ export interface LobbyRoadSlot {
 
 export class LobbyRuntime {
   public readonly lobbyId: string;
+  public readonly lobbyCode: string;
   public readonly seed: number;
   public readonly tiles: readonly TilePlacement[];
   public readonly fsm: TurnStateMachine = new TurnStateMachine();
@@ -78,8 +79,9 @@ export class LobbyRuntime {
   public largestArmySeat: PlayerSeat | null = null;
   public winnerSeat: PlayerSeat | null = null;
 
-  public constructor(lobbyId: string) {
+  public constructor(lobbyId: string, lobbyCode: string) {
     this.lobbyId = lobbyId;
+    this.lobbyCode = lobbyCode;
     this.seed = randomInt(0, 0xffffffff);
     this.tiles = makeStandardLandPlacements(this.seed);
     const topology = createBoardTopology(this.tiles);
@@ -145,6 +147,16 @@ export class LobbyRuntime {
       [ResourceType.Wool]: 0,
       [ResourceType.Ore]: 0,
     };
+  }
+
+  public removePlayer(sessionToken: string): void {
+    for (let i = 0; i < this.players.length; i += 1) {
+      if (this.players[i].sessionToken === sessionToken) {
+        this.clearDisconnectTimer(this.players[i]);
+        this.players.splice(i, 1);
+        return;
+      }
+    }
   }
 
   public addPlayer(

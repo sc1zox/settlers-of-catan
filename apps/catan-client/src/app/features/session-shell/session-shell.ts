@@ -1,20 +1,22 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
-  AvatarKind,
   BuildKind,
-  ClientStorageKey,
   DefaultDisplayName,
   GamePhase,
   KnownLobbyId,
+  LiveKitCredentialsPayload,
   PlayerSeat,
   ResourceType,
+  isLobbyCodeValid,
 } from '@catan/api-interfaces';
 import { collectRobberVictimSeats } from '@catan/shared-game-field';
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { GameStateResource } from '../../core/game/game-state.resource';
 import { PlayerSessionService } from '../../core/session/player-session.service';
+import { GameSettingsService } from '../game-settings/game-settings.service';
+import { LobbyLiveKitService } from '../webcam-head/lobby-livekit.service';
 import { BuildConfirmModel, BuildConfirmPopoverComponent } from '../../game-canvas/build-confirm-popover';
 import { DiscardModalComponent } from '../../game-canvas/discard-modal';
 import { DevCardModalComponent, YearOfPlentyPick } from '../dev-cards/dev-card-modal';
@@ -35,13 +37,8 @@ import { LobbyShellGameUiService } from '../lobby-game-ui/lobby-shell-game-ui.se
 import { totalResourceCards } from '../../shared/helper/lobby-game-ui/resource-card-totals';
 import { ShellFeedbackService } from '../shell-feedback/shell-feedback.service';
 import { SpectatorCameraService } from '../spectator-camera/spectator-camera.service';
+import { GameSettingsToggle } from '../game-settings/game-settings-toggle';
 import { SpectatorCameraToggle } from '../spectator-camera/spectator-camera-toggle';
-import {
-  DEFAULT_AVATAR_KIND,
-  normalizeSelectableAvatarKind,
-  SELECTABLE_AVATARS,
-} from '../../shared/helper/avatar/avatar-options';
-
 @Component({
   selector: 'app-session-shell',
   standalone: true,
@@ -55,6 +52,7 @@ import {
     TradePanelComponent,
     RobberVictimPopoverComponent,
     SpectatorCameraToggle,
+    GameSettingsToggle,
     TranslatePipe,
   ],
   templateUrl: './session-shell.html',
@@ -67,6 +65,8 @@ export class SessionShell {
   public readonly devCards = inject(DevCardsService);
   public readonly shellFeedback = inject(ShellFeedbackService);
   private readonly playerSession = inject(PlayerSessionService);
+  private readonly liveKit = inject(LobbyLiveKitService);
+  public readonly gameSettings = inject(GameSettingsService);
   public readonly spectatorCamService = inject(SpectatorCameraService);
   private readonly translate = inject(TranslateService);
 
@@ -79,7 +79,7 @@ export class SessionShell {
     }),
   });
   public readonly lobbyForm = this.fb.nonNullable.group({
-    lobbyId: this.fb.nonNullable.control<string>(KnownLobbyId.DemoClient, {
+    lobbyCode: this.fb.nonNullable.control<string>(KnownLobbyId.DemoClient, {
       validators: [Validators.required, Validators.minLength(2)],
     }),
   });
@@ -93,10 +93,6 @@ export class SessionShell {
   public readonly robberVictim = signal<RobberVictimModel | null>(null);
   public readonly tradeOpen = signal<boolean>(false);
   public readonly devCardOpen = signal<boolean>(false);
-  public readonly selectedAvatar = signal<AvatarKind>(DEFAULT_AVATAR_KIND);
-  public readonly avatarSelectionDraft = signal<AvatarKind>(DEFAULT_AVATAR_KIND);
-  public readonly selectableAvatars = SELECTABLE_AVATARS;
-
   public readonly isJoinInProgress = computed<boolean>(() => this.joinInProgress());
 
   public readonly robberMode = computed<boolean>(
@@ -146,17 +142,21 @@ export class SessionShell {
 
   public constructor() {
     this.lobbyGameUi.attachUiStep(this.uiStep);
-    const storedAvatar = localStorage.getItem(ClientStorageKey.AvatarKind);
-    const avatarKind = normalizeSelectableAvatarKind(storedAvatar);
-    this.selectedAvatar.set(avatarKind);
-    this.avatarSelectionDraft.set(avatarKind);
   }
 
   public readonly lobbyUiStep = LobbyUiStep;
   public readonly uiFeedbackTone = UiFeedbackTone;
 
-  public lobbyIdValue(): string {
-    return this.lobbyForm.controls.lobbyId.value;
+  public lobbyCodeValue(): string {
+    return this.lobbyForm.controls.lobbyCode.value;
+  }
+
+  public activeLobbyCode(): string {
+    return (
+      this.lobbyGameUi.lobbyUiState()?.lobbyCode ??
+      this.gameState.connection()?.lobbyCode ??
+      this.lobbyCodeValue()
+    );
   }
 
   public startSession(): void {
@@ -176,36 +176,16 @@ export class SessionShell {
       this.lobbyForm.markAllAsTouched();
       this.shellFeedback.setFeedback(
         UiFeedbackTone.Error,
-        this.translate.instant(marker('shell.lobbyIdTooShort')),
+        this.translate.instant(marker('shell.lobbyCodeTooShort')),
       );
       return;
     }
     void this.runJoinLobby();
   }
 
-  public openAvatarWardrobe(): void {
-    this.avatarSelectionDraft.set(this.selectedAvatar());
-    this.uiStep.set(LobbyUiStep.AvatarWardrobe);
-  }
-
-  public backToSignInFromWardrobe(): void {
-    this.avatarSelectionDraft.set(this.selectedAvatar());
-    this.uiStep.set(LobbyUiStep.SignIn);
-  }
-
-  public chooseAvatar(kind: AvatarKind): void {
-    this.avatarSelectionDraft.set(kind);
-  }
-
-  public confirmAvatarSelection(): void {
-    const chosenAvatar = this.avatarSelectionDraft();
-    this.selectedAvatar.set(chosenAvatar);
-    localStorage.setItem(ClientStorageKey.AvatarKind, chosenAvatar);
-    this.uiStep.set(LobbyUiStep.SignIn);
-    this.shellFeedback.setFeedback(
-      UiFeedbackTone.Success,
-      this.translate.instant(marker('shell.avatarSaved')),
-    );
+  public onWebcamEnabledChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.gameSettings.setWebcamEnabled(input.checked);
   }
 
   public backToSignIn(): void {
@@ -219,6 +199,7 @@ export class SessionShell {
   }
 
   public backToJoinLobby(): void {
+    void this.liveKit.disconnect();
     this.gameState.disconnectLobby();
     this.joinInProgress.set(false);
     this.spectatorCamService.reset();
@@ -230,6 +211,7 @@ export class SessionShell {
   }
 
   public resetSession(): void {
+    void this.liveKit.disconnect();
     this.gameState.disconnectLobby();
     this.playerSession.clear();
     this.sessionState.set(null);
@@ -468,6 +450,15 @@ export class SessionShell {
     );
   }
 
+  private connectLiveKitInBackground(credentials: LiveKitCredentialsPayload): void {
+    void this.liveKit.connect(credentials).catch(() => {
+      this.shellFeedback.setFeedback(
+        UiFeedbackTone.Info,
+        this.translate.instant(marker('shell.webcamConnectFailed')),
+      );
+    });
+  }
+
   private async runJoinLobby(): Promise<void> {
     const session = this.sessionState();
     if (session === null) {
@@ -478,11 +469,11 @@ export class SessionShell {
       this.uiStep.set(LobbyUiStep.SignIn);
       return;
     }
-    const normalizedLobbyId = this.lobbyForm.controls.lobbyId.value.trim();
-    if (normalizedLobbyId.length < 2) {
+    const lobbyCodeInput = this.lobbyForm.controls.lobbyCode.value.trim();
+    if (!isLobbyCodeValid(lobbyCodeInput)) {
       this.shellFeedback.setFeedback(
         UiFeedbackTone.Error,
-        this.translate.instant(marker('shell.lobbyIdTooShortRun')),
+        this.translate.instant(marker('shell.lobbyCodeTooShortRun')),
       );
       return;
     }
@@ -490,25 +481,30 @@ export class SessionShell {
     this.shellFeedback.setFeedback(
       UiFeedbackTone.Info,
       this.translate.instant(marker('shell.joinConnecting'), {
-        lobbyId: normalizedLobbyId,
+        lobbyCode: lobbyCodeInput,
       }),
     );
     try {
-      await this.gameState.connectToLobby(normalizedLobbyId, session.displayName);
+      const joined = await this.gameState.connectToLobby(lobbyCodeInput, session.displayName);
       this.uiStep.set(LobbyUiStep.Lobby);
       this.joinInProgress.set(false);
       this.shellFeedback.setFeedback(
         UiFeedbackTone.Success,
         this.translate.instant(marker('shell.joinSuccess'), {
-          lobbyId: normalizedLobbyId,
+          lobbyCode: joined.lobbyCode,
         }),
       );
+      if (joined.liveKit !== undefined) {
+        this.connectLiveKitInBackground(joined.liveKit);
+      }
     } catch {
+      void this.liveKit.disconnect();
+      this.gameState.disconnectLobby();
       this.joinInProgress.set(false);
       this.shellFeedback.setFeedback(
         UiFeedbackTone.Error,
         this.translate.instant(marker('shell.joinFailed'), {
-          lobbyId: normalizedLobbyId,
+          lobbyCode: lobbyCodeInput,
         }),
       );
     }

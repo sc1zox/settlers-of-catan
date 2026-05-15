@@ -66,6 +66,8 @@ export class HoverSystem {
   private currentCard: Card | null = null;
   private currentBuildSpot: Object3D | null = null;
   private hoverables: readonly Object3D[];
+  private hoverDirty = true;
+  private readonly clickPointer = new Vector2();
 
   constructor(
     private readonly domElement: HTMLElement,
@@ -81,6 +83,7 @@ export class HoverSystem {
   /** Replace the raycast set after the board or player hands are rebuilt. */
   setHoverables(hoverables: readonly Object3D[]): void {
     this.hoverables = hoverables;
+    this.hoverDirty = true;
     this.setHoveredTile(null);
     this.setHoveredCard(null);
     this.setHoveredBuildSpot(null);
@@ -121,18 +124,20 @@ export class HoverSystem {
 
   public setPointerPickEnabled(enabled: boolean): void {
     this.pointerPickEnabled = enabled;
+    this.hoverDirty = true;
   }
 
   public setExploreReadOnly(enabled: boolean): void {
     this.exploreReadOnly = enabled;
   }
 
-  update(): void {
+  update(forcePick = false): void {
     if (!this.pointerInside) {
       this.emit(null);
       this.setHoveredTile(null);
       this.setHoveredCard(null);
       this.setHoveredBuildSpot(null);
+      this.hoverDirty = false;
       return;
     }
     if (!this.pointerPickEnabled) {
@@ -140,8 +145,13 @@ export class HoverSystem {
       this.setHoveredTile(null);
       this.setHoveredCard(null);
       this.setHoveredBuildSpot(null);
+      this.hoverDirty = false;
       return;
     }
+    if (!forcePick && !this.hoverDirty) {
+      return;
+    }
+    this.hoverDirty = false;
     this.raycaster.setFromCamera(this.pointer, this.camera);
     const hits = this.raycaster.intersectObjects(this.hoverables as Object3D[], true);
     for (let i = 0; i < hits.length; i++) {
@@ -277,10 +287,12 @@ export class HoverSystem {
     this.pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
     this.pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
     this.pointerInside = true;
+    this.hoverDirty = true;
   };
 
   private readonly onPointerLeave = (): void => {
     this.pointerInside = false;
+    this.hoverDirty = true;
   };
 
   private readonly onClick = (ev: MouseEvent): void => {
@@ -291,11 +303,11 @@ export class HoverSystem {
       return;
     }
     const rect = this.domElement.getBoundingClientRect();
-    const ndc = new Vector2(
+    this.clickPointer.set(
       ((ev.clientX - rect.left) / rect.width) * 2 - 1,
       -((ev.clientY - rect.top) / rect.height) * 2 + 1,
     );
-    this.raycaster.setFromCamera(ndc, this.camera);
+    this.raycaster.setFromCamera(this.clickPointer, this.camera);
     const hits = this.raycaster.intersectObjects(this.hoverables as Object3D[], true);
     for (const hit of hits) {
       const obj = walkToKind(hit.object);

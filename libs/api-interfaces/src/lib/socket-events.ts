@@ -1,4 +1,5 @@
 import { ActionRejectCode } from './action-reject-code.enum';
+import type { LiveKitCredentialsPayload } from './livekit.dto';
 import { PlayerSeat } from './player-seat.enum';
 import { ResourceType } from './resource-type.enum';
 import {
@@ -20,13 +21,15 @@ export interface SessionBoundPayload {
 }
 
 export interface JoinLobbyPayload {
-  readonly lobbyId: string;
+  readonly lobbyCode: string;
   readonly displayName: string;
 }
 
 export interface LobbyJoinedPayload {
   readonly lobbyId: string;
+  readonly lobbyCode: string;
   readonly seat: PlayerSeat;
+  readonly liveKit?: LiveKitCredentialsPayload;
 }
 
 export interface BuildSettlementPayload {

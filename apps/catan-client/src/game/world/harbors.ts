@@ -2,15 +2,18 @@ import {
   BoxGeometry,
   ConeGeometry,
   CylinderGeometry,
+  DoubleSide,
   Group,
   Mesh,
   MeshStandardMaterial,
   Object3D,
+  PlaneGeometry,
   Vector3,
 } from 'three';
 import { AxialCoord, axialToWorld, hexRing } from '../board/hex';
 import { ResourceTileType, TileType } from '@catan/shared-game-field';
 import { SceneObjectKind, SceneUserDataKey } from '@catan/api-interfaces';
+import { makeHarborFlagTexture, ResourceKind } from '../cards/textures';
 import { TILE_HEIGHT, WATER_LEVEL_Y } from '../tiles/tile';
 
 export enum HarborKind {
@@ -36,13 +39,12 @@ interface HarborPlacement {
   readonly resource: HarborResource | null;
 }
 
-const HARBOR_FLAG_COLOR: Record<HarborResource | 'generic', number> = {
-  [TileType.Forest]: 0x356f37,
-  [TileType.Fields]: 0xd9b25c,
-  [TileType.Pasture]: 0x95c66f,
-  [TileType.Hills]: 0xa05a3a,
-  [TileType.Mountains]: 0x6c6f76,
-  generic: 0xe8e8ee,
+const HARBOR_TILE_TO_RESOURCE_KIND: Readonly<Record<HarborResource, ResourceKind>> = {
+  [TileType.Forest]: ResourceKind.Wood,
+  [TileType.Fields]: ResourceKind.Grain,
+  [TileType.Pasture]: ResourceKind.Wool,
+  [TileType.Hills]: ResourceKind.Brick,
+  [TileType.Mountains]: ResourceKind.Ore,
 };
 
 const NEIGHBOR_DIRS: readonly AxialCoord[] = Object.freeze([
@@ -131,9 +133,6 @@ export class Harbor {
     const wallMat = new MeshStandardMaterial({ color: 0xc89770, flatShading: true });
     const beamMat = new MeshStandardMaterial({ color: 0x4a2f1a, flatShading: true });
     const roofMat = new MeshStandardMaterial({ color: 0x7a3a25, flatShading: true });
-    const accent = HARBOR_FLAG_COLOR[placement.resource ?? 'generic'];
-    const flagMat = new MeshStandardMaterial({ color: accent, flatShading: true });
-
     const buildingW = 0.95;
     const buildingH = 0.95;
     const buildingD = 0.8;
@@ -225,26 +224,29 @@ export class Harbor {
     roof.castShadow = true;
     this.group.add(roof);
 
-    // Flag pole rising from the roof apex.
-    const poleH = 0.85;
+    const flagW = 0.82;
+    const flagH = 0.48;
+    const poleH = 1.15;
     const poleBaseY = floorY + buildingH + roofH;
-    const pole = new Mesh(new CylinderGeometry(0.03, 0.03, poleH, 6), beamMat);
+    const pole = new Mesh(new CylinderGeometry(0.035, 0.035, poleH, 6), beamMat);
     pole.position.set(0, poleBaseY + poleH / 2, 0);
     pole.castShadow = true;
     this.group.add(pole);
-    const flagY = poleBaseY + poleH - 0.16;
-    const flag = new Mesh(new BoxGeometry(0.42, 0.24, 0.02), flagMat);
-    flag.position.set(0.22, flagY, 0);
+    const flagY = poleBaseY + poleH - flagH / 2 + 0.04;
+    const flagResourceKind =
+      placement.resource !== null ? HARBOR_TILE_TO_RESOURCE_KIND[placement.resource] : null;
+    const flagTex = makeHarborFlagTexture(flagResourceKind, info.ratioFrom);
+    const flagMat = new MeshStandardMaterial({
+      map: flagTex,
+      roughness: 0.92,
+      metalness: 0,
+      side: DoubleSide,
+      flatShading: true,
+    });
+    const flag = new Mesh(new PlaneGeometry(flagW, flagH), flagMat);
+    flag.position.set(flagW / 2 + 0.05, flagY, 0);
     flag.castShadow = true;
     this.group.add(flag);
-    if (info.kind === HarborKind.Generic) {
-      const mark = new Mesh(
-        new BoxGeometry(0.18, 0.18, 0.025),
-        new MeshStandardMaterial({ color: 0x222222 }),
-      );
-      mark.position.set(0.22, flagY, 0.015);
-      this.group.add(mark);
-    }
 
     // Invisible pick volume covering the whole harbour.
     const pickGeom = new BoxGeometry(

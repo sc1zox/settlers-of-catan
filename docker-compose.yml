@@ -1,4 +1,22 @@
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: catan-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
+
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: catan-livekit
+    command: --config /etc/livekit.yaml --dev
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    volumes:
+      - ./deploy/livekit.yaml:/etc/livekit.yaml:ro
+
   api:
     build:
       context: .
@@ -12,8 +30,16 @@ services:
       PORT: "3000"
       NX_DAEMON: "false"
       CHOKIDAR_USEPOLLING: "1"
+      REDIS_URL: redis://redis:6379
+      LIVEKIT_API_KEY: devkey
+      LIVEKIT_API_SECRET: devsecret
+      LIVEKIT_HTTP_URL: http://livekit:7880
+      LIVEKIT_PUBLIC_URL: ws://localhost:7880
     ports:
       - "3000:3000"
+    depends_on:
+      - redis
+      - livekit
     volumes:
       - ./:/workspace
       - /workspace/node_modules

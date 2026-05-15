@@ -21,6 +21,7 @@ import {
   GameSocketServerEvent,
   JoinLobbyPayload,
   LobbyFullStatePayload,
+  LobbyJoinedPayload,
   MoveRobberPayload,
   PlayerSeat,
   ResourceType,
@@ -47,8 +48,10 @@ export class GameSocketService implements OnDestroy {
   private readonly diceRolledSubject = new Subject<DiceRolledPayload>();
   private readonly tradeUpdatedSubject = new Subject<TradeUpdatedPayload>();
   private readonly actionRejectedSubject = new Subject<ActionRejectedPayload>();
+  private readonly lobbyJoinedSubject = new Subject<LobbyJoinedPayload>();
 
   public readonly fullState$ = this.fullStateSubject.asObservable();
+  public readonly lobbyJoined$ = this.lobbyJoinedSubject.asObservable();
   public readonly gameDelta$ = this.gameDeltaSubject.asObservable();
   public readonly diceRolled$ = this.diceRolledSubject.asObservable();
   public readonly tradeUpdated$ = this.tradeUpdatedSubject.asObservable();
@@ -98,8 +101,8 @@ export class GameSocketService implements OnDestroy {
     this.socket = null;
   }
 
-  public joinLobby(lobbyId: string, displayName: string): void {
-    const payload: JoinLobbyPayload = { lobbyId, displayName };
+  public joinLobby(lobbyCode: string, displayName: string): void {
+    const payload: JoinLobbyPayload = { lobbyCode, displayName };
     this.socket?.emit(GameSocketClientEvent.JoinLobby, payload);
   }
 
@@ -226,6 +229,10 @@ export class GameSocketService implements OnDestroy {
     s.off(GameSocketServerEvent.DiceRolled);
     s.off(GameSocketServerEvent.TradeUpdated);
     s.off(GameSocketServerEvent.ActionRejected);
+    s.off(GameSocketServerEvent.LobbyJoined);
+    s.on(GameSocketServerEvent.LobbyJoined, (payload: LobbyJoinedPayload) => {
+      this.lobbyJoinedSubject.next(payload);
+    });
     s.on(GameSocketServerEvent.FullState, (payload: LobbyFullStatePayload) => {
       this.fullStateSubject.next(payload);
     });

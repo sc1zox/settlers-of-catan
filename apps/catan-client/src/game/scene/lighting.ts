@@ -13,6 +13,10 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 /** Direction the warm key light ("sun") shines onto the table from. */
 const SUN_POSITION = new Vector3(14, 24, 10);
 
+export interface LightingRig {
+  readonly sun: DirectionalLight;
+}
+
 /**
  * Lighting rig: a warm directional key light standing in for the sun, soft
  * sky/ground fill, and an image-based environment so every PBR surface picks
@@ -20,7 +24,7 @@ const SUN_POSITION = new Vector3(14, 24, 10);
  * together — the scene reads as sunlit and lively rather than flat and dark,
  * while staying subtle.
  */
-export function addLighting(scene: Scene, renderer: WebGLRenderer): void {
+export function addLighting(scene: Scene, renderer: WebGLRenderer): LightingRig {
   // Filmic tone mapping rolls highlights off gently, so the light reads as
   // natural daylight instead of a flat wash.
   renderer.toneMapping = ACESFilmicToneMapping;
@@ -56,4 +60,5 @@ export function addLighting(scene: Scene, renderer: WebGLRenderer): void {
 
   // Gentle warm ambient floor so unlit faces never crush to pure black.
   scene.add(new AmbientLight(0xffe9c8, 0.2));
+  return { sun };
 }

@@ -222,7 +222,7 @@ function drawTreeIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, siz
   ctx.fillRect(cx - size * 0.06, cy + size * 0.22, size * 0.12, size * 0.28);
   const layers = 4;
   for (let i = 0; i < layers; i++) {
-    const w = size * (0.85 - i * 0.16);
+    const w = size * (0.37 + i * 0.16);
     const yTop = cy - size * 0.5 + i * size * 0.2;
     const yBot = yTop + size * 0.27;
     ctx.fillStyle = i % 2 === 0 ? '#2f5d3a' : '#3a7042';
@@ -268,69 +268,86 @@ function drawBrickIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, si
 }
 
 function drawSheepIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number): void {
-  // Cloud-like fluffy body.
-  ctx.fillStyle = '#f6f1e6';
-  ctx.strokeStyle = '#7a705f';
-  ctx.lineWidth = 2;
-  for (let i = 0; i < 7; i++) {
+  const outline = '#1a1612';
+  const outlineW = Math.max(3, Math.round(size * 0.028));
+  const woolFill = '#f6f1e6';
+  const headFill = '#3a2a1f';
+
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+
+  const drawOutlinedArc = (
+    arcCx: number,
+    arcCy: number,
+    radius: number,
+    fill: string,
+  ): void => {
+    ctx.beginPath();
+    ctx.arc(arcCx, arcCy, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = outline;
+    ctx.lineWidth = outlineW;
+    ctx.stroke();
+    ctx.fillStyle = fill;
+    ctx.fill();
+  };
+
+  const drawOutlinedRect = (x: number, y: number, w: number, h: number, fill: string): void => {
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.strokeStyle = outline;
+    ctx.lineWidth = outlineW;
+    ctx.stroke();
+    ctx.fillStyle = fill;
+    ctx.fill();
+  };
+
+  for (let i = 0; i < 7; i += 1) {
     const a = (i / 7) * Math.PI * 2 + 0.3;
     const dx = Math.cos(a) * size * 0.22;
     const dy = Math.sin(a) * size * 0.16;
-    ctx.beginPath();
-    ctx.arc(cx + dx, cy + dy, size * 0.16, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    drawOutlinedArc(cx + dx, cy + dy, size * 0.16, woolFill);
   }
-  ctx.beginPath();
-  ctx.arc(cx, cy, size * 0.22, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  // Head + face
-  ctx.fillStyle = '#3a2a1f';
-  ctx.beginPath();
-  ctx.arc(cx + size * 0.34, cy - size * 0.05, size * 0.13, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#fff5d9';
-  ctx.beginPath();
-  ctx.arc(cx + size * 0.38, cy - size * 0.08, size * 0.025, 0, Math.PI * 2);
-  ctx.fill();
-  // Legs
-  ctx.fillStyle = '#3a2a1f';
-  ctx.fillRect(cx - size * 0.14, cy + size * 0.2, size * 0.06, size * 0.18);
-  ctx.fillRect(cx + size * 0.06, cy + size * 0.2, size * 0.06, size * 0.18);
+  drawOutlinedArc(cx, cy, size * 0.22, woolFill);
+
+  drawOutlinedArc(cx + size * 0.34, cy - size * 0.05, size * 0.13, headFill);
+  drawOutlinedArc(cx + size * 0.38, cy - size * 0.08, size * 0.025, '#fff5d9');
+
+  const legW = size * 0.06;
+  const legH = size * 0.18;
+  drawOutlinedRect(cx - size * 0.14, cy + size * 0.2, legW, legH, headFill);
+  drawOutlinedRect(cx + size * 0.06, cy + size * 0.2, legW, legH, headFill);
 }
 
 function drawWheatIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number): void {
   ctx.strokeStyle = '#7a5d2a';
   ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.moveTo(cx, cy + size * 0.5);
-  ctx.lineTo(cx, cy - size * 0.2);
+  ctx.moveTo(cx, cy + size * 0.4);
+  ctx.lineTo(cx, cy - size * 0.14);
   ctx.stroke();
-  // Stem leaves
   ctx.beginPath();
-  ctx.moveTo(cx, cy + size * 0.15);
-  ctx.quadraticCurveTo(cx - size * 0.2, cy + size * 0.1, cx - size * 0.25, cy + size * 0.3);
+  ctx.moveTo(cx, cy + size * 0.12);
+  ctx.quadraticCurveTo(cx - size * 0.18, cy + size * 0.08, cx - size * 0.22, cy + size * 0.26);
   ctx.lineWidth = 3;
   ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(cx, cy + size * 0.05);
-  ctx.quadraticCurveTo(cx + size * 0.2, cy, cx + size * 0.25, cy + size * 0.2);
+  ctx.moveTo(cx, cy + size * 0.04);
+  ctx.quadraticCurveTo(cx + size * 0.18, cy - size * 0.02, cx + size * 0.22, cy + size * 0.18);
   ctx.stroke();
-  // Grains
   ctx.lineWidth = 2;
-  for (let row = 0; row < 6; row++) {
-    const y = cy - size * 0.45 + row * size * 0.12;
+  const grainRows = 5;
+  for (let row = 0; row < grainRows; row += 1) {
+    const y = cy - size * 0.36 + row * size * 0.075;
     for (const sign of [-1, 1] as const) {
       ctx.save();
-      ctx.translate(cx + sign * size * 0.07, y);
+      ctx.translate(cx + sign * size * 0.06, y);
       ctx.rotate(sign * 0.45);
-      const grad = ctx.createLinearGradient(0, -size * 0.12, 0, size * 0.12);
+      const grad = ctx.createLinearGradient(0, -size * 0.1, 0, size * 0.1);
       grad.addColorStop(0, '#f1deaa');
       grad.addColorStop(1, '#a8801f');
       ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.ellipse(0, 0, size * 0.06, size * 0.14, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, size * 0.05, size * 0.11, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = '#7a5d2a';
       ctx.stroke();
@@ -548,6 +565,105 @@ const DEV_ICON: Record<
   [DevKind.Monopoly]: drawMonopolyIcon,
   [DevKind.VictoryPoint]: drawCrownIcon,
 };
+
+function drawHarborRatioBand(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  ratioFrom: number,
+  bandH: number,
+): void {
+  ctx.fillStyle = 'rgba(26, 22, 18, 0.82)';
+  ctx.fillRect(0, h - bandH, w, bandH);
+  ctx.fillStyle = '#fff8e8';
+  ctx.font = `800 ${Math.round(bandH * 0.72)}px "Inter", "Segoe UI", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`${ratioFrom}:1`, w / 2, h - bandH / 2);
+}
+
+function drawGenericHarborTradeIcon(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  size: number,
+): void {
+  const cardW = size * 0.34;
+  const cardH = size * 0.48;
+  const offsets = [-size * 0.22, 0, size * 0.22];
+  const fills = ['#3a7042', '#a85a3a', '#d9b25c'];
+  for (let i = 0; i < offsets.length; i += 1) {
+    const x = cx + offsets[i] - cardW / 2;
+    const y = cy - cardH / 2;
+    ctx.fillStyle = fills[i];
+    ctx.strokeStyle = '#1a1612';
+    ctx.lineWidth = 3;
+    roundRect(ctx, x, y, cardW, cardH, 6);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#1a1612';
+  ctx.font = `800 ${Math.round(size * 0.2)}px "Inter", "Segoe UI", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('?', cx, cy + size * 0.02);
+}
+
+const HARBOR_FLAG_W = 512;
+const HARBOR_FLAG_H = 288;
+const HARBOR_FLAG_RATIO_BAND_H = 52;
+
+export function makeHarborFlagTexture(
+  resourceKind: ResourceKind | null,
+  ratioFrom: number,
+): CanvasTexture {
+  const { canvas, ctx } = newCanvas(HARBOR_FLAG_W, HARBOR_FLAG_H);
+  const iconAreaH = HARBOR_FLAG_H - HARBOR_FLAG_RATIO_BAND_H;
+  const iconCenterY = iconAreaH / 2;
+  const iconSize = iconAreaH * 0.84;
+  const borderPad = 8;
+  const iconPad = borderPad + 4;
+
+  if (resourceKind !== null) {
+    const palette = RESOURCE_PALETTE[resourceKind];
+    ctx.fillStyle = palette.accentLight;
+    ctx.fillRect(0, 0, HARBOR_FLAG_W, HARBOR_FLAG_H);
+    ctx.strokeStyle = palette.accentDark;
+    ctx.lineWidth = 8;
+    ctx.strokeRect(
+      borderPad,
+      borderPad,
+      HARBOR_FLAG_W - borderPad * 2,
+      iconAreaH - borderPad,
+    );
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(iconPad, iconPad, HARBOR_FLAG_W - iconPad * 2, iconAreaH - iconPad);
+    ctx.clip();
+    RESOURCE_ICON[resourceKind](ctx, HARBOR_FLAG_W / 2, iconCenterY, iconSize);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = '#e8e8ee';
+    ctx.fillRect(0, 0, HARBOR_FLAG_W, HARBOR_FLAG_H);
+    ctx.strokeStyle = '#8a8a96';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(
+      borderPad,
+      borderPad,
+      HARBOR_FLAG_W - borderPad * 2,
+      iconAreaH - borderPad,
+    );
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(iconPad, iconPad, HARBOR_FLAG_W - iconPad * 2, iconAreaH - iconPad);
+    ctx.clip();
+    drawGenericHarborTradeIcon(ctx, HARBOR_FLAG_W / 2, iconCenterY, iconSize * 0.88);
+    ctx.restore();
+  }
+
+  drawHarborRatioBand(ctx, HARBOR_FLAG_W, HARBOR_FLAG_H, ratioFrom, HARBOR_FLAG_RATIO_BAND_H);
+  return finalize(canvas);
+}
 
 // --- Public texture builders ---
 

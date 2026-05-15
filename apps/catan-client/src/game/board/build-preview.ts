@@ -109,6 +109,7 @@ export class BuildPreview {
       const glow = 0.34 + 0.16 * Math.sin(this.pulse * 3.2);
       this.materials.body.emissiveIntensity = glow;
       this.materials.accent.emissiveIntensity = glow;
+      this.materials.dark.emissiveIntensity = glow * 0.7;
     }
     for (let i = 0; i < this.spots.length; i += 1) {
       const spot = this.spots[i];
@@ -136,6 +137,7 @@ export class BuildPreview {
     if (this.materials) {
       this.materials.body.dispose();
       this.materials.accent.dispose();
+      this.materials.dark.dispose();
       this.materials = null;
     }
     this.pulse = 0;
@@ -178,7 +180,20 @@ export class BuildPreview {
       flatShading: true,
       roughness: 0.5,
     });
-    return { body, accent };
+    // Ghosts use the same emissive accent for "dark" details so doors / windows
+    // stay visible inside the translucent silhouette instead of disappearing.
+    const darkColor = new Color(color).multiplyScalar(0.55);
+    const dark = new MeshStandardMaterial({
+      color: darkColor,
+      emissive: darkColor.clone(),
+      emissiveIntensity: 0.35,
+      transparent: true,
+      opacity: GHOST_OPACITY,
+      depthWrite: false,
+      flatShading: true,
+      roughness: 0.6,
+    });
+    return { body, accent, dark };
   }
 
   private trackGeometries(figure: Group): void {

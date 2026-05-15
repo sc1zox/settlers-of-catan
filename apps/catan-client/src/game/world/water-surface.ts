@@ -69,6 +69,7 @@ function buildDiscGeometry(
 export class WaterSurface {
   readonly mesh: Mesh;
   private readonly disc: DiscGeometry;
+  private normalFrame = 0;
 
   constructor(radius: number) {
     this.disc = buildDiscGeometry(radius, 14, 64);
@@ -100,7 +101,10 @@ export class WaterSurface {
       pos[i + 1] = wave;
     }
     this.disc.positions.needsUpdate = true;
-    this.disc.geometry.computeVertexNormals();
+    this.normalFrame = (this.normalFrame + 1) % 6;
+    if (this.normalFrame === 0) {
+      this.disc.geometry.computeVertexNormals();
+    }
   }
 
   dispose(): void {

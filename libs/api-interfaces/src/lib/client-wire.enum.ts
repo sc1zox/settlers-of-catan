@@ -5,6 +5,11 @@ export enum ClientStorageKey {
   RefreshToken = 'catan.refreshToken',
   UiLocale = 'catan.uiLocale',
   AvatarKind = 'catan.avatarKind',
+  ShadowQuality = 'catan.shadowQuality',
+  PerformanceOverlay = 'catan.performanceOverlay',
+  WebcamEnabled = 'catan.webcamEnabled',
+  WebcamQuality = 'catan.webcamQuality',
+  SceneBrightness = 'catan.sceneBrightness',
 }
 
 export enum UiLocale {

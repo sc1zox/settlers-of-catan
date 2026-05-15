@@ -1,5 +1,5 @@
 import { Euler, Group, MeshStandardMaterial, Object3D, Quaternion, Vector3 } from 'three';
-import { AvatarKind, BuildKind, SceneObjectKind, SceneUserDataKey } from '@catan/api-interfaces';
+import { BuildKind, SceneObjectKind, SceneUserDataKey } from '@catan/api-interfaces';
 import { Card } from '../cards/card';
 import { createCostCard } from '../cards/cost-card';
 import {
@@ -159,6 +159,7 @@ export class PlayerArea {
     this.avatarSeat = new AvatarSeat({
       tableTopY: this.tableY,
       outerEdgeZ: outerZ,
+      bodyColor: options.color,
     });
     this.group.add(this.avatarSeat.group);
 
@@ -185,8 +186,16 @@ export class PlayerArea {
     return false;
   }
 
-  public setAvatar(kind: AvatarKind): void {
-    this.avatarSeat.setAvatar(kind);
+  public setHeadVideo(video: HTMLVideoElement | null): void {
+    this.avatarSeat.setVideoElement(video);
+  }
+
+  public setHeadVideoDisplayGamma(gamma: number): void {
+    this.avatarSeat.setVideoDisplayGamma(gamma);
+  }
+
+  public updateAvatarVideo(): void {
+    this.avatarSeat.update();
   }
 
   /**
@@ -338,6 +347,7 @@ export class PlayerArea {
     for (let i = 0; i < this.handCards.length; i += 1) {
       this.handCards[i].update(dt);
     }
+    this.avatarSeat.update();
     this.updateActivatedFigure(dt);
     this.updateFlight(dt);
   }

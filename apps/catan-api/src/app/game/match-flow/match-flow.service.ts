@@ -37,7 +37,7 @@ export class MatchFlowService {
     const activeSeats = this.turnFlow.getActiveTurnSeats(lobby);
     const minimumPlayerCount = this.demoBots.getMinimumStartPlayerCount(lobby);
     if (activeSeats.length < minimumPlayerCount) {
-      throw new Error(ActionRejectCode.IllegalPlacement);
+      throw new Error(ActionRejectCode.LobbyNotEnoughPlayers);
     }
     lobby.fsm.onLobbyStarted();
     lobby.currentSeat = this.turnFlow.firstTurnSeat(lobby);

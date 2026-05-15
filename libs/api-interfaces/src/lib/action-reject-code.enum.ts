@@ -1,6 +1,7 @@
 export enum ActionRejectCode {
   WrongPhase = 'wrong_phase',
   NotYourTurn = 'not_your_turn',
+  LobbyNotEnoughPlayers = 'lobby_not_enough_players',
   InsufficientResources = 'insufficient_resources',
   IllegalPlacement = 'illegal_placement',
   InvalidPayload = 'invalid_payload',

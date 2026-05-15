@@ -2,6 +2,7 @@
   "reject": {
     "wrongPhase": "Diese Aktion passt nicht zur aktuellen Spielphase (z. B. wuerfeln nur in der Wuerfelphase, bauen nur nach dem Wurf).",
     "notYourTurn": "Du bist nicht am Zug — warte, bis du in der HUD als aktiver Sitz angezeigt wirst.",
+    "lobbyNotEnoughPlayers": "Zum Start sind mindestens zwei aktive Spieler in der Lobby noetig. Lade einen Mitspieler ein, oder nutze den Lobby-Code „demo“ fuer Einzelspieler mit Bots.",
     "insufficientResources": "Dir fehlen Rohstoffe auf der Hand: Die Aktion kostet mehr, als du gerade hast (Siedlung, Stadt, Strasse, Entwicklungskarte oder Spielerhandel).",
     "illegalPlacement": "Ungueltiger Bauplatz: nur markierte Geisterpositionen, kein Bebauen auf fremde Gueter oder ausserhalb der erlaubten Liste.",
     "invalidPayload": "Die Aktion konnte serverseitig nicht verarbeitet werden (ungueltige Daten). Bitte Seite neu laden und erneut versuchen.",
@@ -33,7 +34,8 @@
     "joinConnecting": "Verbinde mit Lobby \"{{lobbyCode}}\" ...",
     "joinSuccess": "Lobby \"{{lobbyCode}}\" erfolgreich beigetreten.",
     "joinFailed": "Verbindung zur Lobby \"{{lobbyCode}}\" ist fehlgeschlagen.",
-    "webcamConnectFailed": "Lobby beigetreten. Webcam-Verbindung konnte nicht hergestellt werden — Video erscheint ggf. spaeter.",
+    "liveKitConnectFailed": "Lobby beigetreten, aber Video-Chat (LiveKit/WebRTC) ist fehlgeschlagen — die Kamera ist damit nicht unbedingt das Problem. Pruefe, ob LiveKit laeuft und erreichbar ist. Technisch: {{detail}}.",
+    "webcamInsecureContext": "Webcam geht nur ueber HTTPS oder localhost. Oeffne die Seite z. B. ueber http://localhost:4200 oder richte TLS ein.",
     "appTitle": "Catan Online",
     "appSubtitle": "Session-basiert anmelden, Lobby beitreten und gemeinsam starten.",
     "labelDisplayName": "Dein Name",

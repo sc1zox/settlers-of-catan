@@ -124,6 +124,8 @@ export class EnumTranslate {
         return 'reject.wrongPhase';
       case ActionRejectCode.NotYourTurn:
         return 'reject.notYourTurn';
+      case ActionRejectCode.LobbyNotEnoughPlayers:
+        return 'reject.lobbyNotEnoughPlayers';
       case ActionRejectCode.InsufficientResources:
         return 'reject.insufficientResources';
       case ActionRejectCode.IllegalPlacement:

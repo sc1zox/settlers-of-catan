@@ -186,9 +186,15 @@ export class SessionShell {
   public onWebcamEnabledChange(event: Event): void {
     const input = event.target as HTMLInputElement;
     this.gameSettings.setWebcamEnabled(input.checked);
+    if (input.checked) {
+      this.beginWebcamPrimingIfEnabledAndSecure();
+    } else {
+      void this.liveKit.abandonPrimedLocalVideoCapture();
+    }
   }
 
   public backToSignIn(): void {
+    void this.liveKit.abandonPrimedLocalVideoCapture();
     this.joinInProgress.set(false);
     this.spectatorCamService.reset();
     this.uiStep.set(LobbyUiStep.SignIn);
@@ -199,6 +205,7 @@ export class SessionShell {
   }
 
   public backToJoinLobby(): void {
+    void this.liveKit.abandonPrimedLocalVideoCapture();
     void this.liveKit.disconnect();
     this.gameState.disconnectLobby();
     this.joinInProgress.set(false);
@@ -211,6 +218,7 @@ export class SessionShell {
   }
 
   public resetSession(): void {
+    void this.liveKit.abandonPrimedLocalVideoCapture();
     void this.liveKit.disconnect();
     this.gameState.disconnectLobby();
     this.playerSession.clear();
@@ -428,6 +436,7 @@ export class SessionShell {
       );
       return;
     }
+    this.beginWebcamPrimingIfEnabledAndSecure();
     let sid = this.playerSession.sessionId();
     if (sid.length === 0) {
       await this.playerSession.ensureReady();
@@ -450,13 +459,50 @@ export class SessionShell {
     );
   }
 
+  private beginWebcamPrimingIfEnabledAndSecure(): void {
+    if (!this.gameSettings.webcamEnabled()) {
+      return;
+    }
+    if (typeof globalThis.isSecureContext === 'boolean' && !globalThis.isSecureContext) {
+      return;
+    }
+    this.liveKit.beginLocalVideoCaptureFromUserGesture();
+  }
+
+  private blockLobbyJoinIfWebcamRequiresSecureContext(): boolean {
+    if (!this.gameSettings.webcamEnabled()) {
+      return true;
+    }
+    if (typeof globalThis.isSecureContext === 'boolean' && !globalThis.isSecureContext) {
+      this.shellFeedback.setFeedback(
+        UiFeedbackTone.Error,
+        this.translate.instant(marker('shell.webcamInsecureContext')),
+      );
+      return false;
+    }
+    return true;
+  }
+
   private connectLiveKitInBackground(credentials: LiveKitCredentialsPayload): void {
-    void this.liveKit.connect(credentials).catch(() => {
+    void this.liveKit.connect(credentials).catch((error: unknown) => {
+      console.error('LiveKit connect failed', credentials.serverUrl, error);
+      const detail =
+        error instanceof Error
+          ? SessionShell.truncateLiveKitDetail(error.message)
+          : SessionShell.truncateLiveKitDetail(String(error));
       this.shellFeedback.setFeedback(
         UiFeedbackTone.Info,
-        this.translate.instant(marker('shell.webcamConnectFailed')),
+        this.translate.instant(marker('shell.liveKitConnectFailed'), { detail }),
       );
     });
+  }
+
+  private static truncateLiveKitDetail(raw: string): string {
+    const oneLine = raw.replace(/\s+/gu, ' ').trim();
+    if (oneLine.length <= 160) {
+      return oneLine;
+    }
+    return `${oneLine.slice(0, 157)}...`;
   }
 
   private async runJoinLobby(): Promise<void> {
@@ -475,6 +521,9 @@ export class SessionShell {
         UiFeedbackTone.Error,
         this.translate.instant(marker('shell.lobbyCodeTooShortRun')),
       );
+      return;
+    }
+    if (!this.blockLobbyJoinIfWebcamRequiresSecureContext()) {
       return;
     }
     this.joinInProgress.set(true);
@@ -498,6 +547,7 @@ export class SessionShell {
         this.connectLiveKitInBackground(joined.liveKit);
       }
     } catch {
+      void this.liveKit.abandonPrimedLocalVideoCapture();
       void this.liveKit.disconnect();
       this.gameState.disconnectLobby();
       this.joinInProgress.set(false);

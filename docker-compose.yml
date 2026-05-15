@@ -6,6 +6,26 @@ services:
       - "6379:6379"
     command: redis-server --save 60 1 --loglevel warning
 
+  turn:
+    image: coturn/coturn:latest
+    container_name: catan-turn
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "49160-49200:49160-49200/udp"
+    command:
+      - "-n"
+      - "--log-file=stdout"
+      - "--listening-port=3478"
+      - "--min-port=49160"
+      - "--max-port=49200"
+      - "--fingerprint"
+      - "--lt-cred-mech"
+      - "--user=catan:catandevturn"
+      - "--realm=catan"
+      - "--no-tls"
+      - "--no-dtls"
+
   livekit:
     image: livekit/livekit-server:latest
     container_name: catan-livekit
@@ -14,8 +34,11 @@ services:
       - "7880:7880"
       - "7881:7881"
       - "7882:7882/udp"
+      - "50000-50100:50000-50100/udp"
     volumes:
       - ./deploy/livekit.yaml:/etc/livekit.yaml:ro
+    depends_on:
+      - turn
 
   api:
     build:

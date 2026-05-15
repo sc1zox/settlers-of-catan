@@ -3,5 +3,16 @@ rtc:
   tcp_port: 7881
   port_range_start: 50000
   port_range_end: 50100
+  turn_servers:
+    - host: 127.0.0.1
+      port: 3478
+      protocol: udp
+      username: catan
+      credential: catandevturn
+    - host: 127.0.0.1
+      port: 3478
+      protocol: tcp
+      username: catan
+      credential: catandevturn
 keys:
   devkey: devsecret

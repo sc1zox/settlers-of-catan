@@ -5,6 +5,7 @@ import { TranslateService } from '@ngx-translate/core';
 const REJECT_KEY: Record<ActionRejectCode, string> = {
   [ActionRejectCode.WrongPhase]: 'reject.wrongPhase',
   [ActionRejectCode.NotYourTurn]: 'reject.notYourTurn',
+  [ActionRejectCode.LobbyNotEnoughPlayers]: 'reject.lobbyNotEnoughPlayers',
   [ActionRejectCode.InsufficientResources]: 'reject.insufficientResources',
   [ActionRejectCode.IllegalPlacement]: 'reject.illegalPlacement',
   [ActionRejectCode.InvalidPayload]: 'reject.invalidPayload',

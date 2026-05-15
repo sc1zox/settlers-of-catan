@@ -31,6 +31,10 @@ export enum DevelopmentApiOrigin {
   LocalHttp = 'http://localhost:3000',
 }
 
+export enum ProductionClientApiOrigin {
+  SameHostRelative = '',
+}
+
 export enum SessionHttpAction {
   Bootstrap = 'bootstrap',
   Refresh = 'refresh',

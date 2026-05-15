@@ -3,6 +3,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { WebcamQuality } from '@catan/api-interfaces';
 import { ShadowQuality } from '../../../game/scene/shadow-quality.enum';
 import { GameSettingsService } from './game-settings.service';
+import { LobbyLiveKitService } from '../webcam-head/lobby-livekit.service';
 
 @Component({
   selector: 'app-game-settings-panel',
@@ -151,6 +152,7 @@ import { GameSettingsService } from './game-settings.service';
 })
 export class GameSettingsPanelComponent {
   protected readonly settings = inject(GameSettingsService);
+  private readonly liveKit = inject(LobbyLiveKitService);
   protected readonly shadowQualityLow = ShadowQuality.Low;
   protected readonly shadowQualityMedium = ShadowQuality.Medium;
   protected readonly shadowQualityHigh = ShadowQuality.High;
@@ -179,6 +181,13 @@ export class GameSettingsPanelComponent {
   public onWebcamEnabledChange(event: Event): void {
     const input = event.target as HTMLInputElement;
     this.settings.setWebcamEnabled(input.checked);
+    if (input.checked) {
+      if (typeof globalThis.isSecureContext === 'boolean' && globalThis.isSecureContext) {
+        this.liveKit.beginLocalVideoCaptureFromUserGesture();
+      }
+    } else {
+      void this.liveKit.abandonPrimedLocalVideoCapture();
+    }
   }
 
   public onWebcamQualityChange(event: Event): void {

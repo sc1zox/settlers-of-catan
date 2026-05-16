@@ -9,8 +9,8 @@ import {
   type LobbyFullStatePayload,
   type LobbyJoinedPayload,
 } from '@catan/api-interfaces';
-import { EMPTY, firstValueFrom } from 'rxjs';
-import { filter, take, takeUntil, timeout } from 'rxjs/operators';
+import { EMPTY, firstValueFrom, merge } from 'rxjs';
+import { filter, map, take, takeUntil, timeout } from 'rxjs/operators';
 import { GameSocketService } from '../socket/game-socket.service';
 import { observeAbort } from '../../shared/helper/http/observe-abort';
 import { matchesLobbyConnection } from '../../shared/helper/lobby-game-ui/matches-lobby-connection';
@@ -142,15 +142,21 @@ export class GameStateResource {
       } else {
         this.sockets.joinLobby(lobbyCodeInput.trim(), displayName);
       }
-      const joined = await firstValueFrom(
-        this.sockets.lobbyJoined$.pipe(
-          filter((payload) => payload.lobbyCode === lobbyCode),
-          take(1),
-          timeout(15_000),
-        ),
+      const joinedSignal$ = this.sockets.lobbyJoined$.pipe(
+        filter((payload) => payload.lobbyCode === lobbyCode),
+        map((payload) => ({ kind: 'joined' as const, payload })),
       );
-      this.canonicalLobbyIdSignal.set(joined.lobbyId);
-      return joined;
+      const rejectedSignal$ = this.sockets.actionRejected$.pipe(
+        map((payload) => ({ kind: 'rejected' as const, payload })),
+      );
+      const outcome = await firstValueFrom(
+        merge(joinedSignal$, rejectedSignal$).pipe(take(1), timeout(15_000)),
+      );
+      if (outcome.kind === 'rejected') {
+        throw new Error(outcome.payload.code);
+      }
+      this.canonicalLobbyIdSignal.set(outcome.payload.lobbyId);
+      return outcome.payload;
     } catch (error) {
       this.subscriptionParamsSignal.set(undefined);
       this.canonicalLobbyIdSignal.set('');

@@ -2,7 +2,7 @@ import { GamePhase, LobbyFullStatePayload } from '@catan/api-interfaces';
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslateInstantFn } from '../../../../shared/i18n/translate-instant-fn';
 import { LobbyUiState, LobbyUiStep } from '../../types/lobby-ui-state';
-import { displayNameForSeat, robberDiscardDisplayNames } from './lobby-ui.mapper';
+import { robberDiscardDisplayNames } from './lobby-ui.mapper';
 
 export function buildTurnAnnouncerText(
   params: {
@@ -83,12 +83,7 @@ export function buildTurnAnnouncerText(
     return instant(marker('announcer.buildingOther'), { activeName: active });
   }
   if (phase === GamePhase.Finished) {
-    const winner = raw.winnerSeat;
-    if (winner !== null) {
-      const winnerName = displayNameForSeat(raw, winner, instant);
-      return instant(marker('announcer.finishedWithWinner'), { winnerName });
-    }
-    return instant(marker('announcer.finished'));
+    return '';
   }
   if (phase === GamePhase.EndTurn) {
     if (selfTurn) {

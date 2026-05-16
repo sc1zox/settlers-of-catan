@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal, Signal } from '@angular/core';
-import { LobbyFullStatePayload, LobbyPlayerPublicDto, PlayerSeat } from '@catan/api-interfaces';
+import { GamePhase, LobbyFullStatePayload, LobbyPlayerPublicDto, PlayerSeat } from '@catan/api-interfaces';
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslateService } from '@ngx-translate/core';
 import { TranslateInstantFn } from '../../../shared/i18n/translate-instant-fn';
@@ -7,6 +7,7 @@ import { EnumTranslate } from '../../../game/i18n/enum-translate.helper';
 import { GameStateResource } from '../../core/game/game-state.resource';
 import { LobbyUiState, LobbyUiStep } from '../../shared/types/lobby-ui-state';
 import {
+  displayNameForSeat,
   mapLobbyFullStateToUiState,
   phaseLabel,
   seatLabel,
@@ -44,14 +45,25 @@ export class LobbyGameUiStateService {
 
   public readonly isLobbyLoading = computed<boolean>(() => this.gameState.lobby.isLoading());
 
-  public readonly activeSeatLabel = computed<string>(() => {
-    const state = this.lobbyUiState();
-    return state === null ? '-' : seatLabel(state.activeSeat, this.instant);
-  });
-
   public readonly phaseLabel = computed<string>(() => {
     const state = this.lobbyUiState();
     return state === null ? '-' : phaseLabel(state.phase, this.instant);
+  });
+
+  public readonly gameFinishedBannerText = computed<string | null>(() => {
+    const ui = this.lobbyUiState();
+    const raw = this.rawLobbyState();
+    if (ui === null || raw === undefined) {
+      return null;
+    }
+    if (ui.phase !== GamePhase.Finished) {
+      return null;
+    }
+    if (raw.winnerSeat !== null) {
+      const winnerName = displayNameForSeat(raw, raw.winnerSeat, this.instant);
+      return this.instant(marker('announcer.finishedWithWinner'), { winnerName });
+    }
+    return this.instant(marker('announcer.finished'));
   });
 
   public readonly longestRoadLabel = computed<string>(() => {
@@ -68,14 +80,6 @@ export class LobbyGameUiStateService {
       return '-';
     }
     return seatLabel(state.largestArmySeat, this.instant);
-  });
-
-  public readonly winnerLabel = computed<string>(() => {
-    const state = this.lobbyUiState();
-    if (state === null || state.winnerSeat === null) {
-      return '-';
-    }
-    return seatLabel(state.winnerSeat, this.instant);
   });
 
   public readonly selfSeat = computed<PlayerSeat | null>(() => {

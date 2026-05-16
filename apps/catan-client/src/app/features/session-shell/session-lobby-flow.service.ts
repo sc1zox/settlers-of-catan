@@ -24,6 +24,7 @@ export class SessionLobbyFlowService {
   public readonly uiStep = signal<LobbyUiStep>(LobbyUiStep.SignIn);
   public readonly sessionState = signal<SessionUiState | null>(null);
   public readonly joinInProgress = signal<boolean>(false);
+  public readonly leaveLobbyPromptOpen = signal<boolean>(false);
 
   public readonly isJoinInProgress = computed<boolean>(() => this.joinInProgress());
 
@@ -42,10 +43,6 @@ export class SessionLobbyFlowService {
       }
       if (this.uiStep() !== LobbyUiStep.InGame) {
         this.uiStep.set(LobbyUiStep.InGame);
-        this.shellFeedback.setFeedback(
-          UiFeedbackTone.Success,
-          this.translate.instant(marker('shell.gameStarted')),
-        );
       }
     });
     effect(() => {
@@ -82,6 +79,19 @@ export class SessionLobbyFlowService {
       UiFeedbackTone.Info,
       this.translate.instant(marker('shell.backToSignIn')),
     );
+  }
+
+  public requestLeaveLobby(): void {
+    this.leaveLobbyPromptOpen.set(true);
+  }
+
+  public dismissLeaveLobbyPrompt(): void {
+    this.leaveLobbyPromptOpen.set(false);
+  }
+
+  public confirmLeaveLobby(): void {
+    this.leaveLobbyPromptOpen.set(false);
+    this.backToJoinLobby();
   }
 
   public backToJoinLobby(): void {

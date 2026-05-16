@@ -1,7 +1,7 @@
 {
   "reject": {
     "wrongPhase": "Diese Aktion passt nicht zur aktuellen Spielphase (z. B. wuerfeln nur in der Wuerfelphase, bauen nur nach dem Wurf).",
-    "notYourTurn": "Du bist nicht am Zug — warte, bis du in der HUD als aktiver Sitz angezeigt wirst.",
+    "notYourTurn": "Du bist nicht am Zug — sobald du wieder dran bist, stehen dir die Buttons in der Leiste wieder zur Verfuegung.",
     "lobbyNotEnoughPlayers": "Zum Start sind mindestens drei aktive Spieler in der Lobby noetig. Lade Mitspieler ein oder fuelle als Host freie Sitze mit Bots auf.",
     "insufficientResources": "Dir fehlen Rohstoffe auf der Hand: Die Aktion kostet mehr, als du gerade hast (Siedlung, Stadt, Strasse, Entwicklungskarte oder Spielerhandel).",
     "illegalPlacement": "Ungueltiger Bauplatz: nur markierte Geisterpositionen, kein Bebauen auf fremde Gueter oder ausserhalb der erlaubten Liste.",
@@ -76,14 +76,17 @@
     "badgeOffline": "Offline",
     "buttonStartGame": "Spiel starten",
     "buttonFillBots": "Sitze mit Bots auffuellen",
-    "buttonOtherLobby": "Andere Lobby",
-    "buttonEndSession": "Session beenden",
-    "hudLobby": "Lobby",
-    "hudActiveSeat": "Aktiver Sitz",
+    "genericPlayer": "Spieler",
+    "backLeaveLobbyAria": "Zurueck: Lobby verlassen",
+    "leaveLobbyPromptTitle": "Lobby verlassen?",
+    "leaveLobbyPromptHint":
+      "Du kehrst zur Lobby-Auswahl zurueck. Deine aktuelle Spieler-Session bleibt erhalten.",
+    "leaveLobbyYes": "Ja",
+    "leaveLobbyNo": "Nein",
+    "dismissLeaveDialogAria": "Abbrechen: Dialog schliessen",
     "hudPhase": "Phase",
     "hudLongestRoad": "Laengste Strasse",
     "hudLargestArmy": "Groesste Rittermacht",
-    "hudWinner": "Sieger",
     "hudDiscardPrompt": "Bitte Karten zum Abwerfen auswaehlen.",
     "hudSpectateWait": "Zuschauen — {{name}} ist am Zug.",
     "buttonRollDice": "Wuerfeln",
@@ -93,10 +96,7 @@
     "buttonEndTurn": "Zug beenden",
     "hintBuildSpot": "Bauplatz auf dem Brett anklicken — Klick ins Leere bricht ab.",
     "hintRobber": "Raeuber: ein Feld anklicken.",
-    "hintBuildFromArsenal": "Bauen: Figur im eigenen Lager anklicken.",
-    "buttonOtherLobbyHud": "Andere Lobby",
-    "buttonEndSessionHud": "Session beenden",
-    "genericPlayer": "Spieler"
+    "hintBuildFromArsenal": "Bauen: Figur im eigenen Lager anklicken."
   },
   "seat": {
     "north": "Nord",
@@ -273,7 +273,9 @@
     "webcamEnable": "Webcam senden",
     "webcamQuality": "Videoqualitaet",
     "webcamLow": "Niedrig (320x240)",
-    "webcamMedium": "Mittel (480x360)"
+    "webcamMedium": "Mittel (480x360)",
+    "lobbyTitle": "Lobby",
+    "lobbyCodeLabel": "Aktiver Lobby-Code"
   },
   "gameCanvas": {
     "closeCardAria": "Karte schließen"

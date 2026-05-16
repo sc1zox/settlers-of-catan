@@ -1,17 +1,202 @@
 .hud {
-  position: absolute;
-  top: 1.25rem;
-  left: 1.25rem;
-  z-index: 20;
+  position: fixed;
+  bottom: calc(6.95rem + env(safe-area-inset-bottom));
+  left: calc(1.05rem + env(safe-area-inset-left));
+  top: auto;
+  z-index: 22;
   display: grid;
-  gap: 0.7rem;
+  gap: 0.65rem;
   width: min(260px, calc(100vw - 2.5rem));
   background: rgba(14, 22, 38, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.14);
   backdrop-filter: blur(12px);
   border-radius: 14px;
-  padding: 0.9rem;
+  padding: 0.85rem;
   pointer-events: auto;
+}
+
+.shell-back-btn {
+  position: fixed;
+  top: calc(1.05rem + env(safe-area-inset-top));
+  left: calc(1.05rem + env(safe-area-inset-left));
+  z-index: 44;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(14, 22, 38, 0.82);
+  color: rgba(244, 248, 255, 0.92);
+  cursor: pointer;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.shell-back-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.shell-back-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.shell-back-btn__icon {
+  font-size: 1.35rem;
+  line-height: 1;
+  font-weight: 700;
+  translate: -1px 0;
+}
+
+.shell-leave-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  pointer-events: auto;
+}
+
+.shell-leave-overlay__backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: rgba(4, 8, 16, 0.55);
+  backdrop-filter: blur(4px);
+  cursor: default;
+}
+
+.shell-leave-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(360px, 100%);
+  padding: 1.15rem 1.25rem 1.2rem;
+  border-radius: 16px;
+  background: rgba(14, 22, 38, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+}
+
+.shell-leave-dialog__title {
+  margin: 0 0 0.45rem;
+  font-size: 1.1rem;
+  font-weight: 650;
+}
+
+.shell-leave-dialog__hint {
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: rgba(233, 239, 255, 0.74);
+}
+
+.shell-leave-dialog__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+}
+
+.game-finished-banner {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 48;
+  max-width: min(540px, 92vw);
+  padding: 1.2rem 1.65rem;
+  transform: translate(-50%, -50%);
+  border-radius: 18px;
+  text-align: center;
+  font-size: clamp(1.12rem, 2.9vw, 1.42rem);
+  font-weight: 700;
+  line-height: 1.38;
+  color: #f4f9ff;
+  background: rgba(10, 16, 32, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(16px);
+  pointer-events: none;
+}
+
+.hud-bottom-dock {
+  position: fixed;
+  bottom: calc(1.05rem + env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: 24;
+  display: grid;
+  gap: 0.52rem;
+  width: min(520px, calc(100vw - 2rem));
+  padding: 0.62rem 0.92rem;
+  transform: translateX(-50%);
+  border-radius: 14px;
+  background: rgba(12, 18, 32, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.32);
+  pointer-events: none;
+}
+
+.hud-bottom-dock__announcer {
+  margin: 0;
+  padding: 0 0.15rem 0.1rem;
+  font-size: 0.91rem;
+  line-height: 1.43;
+  text-align: center;
+  color: #e9f3ff;
+  animation: hud-announcer-line-in 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.hud-bottom-dock__bonus-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+
+.hud-bottom-dock__bonus {
+  display: grid;
+  gap: 0.12rem;
+  padding: 0.46rem 0.48rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.hud-bottom-dock__bonus span {
+  font-size: 0.68rem;
+  color: rgba(233, 239, 255, 0.66);
+}
+
+.hud-bottom-dock__bonus strong {
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+
+.hud-bottom-dock__phase {
+  display: grid;
+  gap: 0.12rem;
+  padding: 0.48rem 0.54rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.hud-bottom-dock__phase span {
+  font-size: 0.68rem;
+  color: rgba(233, 239, 255, 0.66);
+}
+
+.hud-bottom-dock__phase strong {
+  font-size: 0.92rem;
+  font-weight: 650;
 }
 
 .hud__feedback {
@@ -20,7 +205,7 @@
 
 .hud__chrome {
   display: grid;
-  gap: 0.7rem;
+  gap: 0.65rem;
 }
 
 .hud--spectator-paused .hud__chrome {
@@ -32,49 +217,25 @@
     filter 0.35s ease;
 }
 
-.hud__meta {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.45rem;
-}
-
-.hud__meta p {
-  margin: 0;
-  display: grid;
-  gap: 0.18rem;
-  padding: 0.45rem 0.5rem;
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.hud__meta span {
-  font-size: 0.7rem;
-  color: rgba(233, 239, 255, 0.66);
-}
-
-.hud__meta strong {
-  font-size: 0.86rem;
-}
-
 .hud__actions {
   display: grid;
-  gap: 0.45rem;
+  gap: 0.42rem;
 }
 
 .hud__actions button {
-  padding: 0.58rem 0.8rem;
-  font-size: 0.88rem;
+  padding: 0.56rem 0.75rem;
+  font-size: 0.87rem;
 }
 
 .hud__hint {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   line-height: 1.35;
   color: #c9defb;
-  background: rgba(66, 165, 245, 0.16);
-  border: 1px solid rgba(66, 165, 245, 0.32);
+  background: rgba(66, 165, 245, 0.14);
+  border: 1px solid rgba(66, 165, 245, 0.28);
   border-radius: 9px;
-  padding: 0.5rem 0.6rem;
+  padding: 0.48rem 0.54rem;
 }
 
 .hud__hint--soft {
@@ -83,23 +244,10 @@
   border-color: rgba(255, 255, 255, 0.12);
 }
 
-.hud__session {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  padding-top: 0.7rem;
-}
-
-.hud__session button {
-  padding: 0.5rem 0.6rem;
-  font-size: 0.8rem;
-}
-
 .hud__play-surface {
   display: grid;
-  gap: 0.45rem;
-  min-height: 2.4rem;
+  gap: 0.42rem;
+  min-height: 2.2rem;
 }
 
 .hud__play-surface--locked {
@@ -112,10 +260,10 @@
 
 .hud__play-wait {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   line-height: 1.35;
   color: rgba(233, 239, 255, 0.82);
-  padding: 0.35rem 0.4rem 0.15rem;
+  padding: 0.32rem 0.38rem 0.12rem;
 }
 
 .hud__play-wait strong {
@@ -126,35 +274,10 @@
   color: #ffe8c4;
 }
 
-.hud-announcer {
-  position: fixed;
-  bottom: 1.15rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 28;
-  max-width: min(560px, calc(100vw - 2.5rem));
-  padding: 0.65rem 1rem;
-  border-radius: 14px;
-  background: rgba(12, 18, 32, 0.88);
-  border: 1px solid rgba(142, 197, 255, 0.35);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(12px);
-  pointer-events: none;
-}
-
-.hud-announcer__text {
-  margin: 0;
-  font-size: 0.92rem;
-  line-height: 1.45;
-  color: #e8f1ff;
-  text-align: center;
-  animation: hud-announcer-in 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-@keyframes hud-announcer-in {
+@keyframes hud-announcer-line-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(8px);
   }
 
   to {

@@ -21,11 +21,10 @@ export class LobbyShellGameUiService {
   public readonly lobbyUiState = this.core.lobbyUiState;
   public readonly rawLobbyState = this.core.rawLobbyState;
   public readonly isLobbyLoading = this.core.isLobbyLoading;
-  public readonly activeSeatLabel = this.core.activeSeatLabel;
   public readonly phaseLabel = this.core.phaseLabel;
+  public readonly gameFinishedBannerText = this.core.gameFinishedBannerText;
   public readonly longestRoadLabel = this.core.longestRoadLabel;
   public readonly largestArmyLabel = this.core.largestArmyLabel;
-  public readonly winnerLabel = this.core.winnerLabel;
   public readonly selfSeat = this.core.selfSeat;
   public readonly selfPlayer = this.core.selfPlayer;
   public readonly isSelfTurn = this.core.isSelfTurn;

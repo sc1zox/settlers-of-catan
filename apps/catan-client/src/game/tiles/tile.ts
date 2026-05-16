@@ -1,5 +1,4 @@
 import {
-  AdditiveBlending,
   BufferGeometry,
   CanvasTexture,
   CylinderGeometry,
@@ -10,6 +9,7 @@ import {
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
+  NormalBlending,
   Sprite,
   SpriteMaterial,
   Vector3,
@@ -34,9 +34,9 @@ export const WATER_LEVEL_Y = -0.4;
 
 const CHIP_BALLOON_REF_BASE_SCALE = 0.55;
 const CHIP_BALLOON_REF_HOVER_SCALE = 1.15;
-const CHIP_BALLOON_REF_BASE_OPACITY = 0.4;
+const CHIP_BALLOON_REF_BASE_OPACITY = 0.74;
 const CHIP_BALLOON_REF_HOVER_OPACITY = 0.95;
-const CHIP_BALLOON_VISUAL_UPSCALE = 1.52;
+const CHIP_BALLOON_VISUAL_UPSCALE = 1.62;
 
 const CHIP_BASE_SCALE = CHIP_BALLOON_REF_BASE_SCALE * CHIP_BALLOON_VISUAL_UPSCALE;
 const CHIP_HOVER_SCALE =
@@ -113,7 +113,7 @@ export abstract class Tile {
       opacity: CHIP_BASE_OPACITY,
       depthWrite: false,
       depthTest: true,
-      blending: AdditiveBlending,
+      blending: NormalBlending,
     });
     const sprite = new Sprite(material);
     sprite.scale.set(CHIP_BASE_SCALE, CHIP_BASE_SCALE, 1);
@@ -132,9 +132,9 @@ export abstract class Tile {
     const beamMat = new MeshBasicMaterial({
       color: value === 6 || value === 8 ? 0xffc8b8 : 0xc8e8f2,
       transparent: true,
-      opacity: 0.18,
+      opacity: 0.3,
       depthWrite: false,
-      blending: AdditiveBlending,
+      blending: NormalBlending,
     });
     const beamMesh = new Mesh(beamGeom, beamMat);
     beamMesh.position.y = beamBottomY + beamHeight / 2;
@@ -166,7 +166,7 @@ export abstract class Tile {
       this.chipSprite.material.opacity =
         CHIP_BASE_OPACITY + (CHIP_HOVER_OPACITY - CHIP_BASE_OPACITY) * eased;
       if (this.chipBeamMaterial) {
-        this.chipBeamMaterial.opacity = 0.14 + 0.32 * eased;
+        this.chipBeamMaterial.opacity = 0.26 + 0.34 * eased;
       }
       if (this.chipPointerHovered) {
         this.chipHoverT = Math.min(1, this.chipHoverT + dt * 8);
@@ -206,7 +206,7 @@ function makeChipTexture(value: number): CanvasTexture {
   const mid = size / 2;
   const ringRadius = (size / 2) * (92 / 128);
   const fontPx = Math.round(148 * (size / 256));
-  const ringLineWidth = 3.5 * (size / 256);
+  const ringLineWidth = 4.85 * (size / 256);
   const digitStrokeWidth = Math.max(2, 2.25 * (size / 256));
   const canvas = document.createElement('canvas');
   canvas.width = size;

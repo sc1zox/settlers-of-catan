@@ -67,14 +67,6 @@ export class SessionShellFacadeService {
     return this.lobbyForm.controls.lobbyCode.value;
   }
 
-  public activeLobbyCode(): string {
-    return (
-      this.lobbyGameUi.lobbyUiState()?.lobbyCode ??
-      this.gameState.connection()?.lobbyCode ??
-      this.lobbyCodeValue()
-    );
-  }
-
   public startSession(): void {
     if (this.sessionForm.invalid) {
       this.sessionForm.markAllAsTouched();

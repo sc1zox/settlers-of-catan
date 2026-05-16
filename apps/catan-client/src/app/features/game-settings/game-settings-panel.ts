@@ -3,6 +3,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { WebcamQuality } from '@catan/api-interfaces';
 import { ShadowQuality } from '../../../game/scene/shadow-quality.enum';
 import { GameSettingsService } from './game-settings.service';
+import { LobbyShellGameUiService } from '../lobby-game-ui/lobby-shell-game-ui.service';
 import { LobbyLiveKitService } from '../webcam-head/lobby-livekit.service';
 
 @Component({
@@ -143,12 +144,23 @@ import { LobbyLiveKitService } from '../webcam-head/lobby-livekit.service';
           </button>
         </div>
       </section>
+
+      @if (lobbyUi.lobbyUiState(); as ls) {
+        <section class="settings-section">
+          <h3>{{ 'settings.lobbyTitle' | translate }}</h3>
+          <div class="settings-row">
+            <span>{{ 'settings.lobbyCodeLabel' | translate }}</span>
+            <strong class="settings-lobby-code">{{ ls.lobbyCode }}</strong>
+          </div>
+        </section>
+      }
     </aside>
   `,
   styleUrl: './game-settings-panel.scss',
 })
 export class GameSettingsPanelComponent {
   protected readonly settings = inject(GameSettingsService);
+  protected readonly lobbyUi = inject(LobbyShellGameUiService);
   private readonly liveKit = inject(LobbyLiveKitService);
   protected readonly shadowQualityLow = ShadowQuality.Low;
   protected readonly shadowQualityMedium = ShadowQuality.Medium;

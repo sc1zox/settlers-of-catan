@@ -1,5 +1,4 @@
 import {
-  AdditiveBlending,
   BoxGeometry,
   CanvasTexture,
   ClampToEdgeWrapping,
@@ -7,9 +6,11 @@ import {
   CylinderGeometry,
   DoubleSide,
   Group,
+  LinearFilter,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
+  NormalBlending,
   PlaneGeometry,
   SRGBColorSpace,
   Vector3,
@@ -38,11 +39,10 @@ const NAME_PLATE_WIDTH = 1.42;
 const NAME_PLATE_HEIGHT = 0.34;
 const NAME_PLATE_Y = 2.02;
 const NAME_PLATE_Z = -0.12;
-const NAME_PLATE_BASE_OPACITY = 0.88;
-const NAME_PLATE_BOB_AMPLITUDE = 0.03;
-const NAME_PLATE_BOB_SPEED = 1.9;
-const NAME_PLATE_PULSE_SPEED = 2.4;
-const NAME_PLATE_PULSE_AMPLITUDE = 0.12;
+const NAME_PLATE_BOB_AMPLITUDE = 0.02;
+const NAME_PLATE_BOB_SPEED = 1.6;
+const NAME_PLATE_TEXTURE_WIDTH = 1024;
+const NAME_PLATE_TEXTURE_HEIGHT = 256;
 
 export interface AvatarSeatVideoOptions {
   readonly placeholderWhenEmpty: boolean;
@@ -89,9 +89,9 @@ export class AvatarSeat {
     });
     this.namePlateMaterial = new MeshBasicMaterial({
       transparent: true,
-      opacity: NAME_PLATE_BASE_OPACITY,
+      opacity: 1,
       toneMapped: false,
-      blending: AdditiveBlending,
+      blending: NormalBlending,
       side: DoubleSide,
       depthWrite: false,
       depthTest: true,
@@ -159,10 +159,6 @@ export class AvatarSeat {
     this.namePlateTime += dt;
     const wobble = Math.sin(this.namePlateTime * NAME_PLATE_BOB_SPEED) * NAME_PLATE_BOB_AMPLITUDE;
     this.namePlateMesh.position.y = NAME_PLATE_Y + wobble;
-    const pulse =
-      NAME_PLATE_BASE_OPACITY +
-      Math.sin(this.namePlateTime * NAME_PLATE_PULSE_SPEED) * NAME_PLATE_PULSE_AMPLITUDE;
-    this.namePlateMaterial.opacity = pulse;
   }
 
   public setDisplayName(name: string): void {
@@ -296,8 +292,8 @@ export class AvatarSeat {
 
   private static buildNamePlateTexture(name: string): CanvasTexture {
     const canvas = document.createElement('canvas');
-    canvas.width = 1024;
-    canvas.height = 256;
+    canvas.width = NAME_PLATE_TEXTURE_WIDTH;
+    canvas.height = NAME_PLATE_TEXTURE_HEIGHT;
     const ctx = canvas.getContext('2d');
     if (ctx === null) {
       const fallback = new CanvasTexture(canvas);
@@ -305,36 +301,131 @@ export class AvatarSeat {
       return fallback;
     }
 
-    const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-    gradient.addColorStop(0, 'rgba(0, 214, 255, 0.24)');
-    gradient.addColorStop(0.5, 'rgba(193, 71, 255, 0.42)');
-    gradient.addColorStop(1, 'rgba(0, 214, 255, 0.24)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 42, canvas.width, canvas.height - 84);
+    const w = canvas.width;
+    const h = canvas.height;
+    const padX = 56;
+    const padY = 48;
+    const plateLeft = padX;
+    const plateRight = w - padX;
+    const plateTop = padY;
+    const plateBottom = h - padY;
+    const plateHeight = plateBottom - plateTop;
+    const notch = plateHeight * 0.42;
 
-    ctx.strokeStyle = 'rgba(130, 230, 255, 0.78)';
-    ctx.lineWidth = 8;
-    ctx.strokeRect(24, 52, canvas.width - 48, canvas.height - 104);
+    ctx.clearRect(0, 0, w, h);
 
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-    ctx.font = 'bold 108px "Comic Sans MS", "Trebuchet MS", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(0, 242, 255, 0.95)';
-    ctx.shadowBlur = 26;
-    ctx.fillText(name, canvas.width / 2, canvas.height / 2);
+    AvatarSeat.tracePlatePath(ctx, plateLeft, plateTop, plateRight, plateBottom, notch);
+    const fill = ctx.createLinearGradient(0, plateTop, 0, plateBottom);
+    fill.addColorStop(0, 'rgba(14, 22, 38, 0.94)');
+    fill.addColorStop(1, 'rgba(8, 14, 26, 0.94)');
+    ctx.fillStyle = fill;
+    ctx.fill();
 
+    const accentTop = plateTop + 6;
+    const accentBottom = plateBottom - 6;
+    const accent = ctx.createLinearGradient(0, accentTop, 0, accentBottom);
+    accent.addColorStop(0, 'rgba(120, 240, 255, 1)');
+    accent.addColorStop(0.5, 'rgba(180, 110, 255, 1)');
+    accent.addColorStop(1, 'rgba(120, 240, 255, 1)');
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 4;
+    ctx.shadowColor = 'rgba(0, 230, 255, 0.85)';
+    ctx.shadowBlur = 14;
+    ctx.stroke();
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.44)';
-    ctx.lineWidth = 3;
-    ctx.strokeText(name, canvas.width / 2, canvas.height / 2);
+
+    ctx.fillStyle = 'rgba(120, 240, 255, 0.9)';
+    const tickThickness = 6;
+    const tickHeight = plateHeight * 0.46;
+    const tickYTop = plateTop + (plateHeight - tickHeight) / 2;
+    ctx.fillRect(plateLeft + 22, tickYTop, tickThickness, tickHeight);
+    ctx.fillRect(plateRight - 22 - tickThickness, tickYTop, tickThickness, tickHeight);
+
+    const upper = name.toUpperCase();
+    const baseFont =
+      '700 110px "Rajdhani", "Eurostile", "Bahnschrift", "Inter", "Segoe UI", system-ui, sans-serif';
+    ctx.font = baseFont;
+    const trackingPx = 6;
+    AvatarSeat.fillTrackedText(ctx, upper, w / 2, h / 2 + 4, trackingPx, {
+      fill: 'rgba(238, 252, 255, 1)',
+      glow: 'rgba(120, 230, 255, 0.85)',
+      glowBlur: 18,
+      stroke: 'rgba(6, 12, 22, 0.85)',
+      strokeWidth: 2,
+    });
 
     const texture = new CanvasTexture(canvas);
     texture.colorSpace = SRGBColorSpace;
     texture.wrapS = ClampToEdgeWrapping;
     texture.wrapT = ClampToEdgeWrapping;
+    texture.magFilter = LinearFilter;
+    texture.minFilter = LinearFilter;
+    texture.anisotropy = 8;
     texture.needsUpdate = true;
     return texture;
+  }
+
+  private static tracePlatePath(
+    ctx: CanvasRenderingContext2D,
+    left: number,
+    top: number,
+    right: number,
+    bottom: number,
+    notch: number,
+  ): void {
+    ctx.beginPath();
+    ctx.moveTo(left + notch, top);
+    ctx.lineTo(right - notch, top);
+    ctx.lineTo(right, top + notch);
+    ctx.lineTo(right, bottom - notch);
+    ctx.lineTo(right - notch, bottom);
+    ctx.lineTo(left + notch, bottom);
+    ctx.lineTo(left, bottom - notch);
+    ctx.lineTo(left, top + notch);
+    ctx.closePath();
+  }
+
+  private static fillTrackedText(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    centerX: number,
+    centerY: number,
+    trackingPx: number,
+    style: {
+      fill: string;
+      glow: string;
+      glowBlur: number;
+      stroke: string;
+      strokeWidth: number;
+    },
+  ): void {
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    let totalWidth = -trackingPx;
+    const widths = new Array<number>(text.length);
+    for (let i = 0; i < text.length; i += 1) {
+      const wMeasured = ctx.measureText(text.charAt(i)).width;
+      widths[i] = wMeasured;
+      totalWidth += wMeasured + trackingPx;
+    }
+    let cursor = centerX - totalWidth / 2;
+    ctx.shadowColor = style.glow;
+    ctx.shadowBlur = style.glowBlur;
+    ctx.fillStyle = style.fill;
+    for (let i = 0; i < text.length; i += 1) {
+      const ch = text.charAt(i);
+      ctx.fillText(ch, cursor, centerY);
+      cursor += widths[i] + trackingPx;
+    }
+    ctx.shadowBlur = 0;
+    cursor = centerX - totalWidth / 2;
+    ctx.strokeStyle = style.stroke;
+    ctx.lineWidth = style.strokeWidth;
+    for (let i = 0; i < text.length; i += 1) {
+      const ch = text.charAt(i);
+      ctx.strokeText(ch, cursor, centerY);
+      cursor += widths[i] + trackingPx;
+    }
   }
 
   private ensureVideoTextureFromAttached(): void {

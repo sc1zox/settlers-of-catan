@@ -1,25 +1,51 @@
-# Settlers of Catan (Browser)
+# Settlers of Catan (Browser Edition)
 
-Nx-Monorepo mit Angular-Frontend (Three.js), NestJS-API (Socket.IO) und gemeinsamen TypeScript-Libs. Lobby, Spielzustand und Echtzeitaktionen laufen über Websockets; HTTP dient vor allem Session und Bootstrap.
+Ein modernes, browserbasiertes Catan-Erlebnis mit Echtzeit-Multiplayer, 3D-Spielbrett und klarer TypeScript-Architektur.
 
-## Voraussetzungen
+## Warum dieses Projekt?
 
-- **Node.js** ≥ 24.10 (siehe `package.json` → `engines`)
-- **npm** (Workspace nutzt `npm@11.x`)
+- Echte Multiplayer-Interaktion über Socket.IO statt Polling.
+- 3D-Spieloberfläche mit Three.js und klarer Trennung zwischen UI und Engine.
+- Gemeinsame Typen und Wire-Contracts für Client und Server aus einer Quelle.
+- Feature-basierte Struktur im Monorepo, gut für langfristige Wartbarkeit und Refactoring.
+- Guter Playground für Echtzeitlogik, State-Machines und Multiplayer-UX.
 
-## Schnellstart (lokal)
+## Was du sofort bekommst
+
+- Lobby und Match-Flow mit serverseitig autoritativem Spielzustand.
+- Build-/Trade-/Robber-Interaktionen als echte In-Game-Aktionen.
+- Angular-Client (zoneless) und NestJS-API in einem Nx-Workspace.
+- Entwicklungssetup lokal oder per Docker Compose.
+- Solides Linting, Formatierung und testbare Teilbereiche.
+
+## Tech Stack
+
+- Frontend: `Angular 21`, `Three.js`, `RxJS`
+- Backend: `NestJS 11`, `Socket.IO`
+- Monorepo: `Nx`
+- Shared domain/contracts: `libs/api-interfaces`, `libs/shared/game-field`
+- Optionales Infra-Setup (Compose): `Redis`, `LiveKit`, `Coturn`
+
+## Schnellstart
+
+### Voraussetzungen
+
+- `Node.js` >= `24.10`
+- `npm` (Workspace nutzt `npm@11.x`)
+
+### Lokal starten
 
 ```bash
 npm install
 npm start
 ```
 
-Das startet parallel:
+Danach laufen:
 
-- **API** unter `http://localhost:3000`
-- **Web-Client** unter `http://localhost:4200`
+- API: `http://localhost:3000`
+- Web: `http://localhost:4200`
 
-Einzeln:
+Einzeln starten:
 
 ```bash
 npm run start:api
@@ -32,49 +58,76 @@ npm run start:client
 docker compose up
 ```
 
-Startet u. a. **Redis**, **Coturn**, **LiveKit** sowie die Dev-Container für **API** (`:3000`) und **Web** (`:4200`). Über Bind-Mounts sollten `NX_DAEMON=false` und `CHOKIDAR_USEPOLLING=1` gesetzt sein (im Compose bereits vorgesehen), damit Watchers zuverlässig laufen.
+Compose startet die Web/API-Container plus zusätzliche Services wie Redis, Coturn und LiveKit. Das ist hilfreich, wenn du Integrationspfade lokal mit realistischer Umgebung testen willst.
 
-Produktionsnahe Variablen sind in `deploy/env.prod.example` skizziert.
+Produktionsnahe Umgebungsvariablen findest du in `deploy/env.prod.example`.
 
-## Wichtige npm-Skripte
-
-| Skript | Zweck |
-| --- | --- |
-| `npm run build` | Production-Build von `catan-client` und `catan-api` |
-| `npm run watch` | Inkrementeller Dev-Build nur Client |
-| `npm test` | Vitest (Unit-Tests, aktuell Client) |
-| `npm run lint` | ESLint über alle Projekte inkl. Modulgrenzen |
-| `npm run format` / `format:check` | Prettier für `apps/**` und `libs/**` |
-
-## Repository-Layout
-
-| Pfad | Inhalt |
-| --- | --- |
-| `apps/catan-client` | Angular 21 (Standalone, Zoneless), 3D-Tisch über Three.js |
-| `apps/catan-api` | NestJS 11, REST (`/api/…`), Socket.IO-Namespace `/game` |
-| `libs/api-interfaces` | Wire-Format: Enums, DTOs, Socket-Events — **gemeinsame Kontrakte** für Client und Server |
-| `libs/shared/game-field` | Brettlogik (Topologie,/generierte Placements), nutzbar von beiden Seiten |
-
-Neue Socket-Events, Fehlercodes oder DTOs gehören nach **`@catan/api-interfaces`**, damit beide Enden dieselben Typen importieren.
-
-## Architektur kurz
-
-- **Session**: JWT-basierte Spielersitzung (Refresh über HTTP); siehe `BearerSessionGuard` und Session-Module in der API.
-- **Spiel**: Lobby und Match-Flow in Feature-Services; Zustandsänderungen werden nach außen per **`FullState`** verteilt (Single Source of Truth für den Client).
-- **Video/WebRTC**: LiveKit + Coturn sind im Compose vorhanden; Client nutzt `livekit-client`.
-
-Ausführliche Konventionen und Dateiverweise für Agents und Maintainer stehen in **`CLAUDE.md`** im Repo-Root.
-
-## Tests
-
-End-to-End-Tests sind derzeit nicht Teil des Standard-Setups. Unit-Tests:
+## Nützliche Commands
 
 ```bash
+npm run build          # Build von catan-client + catan-api
+npm run watch          # Inkrementeller Dev-Build für den Client
+npm test               # Unit-Tests (aktuell primär Client)
+npm run lint           # ESLint inkl. Nx Modulgrenzen
+npm run format         # Prettier Formatierung
+npm run format:check   # Prettier Check
+```
+
+## Projektstruktur
+
+- `apps/catan-client`: Angular-Frontend und Three.js-Engine
+- `apps/catan-api`: NestJS-Backend (REST + Socket Gateway)
+- `libs/api-interfaces`: DTOs, Events, Enums, gemeinsame Verträge
+- `libs/shared/game-field`: geteilte Brett-/Topologie-Logik
+
+Wichtig: Alles, was über die Leitung geht (Events, DTOs, Error-Codes, Konstante Schlüssel), gehört in die Shared Contracts unter `libs/`.
+
+## Architektur in 60 Sekunden
+
+- Der Server ist für Spielregeln und Übergänge zuständig (autoritativer Zustand).
+- Der Client rendert und interagiert auf Basis von `FullState`.
+- Socket-Events treiben Echtzeitaktionen.
+- HTTP kümmert sich primär um Session, Bootstrap und Token-Refresh.
+
+Das Ergebnis: weniger inkonsistente States, klare Verantwortlichkeiten, gut debuggbar.
+
+## Development Workflow
+
+Empfohlener Ablauf:
+
+1. Branch erstellen.
+2. Änderung klein und fokussiert halten.
+3. Lint/Test/Build lokal laufen lassen.
+4. Merge Request mit kurzer Begründung erstellen.
+
+Vor dem Merge:
+
+```bash
+npm run lint
 npm test
+npm run build
 ```
 
-Gezielt filtern (Beispiel):
+## Nächste sinnvolle Ausbauten
 
-```bash
-npx nx test catan-client --test-name-pattern="App"
-```
+- UI/UX-Polish im Session- und HUD-Bereich.
+- Weitere Tests rund um Match-Flow und Engine-Integration.
+- Performance-Tuning bei Rendering und Szene-Updates.
+- Dokumentation erweitern (`docs/`) oder Developer-Onboarding verbessern.
+
+## Roadmap (kurz)
+
+- Mehr Gameplay-Polish und visuelles Feedback.
+- Ausbau von Testabdeckung und Qualitätssicherung.
+- Weitere Multiplayer- und Social-Features.
+- Bessere Onboarding-Pfade.
+
+## Motivation zum Ausprobieren
+
+Das Projekt liefert nicht nur ein Spiel, sondern ein vollständiges, modernes Realtime-Webprojekt:
+
+- spannend genug, um dran zu bleiben
+- strukturiert genug, um sauber zu entwickeln
+- so aufgebaut, dass neue Features sauber integriert werden können
+
+Wenn du Catan magst oder Multiplayer-Architektur lernen willst, ist das ein sehr guter Startpunkt.

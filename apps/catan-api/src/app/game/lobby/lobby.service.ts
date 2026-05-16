@@ -154,9 +154,11 @@ export class LobbyService {
     if (!this.nonBotLobbyMembersHaveSockets(lobby)) {
       return;
     }
-    void this.redisLobby.refreshLobbyActivity(lobby.lobbyId, lobby.lobbyCode).catch((error: unknown) => {
-      this.logger.warn(`refreshLobbyActivity failed (${lobby.lobbyCode}): ${String(error)}`);
-    });
+    void this.redisLobby
+      .refreshLobbyActivity(lobby.lobbyId, lobby.lobbyCode)
+      .catch((error: unknown) => {
+        this.logger.warn(`refreshLobbyActivity failed (${lobby.lobbyCode}): ${String(error)}`);
+      });
   }
 
   public ensureLobbyAdminConsistent(lobby: LobbyRuntime): void {

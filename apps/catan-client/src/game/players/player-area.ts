@@ -71,7 +71,13 @@ export class PlayerArea {
     this.group.add(cost.card.mesh);
     this.costCard = cost.card;
 
-    this.avatar = new PlayerAreaAvatar(this.group, this.tableY, outerZ, options.color, this.info.name);
+    this.avatar = new PlayerAreaAvatar(
+      this.group,
+      this.tableY,
+      outerZ,
+      options.color,
+      this.info.name,
+    );
 
     this.hand = new PlayerAreaHand(this.group, options.seat, this.tableY, this.cardRowZ);
     this._cards = [this.costCard];

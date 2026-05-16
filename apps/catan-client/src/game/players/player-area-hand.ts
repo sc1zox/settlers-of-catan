@@ -129,9 +129,7 @@ export class PlayerAreaHand {
     card.mesh.position.x += jitter;
     card.mesh.position.y += DEAL_DROP_HEIGHT;
     card.mesh.position.z += jitter * 0.4;
-    card.mesh.quaternion.multiply(
-      new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), 0.6),
-    );
+    card.mesh.quaternion.multiply(new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), 0.6));
   }
 
   private emptyResourceCounts(): Record<ResourceKind, number> {

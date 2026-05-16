@@ -1,10 +1,6 @@
 import { BufferGeometry, Group, Mesh, Vector3 } from 'three';
 import { BuildKind } from '@catan/api-interfaces';
-import type {
-  LobbyRoadDto,
-  LobbySettlementDto,
-  PlayerSeat,
-} from '@catan/api-interfaces';
+import type { LobbyRoadDto, LobbySettlementDto, PlayerSeat } from '@catan/api-interfaces';
 import {
   createFigureMaterials,
   disposeFigureMaterials,
@@ -194,11 +190,7 @@ export class BoardBuildings {
     return figure;
   }
 
-  private upgradeToCity(
-    dto: LobbySettlementDto,
-    existing: PlacedSettlement,
-    fly: boolean,
-  ): Group {
+  private upgradeToCity(dto: LobbySettlementDto, existing: PlacedSettlement, fly: boolean): Group {
     this.group.remove(existing.group);
     this.releaseGeometries(existing.group);
     const figure = makeCity(this.materialsForSeat(dto.seat));

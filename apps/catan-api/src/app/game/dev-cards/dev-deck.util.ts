@@ -5,7 +5,10 @@ import { DevCardType } from '@catan/api-interfaces';
  * Standard Catan development-card composition: 25 cards total.
  * 14 knights, 5 victory points, 2 each of monopoly / year of plenty / road building.
  */
-export const DEV_CARD_DECK_COMPOSITION: readonly { readonly card: DevCardType; readonly count: number }[] = [
+export const DEV_CARD_DECK_COMPOSITION: readonly {
+  readonly card: DevCardType;
+  readonly count: number;
+}[] = [
   { card: DevCardType.Knight, count: 14 },
   { card: DevCardType.VictoryPoint, count: 5 },
   { card: DevCardType.Monopoly, count: 2 },

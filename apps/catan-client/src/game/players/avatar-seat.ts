@@ -79,7 +79,11 @@ export class AvatarSeat {
     const bodyMat = this.createMaterial(options.bodyColor, 0.88);
     const limbMat = this.createMaterial(0xeff6ff, 0.8);
     this.screenMaterial = new MeshBasicMaterial({
-      color: new Color(DEFAULT_VIDEO_DISPLAY_GAMMA, DEFAULT_VIDEO_DISPLAY_GAMMA, DEFAULT_VIDEO_DISPLAY_GAMMA),
+      color: new Color(
+        DEFAULT_VIDEO_DISPLAY_GAMMA,
+        DEFAULT_VIDEO_DISPLAY_GAMMA,
+        DEFAULT_VIDEO_DISPLAY_GAMMA,
+      ),
       toneMapped: false,
     });
     this.namePlateMaterial = new MeshBasicMaterial({

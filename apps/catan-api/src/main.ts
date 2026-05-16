@@ -2,11 +2,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { IoAdapter } from '@nestjs/platform-socket.io';
-import {
-  ApiGlobalPathPrefix,
-  ProcessEnvKey,
-  SwaggerUiPath,
-} from '@catan/api-interfaces';
+import { ApiGlobalPathPrefix, ProcessEnvKey, SwaggerUiPath } from '@catan/api-interfaces';
 import { AppModule } from './app/app.module';
 import { applyHttpCorsFromEnv } from './app/http/cors-env.util';
 

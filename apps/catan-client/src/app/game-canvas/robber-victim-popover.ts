@@ -87,6 +87,6 @@ export interface RobberVictimModel {
   ],
 })
 export class RobberVictimPopoverComponent {
-    readonly model = input<RobberVictimModel | null>(null);
+  readonly model = input<RobberVictimModel | null>(null);
   readonly pick = output<PlayerSeat | null>();
 }

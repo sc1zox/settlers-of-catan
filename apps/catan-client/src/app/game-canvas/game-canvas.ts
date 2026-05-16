@@ -13,10 +13,7 @@ import {
 } from '@angular/core';
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import {
-  BuildKind,
-  SceneObjectKind,
-} from '@catan/api-interfaces';
+import { BuildKind, SceneObjectKind } from '@catan/api-interfaces';
 import { GameEngine } from '../../game/engine';
 import { setGameTranslateFn } from '../../game/i18n-bridge';
 import { GameStateResource } from '../core/game/game-state.resource';

@@ -14,12 +14,7 @@ import {
 import { shadowQualityPreset } from './scene/shadow-quality-preset';
 import { ShadowQuality } from './scene/shadow-quality.enum';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import {
-  BuildKind,
-  GamePhase,
-  PlayerSeat,
-  SceneUserDataKey,
-} from '@catan/api-interfaces';
+import { BuildKind, GamePhase, PlayerSeat, SceneUserDataKey } from '@catan/api-interfaces';
 import type { LobbySceneState } from '../app/shared/helper/game-scene/lobby-scene-state';
 import { Board } from './board/board';
 import { BoardBuildings, type SpawnedBuildPiece } from './board/buildings';
@@ -201,11 +196,7 @@ export class GameEngine {
     this.buildPreview = new BuildPreview();
     this.scene.add(this.buildPreview.group);
 
-    this.hover = new HoverSystem(
-      this.renderer.domElement,
-      this.camera,
-      this.collectHoverables(),
-    );
+    this.hover = new HoverSystem(this.renderer.domElement, this.camera, this.collectHoverables());
     this.hover.setCardClickHandler((card) => this.handleCardClick(card));
     this.hover.setDieClickHandler((_die) => {
       if (!this.diceRollClickEnabled) {
@@ -505,10 +496,8 @@ export class GameEngine {
     this.legalRoadEdgeIds = state.legalRoadEdgeIds;
     this.legalCityVertexIds = state.legalCityVertexIds;
     this.legalRoadBuildingEdgeIds = state.legalRoadBuildingEdgeIds;
-    const flyIns = this.buildings.syncToState(
-      state.settlements,
-      state.roads,
-      (kind, seat) => this.canFlyInArsenalFigure(kind, seat),
+    const flyIns = this.buildings.syncToState(state.settlements, state.roads, (kind, seat) =>
+      this.canFlyInArsenalFigure(kind, seat),
     );
     for (let i = 0; i < flyIns.length; i += 1) {
       this.startArsenalFlyIn(flyIns[i]);
@@ -523,10 +512,7 @@ export class GameEngine {
       area.setDisplayName(playerState.displayName);
       const handSignature = computeHandSignature(playerState.resources, playerState.devCardsInHand);
       if (this.handSignatureBySeat[playerState.seat] !== handSignature) {
-        area.setHand(
-          expandResourceHand(playerState.resources),
-          playerState.devCardsInHand,
-        );
+        area.setHand(expandResourceHand(playerState.resources), playerState.devCardsInHand);
         this.handSignatureBySeat[playerState.seat] = handSignature;
       }
     }
@@ -734,7 +720,9 @@ export class GameEngine {
     this.world.update(dt, t);
     this.sunShafts.update(dt, t);
     this.clouds.update(dt, t);
-    const boardOverlayVisible = this.frustumCull.intersectsOrigin(BOARD_OVERLAY_UPDATE_BOUNDS_RADIUS);
+    const boardOverlayVisible = this.frustumCull.intersectsOrigin(
+      BOARD_OVERLAY_UPDATE_BOUNDS_RADIUS,
+    );
     this.buildings.group.visible = boardOverlayVisible;
     this.robberFigure.group.visible = boardOverlayVisible;
     this.buildPreview.group.visible = boardOverlayVisible;
@@ -743,7 +731,10 @@ export class GameEngine {
       this.robberFigure.update(dt);
       this.buildPreview.update(dt);
     }
-    const diceVisible = this.frustumCull.intersectsObject(this.diceTray.group, DICE_UPDATE_BOUNDS_RADIUS);
+    const diceVisible = this.frustumCull.intersectsObject(
+      this.diceTray.group,
+      DICE_UPDATE_BOUNDS_RADIUS,
+    );
     this.diceTray.group.visible = diceVisible;
     if (diceVisible) {
       this.diceTray.update(dt);
@@ -786,7 +777,12 @@ export class GameEngine {
       boardOverlayVisible,
       diceVisible,
     });
-    this.perfAggregator.tick(dt, this.renderer, this.board.tiles.length, this.harbors.harbors.length);
+    this.perfAggregator.tick(
+      dt,
+      this.renderer,
+      this.board.tiles.length,
+      this.harbors.harbors.length,
+    );
     this.rafId = requestAnimationFrame(this.loop);
   };
 

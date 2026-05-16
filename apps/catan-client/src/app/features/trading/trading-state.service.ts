@@ -1,10 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
-import {
-  PlayerSeat,
-  ResourceType,
-  type TradeUpdatedPayload,
-} from '@catan/api-interfaces';
+import { PlayerSeat, ResourceType, type TradeUpdatedPayload } from '@catan/api-interfaces';
 import { EMPTY } from 'rxjs';
 import { filter, takeUntil } from 'rxjs/operators';
 import { GameStateResource } from '../../core/game/game-state.resource';

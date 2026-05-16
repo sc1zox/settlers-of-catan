@@ -1,14 +1,6 @@
 import { Body, Controller, HttpCode, Post } from '@nestjs/common';
-import {
-  PlayerSessionBundleResponse,
-  SwaggerApiTag,
-} from '@catan/api-interfaces';
-import {
-  ApiBody,
-  ApiOkResponse,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
+import { PlayerSessionBundleResponse, SwaggerApiTag } from '@catan/api-interfaces';
+import { ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { randomUUID } from 'node:crypto';
 import { Public } from '../http/decorators/public.decorator';
 import { SessionBootstrapDto } from './dto/session-bootstrap.dto';
@@ -27,9 +19,7 @@ export class SessionController {
   @ApiOperation({ summary: 'Create or resume a player session (JWT pair)' })
   @ApiBody({ type: SessionBootstrapDto })
   @ApiOkResponse({ description: 'Access and refresh tokens bound to session id' })
-  public async bootstrap(
-    @Body() body: SessionBootstrapDto,
-  ): Promise<PlayerSessionBundleResponse> {
+  public async bootstrap(@Body() body: SessionBootstrapDto): Promise<PlayerSessionBundleResponse> {
     let sessionId: string = randomUUID();
     if (body.legacySessionId !== undefined && isUuid(body.legacySessionId)) {
       sessionId = body.legacySessionId;
@@ -49,9 +39,7 @@ export class SessionController {
   @ApiOperation({ summary: 'Rotate access token using refresh token' })
   @ApiBody({ type: SessionRefreshDto })
   @ApiOkResponse({ description: 'New token pair for the same session id' })
-  public async refresh(
-    @Body() body: SessionRefreshDto,
-  ): Promise<PlayerSessionBundleResponse> {
+  public async refresh(@Body() body: SessionRefreshDto): Promise<PlayerSessionBundleResponse> {
     const sessionId = this.playerJwt.verifyRefreshToken(body.refreshToken);
     const pair = await this.playerJwt.mintPair(sessionId);
     return {

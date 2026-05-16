@@ -1,10 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import {
-  AuthErrorCode,
-  PlayerSessionTokenKind,
-  ProcessEnvKey,
-} from '@catan/api-interfaces';
+import { AuthErrorCode, PlayerSessionTokenKind, ProcessEnvKey } from '@catan/api-interfaces';
 
 interface PlayerJwtPayload {
   readonly kind?: PlayerSessionTokenKind;
@@ -21,14 +17,8 @@ export class PlayerSessionJwtService {
   private readonly refreshTtl: JwtTtl;
 
   public constructor(private readonly jwt: JwtService) {
-    this.accessTtl = this.parseJwtTtl(
-      process.env[ProcessEnvKey.PlayerSessionAccessTtl],
-      '15m',
-    );
-    this.refreshTtl = this.parseJwtTtl(
-      process.env[ProcessEnvKey.PlayerSessionRefreshTtl],
-      '30d',
-    );
+    this.accessTtl = this.parseJwtTtl(process.env[ProcessEnvKey.PlayerSessionAccessTtl], '15m');
+    this.refreshTtl = this.parseJwtTtl(process.env[ProcessEnvKey.PlayerSessionRefreshTtl], '30d');
   }
 
   public async mintPair(

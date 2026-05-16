@@ -16,7 +16,10 @@ describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [...appConfig.providers, { provide: TranslateLoader, useClass: DeJsonTranslateLoader }],
+      providers: [
+        ...appConfig.providers,
+        { provide: TranslateLoader, useClass: DeJsonTranslateLoader },
+      ],
     }).compileComponents();
   });
 

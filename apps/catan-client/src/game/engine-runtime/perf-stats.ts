@@ -34,7 +34,12 @@ export class PerfStatsAggregator {
     this.perfLastDiceVisible = snapshot.diceVisible;
   }
 
-  public tick(dt: number, renderer: WebGLRenderer, boardTileCount: number, harborCount: number): void {
+  public tick(
+    dt: number,
+    renderer: WebGLRenderer,
+    boardTileCount: number,
+    harborCount: number,
+  ): void {
     if (this.perfHandler === null) {
       this.perfAccumFrames = 0;
       this.perfAccumSeconds = 0;

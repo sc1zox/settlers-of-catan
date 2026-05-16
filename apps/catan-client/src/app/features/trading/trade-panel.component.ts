@@ -12,7 +12,11 @@ import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { PlayerSeat, ResourceType, type TradeOfferDto } from '@catan/api-interfaces';
 import { TranslateInstantFn } from '../../../shared/i18n/translate-instant-fn';
-import type { BankTradeRequest, ProposeTradeRequest, TradePartner } from '../../shared/types/trading-ui.types';
+import type {
+  BankTradeRequest,
+  ProposeTradeRequest,
+  TradePartner,
+} from '../../shared/types/trading-ui.types';
 import { RESOURCE_TYPE_ORDER, resourceTypeLabel } from '../../shared/resource-labels';
 
 type TradeView = 'bank' | 'player';
@@ -38,7 +42,11 @@ type TradeView = 'bank' | 'player';
               <button type="button" [class.active]="view() === 'bank'" (click)="view.set('bank')">
                 {{ 'trade.tabBank' | translate }}
               </button>
-              <button type="button" [class.active]="view() === 'player'" (click)="view.set('player')">
+              <button
+                type="button"
+                [class.active]="view() === 'player'"
+                (click)="view.set('player')"
+              >
                 {{ 'trade.tabPlayers' | translate }}
               </button>
             </div>

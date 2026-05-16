@@ -15,21 +15,11 @@ export class BuildSocketFacade {
     this.gameService.buildSettlement(lobbyId, sessionToken, vertexId, server);
   }
 
-  public buildRoad(
-    lobbyId: string,
-    sessionToken: string,
-    edgeId: string,
-    server: Server,
-  ): void {
+  public buildRoad(lobbyId: string, sessionToken: string, edgeId: string, server: Server): void {
     this.gameService.buildRoad(lobbyId, sessionToken, edgeId, server);
   }
 
-  public buildCity(
-    lobbyId: string,
-    sessionToken: string,
-    vertexId: string,
-    server: Server,
-  ): void {
+  public buildCity(lobbyId: string, sessionToken: string, vertexId: string, server: Server): void {
     this.gameService.buildCity(lobbyId, sessionToken, vertexId, server);
   }
 

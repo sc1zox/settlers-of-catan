@@ -1,14 +1,6 @@
-export {
-  DevKind,
-  ResourceKind,
-  devKindLabel,
-  resourceKindLabel,
-} from './textures-enums-labels';
+export { DevKind, ResourceKind, devKindLabel, resourceKindLabel } from './textures-enums-labels';
 
-export {
-  makeCostCardBackTexture,
-  makeCostCardTexture,
-} from './textures-cost-card';
+export { makeCostCardBackTexture, makeCostCardTexture } from './textures-cost-card';
 
 export { makeDevBackTexture } from './textures-dev-icons';
 

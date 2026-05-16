@@ -35,9 +35,7 @@ export class GameStateResource {
         return EMPTY;
       }
       return this.sockets.fullState$.pipe(
-        filter((state) =>
-          matchesLobbyConnection(state.lobbyId, state.lobbyCode, params),
-        ),
+        filter((state) => matchesLobbyConnection(state.lobbyId, state.lobbyCode, params)),
         takeUntil(observeAbort(abortSignal)),
       );
     },
@@ -61,10 +59,7 @@ export class GameStateResource {
     defaultValue: undefined,
   });
 
-  public async joinLobby(
-    lobbyCodeInput: string,
-    displayName: string,
-  ): Promise<LobbyJoinedPayload> {
+  public async joinLobby(lobbyCodeInput: string, displayName: string): Promise<LobbyJoinedPayload> {
     return this.connectToLobby(lobbyCodeInput, displayName, 'join');
   }
 
@@ -172,9 +167,7 @@ export class GameStateResource {
     this.sockets.buyDevCard(params.lobbyId);
   }
 
-  public submitRobberDiscard(
-    discard: Readonly<Partial<Record<ResourceType, number>>>,
-  ): void {
+  public submitRobberDiscard(discard: Readonly<Partial<Record<ResourceType, number>>>): void {
     const params = this.lobbyParams();
     if (params === undefined) {
       return;

@@ -1,10 +1,4 @@
-import {
-  Matrix4,
-  PerspectiveCamera,
-  Quaternion,
-  Vector2,
-  Vector3,
-} from 'three';
+import { Matrix4, PerspectiveCamera, Quaternion, Vector2, Vector3 } from 'three';
 import { Card } from '../cards/card';
 import {
   CARD_FACE_TO_CAMERA,
@@ -54,10 +48,7 @@ export class FocusCardFan {
     handler?.(false);
   }
 
-  public commitFocusedMembers(
-    members: Card[],
-    handler: ((focused: boolean) => void) | null,
-  ): void {
+  public commitFocusedMembers(members: Card[], handler: ((focused: boolean) => void) | null): void {
     for (let i = 0; i < this.focusedGroup.length; i += 1) {
       this.focusedGroup[i].setMode('rest');
     }

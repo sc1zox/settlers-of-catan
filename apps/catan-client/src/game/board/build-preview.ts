@@ -1,12 +1,4 @@
-import {
-  BufferGeometry,
-  Color,
-  Group,
-  Mesh,
-  MeshStandardMaterial,
-  Object3D,
-  Vector3,
-} from 'three';
+import { BufferGeometry, Color, Group, Mesh, MeshStandardMaterial, Object3D, Vector3 } from 'three';
 import { BuildKind, SceneObjectKind, SceneUserDataKey } from '@catan/api-interfaces';
 import { makeCity, makeRoad, makeSettlement, PlayerFigureMaterials } from '../players/figures';
 import { TILE_HEIGHT } from '../tiles/tile';

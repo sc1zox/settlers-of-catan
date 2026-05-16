@@ -165,22 +165,12 @@ export class GameSocketService implements OnDestroy {
     this.socket?.emit(GameSocketClientEvent.RobberDiscard, payload);
   }
 
-  public moveRobber(
-    lobbyId: string,
-    q: number,
-    r: number,
-    victimSeat?: PlayerSeat,
-  ): void {
+  public moveRobber(lobbyId: string, q: number, r: number, victimSeat?: PlayerSeat): void {
     const payload: MoveRobberPayload = { lobbyId, q, r, victimSeat };
     this.socket?.emit(GameSocketClientEvent.MoveRobber, payload);
   }
 
-  public playKnight(
-    lobbyId: string,
-    q: number,
-    r: number,
-    victimSeat?: PlayerSeat,
-  ): void {
+  public playKnight(lobbyId: string, q: number, r: number, victimSeat?: PlayerSeat): void {
     const payload: PlayKnightPayload = { lobbyId, q, r, victimSeat };
     this.socket?.emit(GameSocketClientEvent.PlayKnight, payload);
   }
@@ -195,11 +185,7 @@ export class GameSocketService implements OnDestroy {
     this.socket?.emit(GameSocketClientEvent.PlayYearOfPlenty, payload);
   }
 
-  public playRoadBuilding(
-    lobbyId: string,
-    firstEdgeId: string,
-    secondEdgeId?: string,
-  ): void {
+  public playRoadBuilding(lobbyId: string, firstEdgeId: string, secondEdgeId?: string): void {
     const payload: PlayRoadBuildingPayload = { lobbyId, firstEdgeId, secondEdgeId };
     this.socket?.emit(GameSocketClientEvent.PlayRoadBuilding, payload);
   }

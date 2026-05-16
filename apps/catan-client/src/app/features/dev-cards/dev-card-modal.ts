@@ -45,9 +45,15 @@ type DevModalView = 'menu' | 'monopoly' | 'plenty';
           @switch (view()) {
             @case ('menu') {
               <div class="actions">
-                <button type="button" (click)="playKnight.emit()">{{ 'devCard.knight' | translate }}</button>
-                <button type="button" (click)="view.set('monopoly')">{{ 'devCard.monopoly' | translate }}</button>
-                <button type="button" (click)="view.set('plenty')">{{ 'devCard.plenty' | translate }}</button>
+                <button type="button" (click)="playKnight.emit()">
+                  {{ 'devCard.knight' | translate }}
+                </button>
+                <button type="button" (click)="view.set('monopoly')">
+                  {{ 'devCard.monopoly' | translate }}
+                </button>
+                <button type="button" (click)="view.set('plenty')">
+                  {{ 'devCard.plenty' | translate }}
+                </button>
                 <button type="button" (click)="playRoadBuilding.emit()">
                   {{ 'devCard.roadBuilding' | translate }}
                 </button>
@@ -98,9 +104,7 @@ type DevModalView = 'menu' | 'monopoly' | 'plenty';
               <button
                 type="button"
                 class="confirm"
-                (click)="
-                  playYearOfPlenty.emit({ first: plentyFirst(), second: plentySecond() })
-                "
+                (click)="playYearOfPlenty.emit({ first: plentyFirst(), second: plentySecond() })"
               >
                 {{ 'devCard.playPlenty' | translate }}
               </button>
@@ -205,7 +209,7 @@ type DevModalView = 'menu' | 'monopoly' | 'plenty';
   ],
 })
 export class DevCardModalComponent {
-    private readonly translate = inject(TranslateService);
+  private readonly translate = inject(TranslateService);
   private readonly instant: TranslateInstantFn = (key, params) =>
     this.translate.instant(marker(key), params);
 

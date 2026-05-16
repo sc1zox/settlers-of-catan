@@ -1,8 +1,5 @@
 import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
-import {
-  HttpApiRelativePath,
-  SwaggerApiTag,
-} from '@catan/api-interfaces';
+import { HttpApiRelativePath, SwaggerApiTag } from '@catan/api-interfaces';
 import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AppService } from './app.service';
 import { RequestId } from './http/decorators/request-id.decorator';

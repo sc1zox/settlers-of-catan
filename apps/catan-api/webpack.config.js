@@ -1,9 +1,13 @@
 const { NxAppWebpackPlugin } = require('@nx/webpack/app-plugin');
 const { join } = require('path');
 
+const apiOutputPath = process.env['CATAN_API_WEBPACK_OUT']
+  ? process.env['CATAN_API_WEBPACK_OUT']
+  : join(__dirname, '../../dist/apps/catan-api');
+
 module.exports = {
   output: {
-    path: join(__dirname, '../../dist/apps/catan-api'),
+    path: apiOutputPath,
     ...(process.env.NODE_ENV !== 'production' && {
       devtoolModuleFilenameTemplate: '[absolute-resource-path]',
     }),

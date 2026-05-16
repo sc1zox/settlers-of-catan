@@ -10,11 +10,7 @@
   padding: 0.85rem 0.9rem;
   border-radius: 12px;
   border: 1px solid rgba(113, 164, 255, 0.28);
-  background: linear-gradient(
-    145deg,
-    rgba(79, 134, 255, 0.14) 0%,
-    rgba(255, 255, 255, 0.05) 55%
-  );
+  background: linear-gradient(145deg, rgba(79, 134, 255, 0.14) 0%, rgba(255, 255, 255, 0.05) 55%);
 }
 
 .webcam-option__intro {
@@ -108,7 +104,9 @@
   background: rgba(255, 255, 255, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.22);
   position: relative;
-  transition: background 0.2s ease, border-color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .webcam-option__thumb {

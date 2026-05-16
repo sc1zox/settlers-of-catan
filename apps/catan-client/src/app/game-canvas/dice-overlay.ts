@@ -30,6 +30,6 @@ export interface DiceOverlayModel {
   styleUrl: './dice-overlay.scss',
 })
 export class DiceOverlayComponent {
-    readonly model = input<DiceOverlayModel | null>(null);
+  readonly model = input<DiceOverlayModel | null>(null);
   readonly dismiss = output<void>();
 }

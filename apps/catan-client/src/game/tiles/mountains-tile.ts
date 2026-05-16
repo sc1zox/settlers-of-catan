@@ -1,9 +1,4 @@
-import {
-  ConeGeometry,
-  IcosahedronGeometry,
-  Mesh,
-  MeshStandardMaterial,
-} from 'three';
+import { ConeGeometry, IcosahedronGeometry, Mesh, MeshStandardMaterial } from 'three';
 import { createRng, scatterInHex } from '../animation/rng';
 import { HEX_SIZE } from '../board/hex';
 import { Mine } from '../decorations/mine';
@@ -115,11 +110,7 @@ export class MountainsTile extends Tile {
         TILE_HEIGHT + h / 2,
         oreZ + Math.sin(angle) * 0.08,
       );
-      crystal.rotation.set(
-        (rng() - 0.5) * 0.4,
-        rng() * Math.PI,
-        (rng() - 0.5) * 0.4,
-      );
+      crystal.rotation.set((rng() - 0.5) * 0.4, rng() * Math.PI, (rng() - 0.5) * 0.4);
       crystal.castShadow = true;
       this.group.add(crystal);
     }

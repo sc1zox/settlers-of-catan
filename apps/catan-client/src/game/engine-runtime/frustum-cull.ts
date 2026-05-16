@@ -1,11 +1,4 @@
-import {
-  Frustum,
-  Matrix4,
-  Object3D,
-  PerspectiveCamera,
-  Sphere,
-  Vector3,
-} from 'three';
+import { Frustum, Matrix4, Object3D, PerspectiveCamera, Sphere, Vector3 } from 'three';
 
 export class FrustumCull {
   private readonly viewFrustum = new Frustum();

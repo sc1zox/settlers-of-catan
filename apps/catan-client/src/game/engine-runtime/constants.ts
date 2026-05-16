@@ -8,7 +8,10 @@ export const TABLE_SIZE = 44;
 export const INNER_STRIP_Z = 17.2;
 export const OUTER_STRIP_Z = 21.4;
 
-export const CARD_FACE_TO_CAMERA = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), -Math.PI / 2);
+export const CARD_FACE_TO_CAMERA = new Quaternion().setFromAxisAngle(
+  new Vector3(1, 0, 0),
+  -Math.PI / 2,
+);
 
 export const FOCUS_FILL_RATIO_HAND = 0.52;
 export const FOCUS_FILL_RATIO_SINGLE = 0.9;

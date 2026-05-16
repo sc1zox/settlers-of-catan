@@ -28,10 +28,7 @@ import { LobbyLiveKitService } from '../webcam-head/lobby-livekit.service';
         <h3>{{ 'settings.graphicsTitle' | translate }}</h3>
         <label class="settings-field">
           <span>{{ 'settings.shadowQuality' | translate }}</span>
-          <select
-            [value]="settings.shadowQuality()"
-            (change)="onShadowQualityChange($event)"
-          >
+          <select [value]="settings.shadowQuality()" (change)="onShadowQualityChange($event)">
             <option [value]="shadowQualityLow">{{ 'settings.shadowLow' | translate }}</option>
             <option [value]="shadowQualityMedium">{{ 'settings.shadowMedium' | translate }}</option>
             <option [value]="shadowQualityHigh">{{ 'settings.shadowHigh' | translate }}</option>

@@ -2,7 +2,9 @@ import { ResourceType } from '@catan/api-interfaces';
 import { ResourceKind } from '../cards/textures';
 import { RESOURCE_TYPE_TO_KIND } from './constants';
 
-export function expandResourceHand(resources: Readonly<Record<ResourceType, number>>): ResourceKind[] {
+export function expandResourceHand(
+  resources: Readonly<Record<ResourceType, number>>,
+): ResourceKind[] {
   const hand: ResourceKind[] = [];
   const types = Object.keys(RESOURCE_TYPE_TO_KIND) as ResourceType[];
   for (let i = 0; i < types.length; i += 1) {

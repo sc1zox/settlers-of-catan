@@ -70,8 +70,7 @@ export class LobbyOrchestratorService {
       throw new BadRequestException(ActionRejectCode.UnknownLobby);
     }
     const priorCanonical = this.lobby.getCanonicalIdByLobbyCode(normalizedCode);
-    const lobbyIdleRecycled =
-      priorCanonical !== undefined && priorCanonical !== canonicalLobbyId;
+    const lobbyIdleRecycled = priorCanonical !== undefined && priorCanonical !== canonicalLobbyId;
     if (lobbyIdleRecycled) {
       this.lobby.evictLobby(priorCanonical);
       void this.liveKit.deleteRoom(priorCanonical).catch((error: unknown) => {
@@ -119,11 +118,7 @@ export class LobbyOrchestratorService {
     this.lobby.broadcastFullState(server, lobby);
   }
 
-  public async leaveLobby(
-    lobbyId: string,
-    sessionToken: string,
-    server: Server,
-  ): Promise<void> {
+  public async leaveLobby(lobbyId: string, sessionToken: string, server: Server): Promise<void> {
     const lobby = this.lobby.getLobby(lobbyId);
     if (!lobby) {
       return;

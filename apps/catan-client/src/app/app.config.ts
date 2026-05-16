@@ -6,7 +6,11 @@ import {
   provideZonelessChangeDetection,
 } from '@angular/core';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
-import { provideTranslateLoader, provideTranslateService, TranslateService } from '@ngx-translate/core';
+import {
+  provideTranslateLoader,
+  provideTranslateService,
+  TranslateService,
+} from '@ngx-translate/core';
 import { TRANSLATE_HTTP_LOADER_CONFIG, TranslateHttpLoader } from '@ngx-translate/http-loader';
 import { firstValueFrom } from 'rxjs';
 import { AppInitService } from './core/bootstrap/app-init.service';

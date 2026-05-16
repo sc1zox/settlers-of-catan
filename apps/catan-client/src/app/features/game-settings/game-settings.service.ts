@@ -46,10 +46,7 @@ export class GameSettingsService {
   public readonly benchmarkSummary = this.benchmarkSummarySignal.asReadonly();
 
   public readonly performanceSamplingEnabled = computed<boolean>(
-    () =>
-      this.panelOpenSignal() ||
-      this.performanceOverlaySignal() ||
-      this.benchmarkActiveSignal(),
+    () => this.panelOpenSignal() || this.performanceOverlaySignal() || this.benchmarkActiveSignal(),
   );
 
   public togglePanel(): void {

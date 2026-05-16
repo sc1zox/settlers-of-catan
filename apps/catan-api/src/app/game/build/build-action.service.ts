@@ -61,11 +61,7 @@ export class BuildActionService {
     return delta;
   }
 
-  public buildRoad(
-    lobby: LobbyRuntime,
-    sessionToken: string,
-    edgeId: string,
-  ): GameDeltaPayload {
+  public buildRoad(lobby: LobbyRuntime, sessionToken: string, edgeId: string): GameDeltaPayload {
     this.validation.assertPhase(lobby, [
       GamePhase.SetupForward,
       GamePhase.SetupBackward,
@@ -75,7 +71,10 @@ export class BuildActionService {
     const phase = lobby.fsm.getPhase();
     const isSetupPhase = phase === GamePhase.SetupForward || phase === GamePhase.SetupBackward;
     if (isSetupPhase) {
-      if (lobby.pendingSetupRoadSeat !== player.seat || lobby.pendingSetupRoadFromVertexId === null) {
+      if (
+        lobby.pendingSetupRoadSeat !== player.seat ||
+        lobby.pendingSetupRoadFromVertexId === null
+      ) {
         throw new Error(ActionRejectCode.IllegalPlacement);
       }
       this.validation.assertLegalRoadEdge(
@@ -136,5 +135,4 @@ export class BuildActionService {
     player.visibleVictoryPoints += 1;
     applyPostActionScoring(lobby);
   }
-
 }

@@ -1,10 +1,4 @@
-import {
-  BoxGeometry,
-  CylinderGeometry,
-  Mesh,
-  MeshStandardMaterial,
-  SphereGeometry,
-} from 'three';
+import { BoxGeometry, CylinderGeometry, Mesh, MeshStandardMaterial, SphereGeometry } from 'three';
 import { createRng, scatterInHex } from '../animation/rng';
 import { HEX_SIZE } from '../board/hex';
 import { Tile, TileInit, TILE_HEIGHT } from './tile';
@@ -166,10 +160,7 @@ export class HillsTile extends Tile {
     for (const p of loose) {
       if (Math.hypot(p.x - kilnX, p.z - kilnZ) < 0.55) continue;
       if (Math.hypot(p.x - stackX, p.z - stackZ) < 0.45) continue;
-      const brick = new Mesh(
-        new BoxGeometry(0.13, 0.05, 0.07),
-        rng() > 0.5 ? brickMat : brickDark,
-      );
+      const brick = new Mesh(new BoxGeometry(0.13, 0.05, 0.07), rng() > 0.5 ? brickMat : brickDark);
       brick.position.set(p.x, TILE_HEIGHT + 0.025, p.z);
       brick.rotation.y = rng() * Math.PI;
       brick.rotation.z = (rng() - 0.5) * 0.25;

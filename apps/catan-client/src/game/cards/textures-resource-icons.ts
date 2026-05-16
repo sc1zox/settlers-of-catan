@@ -71,12 +71,7 @@ function drawSheepIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, si
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
 
-  const drawOutlinedArc = (
-    arcCx: number,
-    arcCy: number,
-    radius: number,
-    fill: string,
-  ): void => {
+  const drawOutlinedArc = (arcCx: number, arcCy: number, radius: number, fill: string): void => {
     ctx.beginPath();
     ctx.arc(arcCx, arcCy, radius, 0, Math.PI * 2);
     ctx.strokeStyle = outline;
@@ -263,12 +258,7 @@ export function makeHarborFlagTexture(
     ctx.fillRect(0, 0, HARBOR_FLAG_W, HARBOR_FLAG_H);
     ctx.strokeStyle = palette.accentDark;
     ctx.lineWidth = 8;
-    ctx.strokeRect(
-      borderPad,
-      borderPad,
-      HARBOR_FLAG_W - borderPad * 2,
-      iconAreaH - borderPad,
-    );
+    ctx.strokeRect(borderPad, borderPad, HARBOR_FLAG_W - borderPad * 2, iconAreaH - borderPad);
     ctx.save();
     ctx.beginPath();
     ctx.rect(iconPad, iconPad, HARBOR_FLAG_W - iconPad * 2, iconAreaH - iconPad);
@@ -280,12 +270,7 @@ export function makeHarborFlagTexture(
     ctx.fillRect(0, 0, HARBOR_FLAG_W, HARBOR_FLAG_H);
     ctx.strokeStyle = '#8a8a96';
     ctx.lineWidth = 8;
-    ctx.strokeRect(
-      borderPad,
-      borderPad,
-      HARBOR_FLAG_W - borderPad * 2,
-      iconAreaH - borderPad,
-    );
+    ctx.strokeRect(borderPad, borderPad, HARBOR_FLAG_W - borderPad * 2, iconAreaH - borderPad);
     ctx.save();
     ctx.beginPath();
     ctx.rect(iconPad, iconPad, HARBOR_FLAG_W - iconPad * 2, iconAreaH - iconPad);

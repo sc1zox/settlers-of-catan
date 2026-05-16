@@ -90,7 +90,12 @@ export class CloudField {
           Math.cos(angle) * radius,
           rand(RING_MIN_HEIGHT, RING_MAX_HEIGHT),
           Math.sin(angle) * radius,
-          { puffs: Math.round(rand(5, 9)), spread: rand(2.4, 4.0), flatten: rand(0.6, 0.85), bob: 0.9 },
+          {
+            puffs: Math.round(rand(5, 9)),
+            spread: rand(2.4, 4.0),
+            flatten: rand(0.6, 0.85),
+            bob: 0.9,
+          },
         ),
       );
       index += 1;
@@ -100,7 +105,8 @@ export class CloudField {
     // flat clusters whose puffs overlap into a continuous blanket.
     for (let cx = 0; cx < DECK_COLUMNS; cx += 1) {
       for (let cz = 0; cz < DECK_ROWS; cz += 1) {
-        const x = DECK_X_MIN + ((cx + 0.5) / DECK_COLUMNS) * (DECK_X_MAX - DECK_X_MIN) + rand(-2, 2);
+        const x =
+          DECK_X_MIN + ((cx + 0.5) / DECK_COLUMNS) * (DECK_X_MAX - DECK_X_MIN) + rand(-2, 2);
         const z = DECK_Z_MIN + ((cz + 0.5) / DECK_ROWS) * (DECK_Z_MAX - DECK_Z_MIN) + rand(-2, 2);
         this.clouds.push(
           this.makeCloud(index, x, DECK_HEIGHT + rand(-1.2, 1.2), z, {

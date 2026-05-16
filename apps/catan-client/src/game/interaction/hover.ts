@@ -368,7 +368,9 @@ export class HoverSystem {
       const candidate = walkToKind(hits[i].object);
       if (!candidate) continue;
       if (!isVisibleInHierarchy(candidate)) continue;
-      const candidateKind = candidate.userData[SceneUserDataKey.Kind] as SceneObjectKind | undefined;
+      const candidateKind = candidate.userData[SceneUserDataKey.Kind] as
+        | SceneObjectKind
+        | undefined;
       if (candidateKind !== SceneObjectKind.Card && candidateKind !== SceneObjectKind.Die) continue;
       if (candidate.renderOrder > topObj.renderOrder) {
         topObj = candidate;

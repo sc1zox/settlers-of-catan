@@ -43,7 +43,12 @@ export function paperBackground(ctx: CanvasRenderingContext2D, w: number, h: num
   ctx.fillRect(0, 0, w, h);
 }
 
-export function ornateBorder(ctx: CanvasRenderingContext2D, w: number, h: number, accent: string): void {
+export function ornateBorder(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  accent: string,
+): void {
   ctx.strokeStyle = '#2a1a0d';
   ctx.lineWidth = 8;
   ctx.strokeRect(14, 14, w - 28, h - 28);

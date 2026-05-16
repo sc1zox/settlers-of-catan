@@ -1,10 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  ActionRejectCode,
-  GamePhase,
-  PlayerSeat,
-  ResourceType,
-} from '@catan/api-interfaces';
+import { ActionRejectCode, GamePhase, PlayerSeat, ResourceType } from '@catan/api-interfaces';
 import { GameActionValidationService } from '../validation/game-action-validation.service';
 import { LobbyRuntime } from '../lobby/lobby-runtime';
 import { applyRobberMove } from './robber.util';

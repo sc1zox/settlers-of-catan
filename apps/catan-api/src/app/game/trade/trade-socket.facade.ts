@@ -38,7 +38,11 @@ export class TradeSocketFacade {
   }
 
   public proposeTrade(server: Server, payload: TradeProposePayload, sessionToken: string): void {
-    const body = this.tradeActions.proposeTrade(this.tradeActionContext(server), sessionToken, payload);
+    const body = this.tradeActions.proposeTrade(
+      this.tradeActionContext(server),
+      sessionToken,
+      payload,
+    );
     const roomId = formatSocketIoLobbyRoomId(body.lobbyId);
     server.to(roomId).emit(GameSocketServerEvent.TradeUpdated, body);
     const botSession = this.demoBots.resolveDemoBotTradeAcceptorSessionToken(
@@ -68,7 +72,11 @@ export class TradeSocketFacade {
   }
 
   public acceptTrade(server: Server, payload: TradeAcceptPayload, sessionToken: string): void {
-    const result = this.tradeActions.acceptTrade(this.tradeActionContext(server), sessionToken, payload);
+    const result = this.tradeActions.acceptTrade(
+      this.tradeActionContext(server),
+      sessionToken,
+      payload,
+    );
     if (result.tradeUpdated !== null) {
       server
         .to(formatSocketIoLobbyRoomId(result.lobbyId))
@@ -77,7 +85,11 @@ export class TradeSocketFacade {
   }
 
   public rejectTrade(server: Server, payload: TradeRejectPayload, sessionToken: string): void {
-    const result = this.tradeActions.rejectTrade(this.tradeActionContext(server), sessionToken, payload);
+    const result = this.tradeActions.rejectTrade(
+      this.tradeActionContext(server),
+      sessionToken,
+      payload,
+    );
     if (result.tradeUpdated !== null) {
       server
         .to(formatSocketIoLobbyRoomId(result.lobbyId))

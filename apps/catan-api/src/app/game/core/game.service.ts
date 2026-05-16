@@ -107,11 +107,7 @@ export class GameService {
     this.lobbyOrchestrator.onDisconnect(sessionToken, server);
   }
 
-  public async leaveLobby(
-    lobbyId: string,
-    sessionToken: string,
-    server: Server,
-  ): Promise<void> {
+  public async leaveLobby(lobbyId: string, sessionToken: string, server: Server): Promise<void> {
     await this.lobbyOrchestrator.leaveLobby(lobbyId, sessionToken, server);
   }
 
@@ -319,7 +315,13 @@ export class GameService {
   ): void {
     const lobby = this.lobby.requireLobby(lobbyId);
     this.lobby.assertLobbyOpen(lobby);
-    this.economy.bankTradeAsCurrentTurn(lobby, sessionToken, giveResource, giveAmount, receiveResource);
+    this.economy.bankTradeAsCurrentTurn(
+      lobby,
+      sessionToken,
+      giveResource,
+      giveAmount,
+      receiveResource,
+    );
     this.broadcastFullState(server, lobby);
   }
 

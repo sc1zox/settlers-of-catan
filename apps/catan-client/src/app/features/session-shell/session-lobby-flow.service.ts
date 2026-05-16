@@ -1,11 +1,7 @@
 import { computed, effect, inject, Injectable, signal } from '@angular/core';
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslateService } from '@ngx-translate/core';
-import {
-  GamePhase,
-  LiveKitCredentialsPayload,
-  isLobbyCodeValid,
-} from '@catan/api-interfaces';
+import { GamePhase, LiveKitCredentialsPayload, isLobbyCodeValid } from '@catan/api-interfaces';
 import { GameStateResource } from '../../core/game/game-state.resource';
 import { PlayerSessionService } from '../../core/session/player-session.service';
 import { GameSettingsService } from '../game-settings/game-settings.service';
@@ -194,7 +190,10 @@ export class SessionLobbyFlowService {
     );
   }
 
-  private async runJoinLobby(session: SessionUiState | null, lobbyCodeInput: string): Promise<void> {
+  private async runJoinLobby(
+    session: SessionUiState | null,
+    lobbyCodeInput: string,
+  ): Promise<void> {
     if (session === null) {
       this.shellFeedback.setFeedback(
         UiFeedbackTone.Error,
@@ -251,7 +250,10 @@ export class SessionLobbyFlowService {
     }
   }
 
-  private async runCreateLobby(session: SessionUiState | null, lobbyCodeInput: string): Promise<void> {
+  private async runCreateLobby(
+    session: SessionUiState | null,
+    lobbyCodeInput: string,
+  ): Promise<void> {
     if (session === null) {
       this.shellFeedback.setFeedback(
         UiFeedbackTone.Error,

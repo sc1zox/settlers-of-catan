@@ -7,7 +7,10 @@
   border-radius: 10px;
   background: rgba(12, 10, 16, 0.92);
   color: #f4e3bb;
-  font: 12px/1.35 'Inter', 'Segoe UI', sans-serif;
+  font:
+    12px/1.35 'Inter',
+    'Segoe UI',
+    sans-serif;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.42);
 }
 
@@ -127,7 +130,10 @@
   padding: 5px 8px;
   background: rgba(20, 16, 28, 0.92);
   color: #fff8e5;
-  font: 11px/1.2 'Inter', 'Segoe UI', sans-serif;
+  font:
+    11px/1.2 'Inter',
+    'Segoe UI',
+    sans-serif;
   cursor: pointer;
 
   &:hover {

@@ -20,7 +20,7 @@ const ROWS = 6;
 const PER_ROW = 9;
 /** Plant rows tilt slightly off-axis so they don't read as a grid. */
 const ROW_ANGLE = 0.35;
-const ROW_SPACING = 0.30;
+const ROW_SPACING = 0.3;
 const COL_SPACING = 0.22;
 
 /**

@@ -11,11 +11,7 @@ import type { Object3D } from 'three';
 export type BuildSpotHoverHandler = (figure: Object3D | null) => void;
 
 /** A {@link SceneObjectKind.BuildSpot} ghost figure was clicked. */
-export type BuildSpotClickHandler = (
-  figure: Object3D,
-  screenX: number,
-  screenY: number,
-) => void;
+export type BuildSpotClickHandler = (figure: Object3D, screenX: number, screenY: number) => void;
 
 /** A {@link SceneObjectKind.Arsenal} figure in the local player's stash was clicked. */
 export type ArsenalClickHandler = (figure: Object3D) => void;

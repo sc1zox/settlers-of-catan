@@ -27,6 +27,9 @@ export function percentile(values: readonly number[], quantile: number): number 
     return 0;
   }
   const sorted = [...values].sort((a, b) => a - b);
-  const index = Math.min(sorted.length - 1, Math.max(0, Math.floor((sorted.length - 1) * quantile)));
+  const index = Math.min(
+    sorted.length - 1,
+    Math.max(0, Math.floor((sorted.length - 1) * quantile)),
+  );
   return sorted[index] ?? 0;
 }

@@ -119,7 +119,9 @@ function findOuterSideDirection(q: number, r: number): { q: number; r: number } 
       continue;
     }
     const score =
-      neighborQ * neighborQ + neighborR * neighborR + (neighborQ + neighborR) * (neighborQ + neighborR);
+      neighborQ * neighborQ +
+      neighborR * neighborR +
+      (neighborQ + neighborR) * (neighborQ + neighborR);
     if (score > bestScore) {
       bestScore = score;
       bestDir = dir;

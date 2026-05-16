@@ -23,11 +23,7 @@ export class GatewayLobbyHandlers {
     private readonly lobbySocket: LobbySocketFacade,
   ) {}
 
-  public async joinLobby(
-    server: Server,
-    client: Socket,
-    payload: JoinLobbyPayload,
-  ): Promise<void> {
+  public async joinLobby(server: Server, client: Socket, payload: JoinLobbyPayload): Promise<void> {
     const sessionToken = this.sessions.getSessionToken(client);
     if (!sessionToken) {
       return;
@@ -69,7 +65,11 @@ export class GatewayLobbyHandlers {
     this.gameService.broadcastFullState(server, lobby);
   }
 
-  public async leaveLobby(server: Server, client: Socket, payload: LeaveLobbyPayload): Promise<void> {
+  public async leaveLobby(
+    server: Server,
+    client: Socket,
+    payload: LeaveLobbyPayload,
+  ): Promise<void> {
     const sessionToken = this.sessions.getSessionToken(client);
     if (!sessionToken) {
       return;
@@ -82,7 +82,11 @@ export class GatewayLobbyHandlers {
     this.lobbySocket.startLobby(payload.lobbyId, sessionToken, server);
   }
 
-  public fillLobbyWithBots(server: Server, client: Socket, payload: FillLobbyWithBotsPayload): void {
+  public fillLobbyWithBots(
+    server: Server,
+    client: Socket,
+    payload: FillLobbyWithBotsPayload,
+  ): void {
     const sessionToken = this.sessions.requireSessionToken(client);
     this.lobbySocket.fillLobbyWithBots(payload.lobbyId, sessionToken, server);
   }

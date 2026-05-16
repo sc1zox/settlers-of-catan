@@ -111,9 +111,7 @@ export class LobbyRuntime {
     this.verticesById = topology.verticesById;
     this.edgesById = topology.edgesById;
     const desert = this.tiles.find((tile) => tile.number === null);
-    this.robberCoord = desert
-      ? { q: desert.coord.q, r: desert.coord.r }
-      : { q: 0, r: 0 };
+    this.robberCoord = desert ? { q: desert.coord.q, r: desert.coord.r } : { q: 0, r: 0 };
     this.setupPlacementsBySeat = this.createSeatCounter();
     this.devDeck = createShuffledDevDeck();
   }

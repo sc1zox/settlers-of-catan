@@ -5,10 +5,7 @@ import { PlayerSeat } from '@catan/api-interfaces';
 import { collectRobberVictimSeats } from '@catan/shared-game-field';
 import { GameStateResource } from '../../core/game/game-state.resource';
 import { RobberTilePick } from '../../game-canvas/game-canvas';
-import {
-  RobberVictimCandidate,
-  RobberVictimModel,
-} from '../../game-canvas/robber-victim-popover';
+import { RobberVictimCandidate, RobberVictimModel } from '../../game-canvas/robber-victim-popover';
 import { LobbyShellGameUiService } from '../lobby-game-ui/lobby-shell-game-ui.service';
 import { ShellFeedbackService } from '../shell-feedback/shell-feedback.service';
 import { totalResourceCards } from '../../shared/helper/lobby-game-ui/resource-card-totals';

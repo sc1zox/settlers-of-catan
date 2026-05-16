@@ -17,185 +17,212 @@
     @if (!ui.spectatorCamService.mode()) {
       @if (ui.lobbyFlow.uiStep() !== ui.lobbyUiStepEnum.InGame) {
         <article class="panel">
-        <header class="panel__header">
-          <h1>{{ 'shell.appTitle' | translate }}</h1>
-          <p>{{ 'shell.appSubtitle' | translate }}</p>
-        </header>
+          <header class="panel__header">
+            <h1>{{ 'shell.appTitle' | translate }}</h1>
+            <p>{{ 'shell.appSubtitle' | translate }}</p>
+          </header>
 
-        @if (ui.shellFeedback.feedback() !== null) {
-          <p
-            class="feedback"
-            [class.feedback--info]="ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Info"
-            [class.feedback--success]="ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Success"
-            [class.feedback--error]="ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Error"
-            aria-live="polite"
-          >
-            {{ ui.shellFeedback.feedback()?.message }}
-          </p>
-        }
-
-        @if (ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.SignIn) {
-          <form class="form-block" [formGroup]="ui.sessionForm" (ngSubmit)="ui.startSession()">
-            <label for="displayName">{{ 'shell.labelDisplayName' | translate }}</label>
-            <input id="displayName" type="text" autocomplete="nickname" formControlName="displayName" />
-            @if (ui.sessionForm.controls.displayName.invalid && ui.sessionForm.controls.displayName.touched) {
-              <p class="status">{{ 'shell.validationDisplayName' | translate }}</p>
-            }
-            <div class="webcam-option">
-              <div class="webcam-option__intro">
-                <span class="webcam-option__icon" aria-hidden="true"></span>
-                <div class="webcam-option__copy">
-                  <p class="webcam-option__title">{{ 'shell.webcamTitle' | translate }}</p>
-                  <p class="webcam-option__hint">{{ 'shell.webcamHint' | translate }}</p>
-                </div>
-              </div>
-              <label class="webcam-option__toggle">
-                <input
-                  type="checkbox"
-                  class="webcam-option__input"
-                  [checked]="ui.gameSettings.webcamEnabled()"
-                  (change)="ui.onWebcamEnabledChange($event)"
-                />
-                <span class="webcam-option__track" aria-hidden="true">
-                  <span class="webcam-option__thumb"></span>
-                </span>
-                <span class="webcam-option__label">{{ 'shell.webcamToggle' | translate }}</span>
-              </label>
-            </div>
-            <div class="button-row">
-              <button type="submit">{{ 'shell.buttonStartSession' | translate }}</button>
-            </div>
-          </form>
-        }
-
-        @if (ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.JoinLobby) {
-          <form class="form-block" [formGroup]="ui.lobbyForm" (ngSubmit)="ui.joinLobby()">
-            <p class="session-pill">
-              {{ 'shell.sessionPill' | translate: { displayName: ui.lobbyFlow.sessionState()?.displayName ?? '' } }}
+          @if (ui.shellFeedback.feedback() !== null) {
+            <p
+              class="feedback"
+              [class.feedback--info]="
+                ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Info
+              "
+              [class.feedback--success]="
+                ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Success
+              "
+              [class.feedback--error]="
+                ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Error
+              "
+              aria-live="polite"
+            >
+              {{ ui.shellFeedback.feedback()?.message }}
             </p>
-            <label for="lobbyCode">{{ 'shell.labelLobbyCode' | translate }}</label>
-            <input id="lobbyCode" type="text" autocomplete="off" formControlName="lobbyCode" />
-            @if (ui.lobbyForm.controls.lobbyCode.invalid && ui.lobbyForm.controls.lobbyCode.touched) {
-              <p class="status">{{ 'shell.validationLobbyCode' | translate }}</p>
-            }
-            <div class="button-row">
-              <button
-                type="button"
-                class="button--ghost"
-                [disabled]="ui.lobbyFlow.isJoinInProgress()"
-                (click)="ui.lobbyFlow.backToSignIn()"
-              >
-                {{ 'shell.buttonChangeName' | translate }}
-              </button>
-              <button type="submit" [disabled]="ui.lobbyFlow.isJoinInProgress()">
-                @if (ui.lobbyFlow.isJoinInProgress()) {
-                  <span class="button-spinner" aria-hidden="true"></span>
-                  <span>{{ 'shell.buttonJoining' | translate }}</span>
-                } @else {
-                  <span>{{ 'shell.buttonJoinGame' | translate }}</span>
-                }
-              </button>
-              <button type="button" [disabled]="ui.lobbyFlow.isJoinInProgress()" (click)="ui.createLobby()">
-                @if (ui.lobbyFlow.isJoinInProgress()) {
-                  <span class="button-spinner" aria-hidden="true"></span>
-                  <span>{{ 'shell.buttonCreating' | translate }}</span>
-                } @else {
-                  <span>{{ 'shell.buttonCreateLobby' | translate }}</span>
-                }
-              </button>
-            </div>
-          </form>
-        }
+          }
 
-        @if (ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.Lobby) {
-          <div class="lobby-block">
-            <div class="lobby-meta">
-              <p>
-                <span>{{ 'shell.metaLobby' | translate }}</span
-                ><strong>{{ ui.activeLobbyCode() }}</strong>
-              </p>
-              <p>
-                <span>{{ 'shell.metaActiveSeat' | translate }}</span
-                ><strong>{{ ui.lobbyGameUi.activeSeatLabel() }}</strong>
-              </p>
-              <p>
-                <span>{{ 'shell.metaPhase' | translate }}</span
-                ><strong>{{ ui.lobbyGameUi.phaseLabel() }}</strong>
-              </p>
-            </div>
-
-            @if (ui.lobbyFlow.isJoinInProgress()) {
-              <p class="status">
-                <span class="status-spinner" aria-hidden="true"></span>
-                <span>{{ 'shell.statusJoinInProgress' | translate }}</span>
-              </p>
-            } @else if (ui.lobbyGameUi.isLobbyLoading()) {
-              <p class="status">
-                <span class="status-spinner" aria-hidden="true"></span>
-                <span>{{ 'shell.statusLoadingLobbyState' | translate }}</span>
-              </p>
-            }
-
-            <ul class="seat-list">
-              @for (seat of ui.lobbyGameUi.lobbyUiState()?.seats ?? []; track seat.seat) {
-                <li class="seat-item">
-                  <div>
-                    <p class="seat-title">{{ seat.seatLabel }}</p>
-                    <p class="seat-name">{{ seat.playerName }}</p>
-                  </div>
-                  <div class="seat-badges">
-                    @if (seat.isSelf) {
-                      <span class="badge">{{ 'shell.badgeSelf' | translate }}</span>
-                    }
-                    @if (seat.isConnected) {
-                      <span class="badge badge--online">{{ 'shell.badgeOnline' | translate }}</span>
-                    } @else {
-                      <span class="badge badge--offline">{{ 'shell.badgeOffline' | translate }}</span>
-                    }
-                  </div>
-                </li>
+          @if (ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.SignIn) {
+            <form class="form-block" [formGroup]="ui.sessionForm" (ngSubmit)="ui.startSession()">
+              <label for="displayName">{{ 'shell.labelDisplayName' | translate }}</label>
+              <input
+                id="displayName"
+                type="text"
+                autocomplete="nickname"
+                formControlName="displayName"
+              />
+              @if (
+                ui.sessionForm.controls.displayName.invalid &&
+                ui.sessionForm.controls.displayName.touched
+              ) {
+                <p class="status">{{ 'shell.validationDisplayName' | translate }}</p>
               }
-            </ul>
+              <div class="webcam-option">
+                <div class="webcam-option__intro">
+                  <span class="webcam-option__icon" aria-hidden="true"></span>
+                  <div class="webcam-option__copy">
+                    <p class="webcam-option__title">{{ 'shell.webcamTitle' | translate }}</p>
+                    <p class="webcam-option__hint">{{ 'shell.webcamHint' | translate }}</p>
+                  </div>
+                </div>
+                <label class="webcam-option__toggle">
+                  <input
+                    type="checkbox"
+                    class="webcam-option__input"
+                    [checked]="ui.gameSettings.webcamEnabled()"
+                    (change)="ui.onWebcamEnabledChange($event)"
+                  />
+                  <span class="webcam-option__track" aria-hidden="true">
+                    <span class="webcam-option__thumb"></span>
+                  </span>
+                  <span class="webcam-option__label">{{ 'shell.webcamToggle' | translate }}</span>
+                </label>
+              </div>
+              <div class="button-row">
+                <button type="submit">{{ 'shell.buttonStartSession' | translate }}</button>
+              </div>
+            </form>
+          }
 
-            <div class="button-row">
-              @if (ui.lobbyGameUi.canStartLobby()) {
+          @if (ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.JoinLobby) {
+            <form class="form-block" [formGroup]="ui.lobbyForm" (ngSubmit)="ui.joinLobby()">
+              <p class="session-pill">
+                {{
+                  'shell.sessionPill'
+                    | translate: { displayName: ui.lobbyFlow.sessionState()?.displayName ?? '' }
+                }}
+              </p>
+              <label for="lobbyCode">{{ 'shell.labelLobbyCode' | translate }}</label>
+              <input id="lobbyCode" type="text" autocomplete="off" formControlName="lobbyCode" />
+              @if (
+                ui.lobbyForm.controls.lobbyCode.invalid && ui.lobbyForm.controls.lobbyCode.touched
+              ) {
+                <p class="status">{{ 'shell.validationLobbyCode' | translate }}</p>
+              }
+              <div class="button-row">
                 <button
                   type="button"
-                  [disabled]="ui.lobbyFlow.isJoinInProgress() || ui.lobbyGameUi.isLobbyLoading()"
-                  (click)="ui.startLobby()"
+                  class="button--ghost"
+                  [disabled]="ui.lobbyFlow.isJoinInProgress()"
+                  (click)="ui.lobbyFlow.backToSignIn()"
                 >
-                  {{ 'shell.buttonStartGame' | translate }}
+                  {{ 'shell.buttonChangeName' | translate }}
                 </button>
-              }
-              @if (ui.lobbyGameUi.canFillLobbyWithBots()) {
+                <button type="submit" [disabled]="ui.lobbyFlow.isJoinInProgress()">
+                  @if (ui.lobbyFlow.isJoinInProgress()) {
+                    <span class="button-spinner" aria-hidden="true"></span>
+                    <span>{{ 'shell.buttonJoining' | translate }}</span>
+                  } @else {
+                    <span>{{ 'shell.buttonJoinGame' | translate }}</span>
+                  }
+                </button>
                 <button
                   type="button"
-                  [disabled]="ui.lobbyFlow.isJoinInProgress() || ui.lobbyGameUi.isLobbyLoading()"
-                  (click)="ui.fillLobbyWithBots()"
+                  [disabled]="ui.lobbyFlow.isJoinInProgress()"
+                  (click)="ui.createLobby()"
                 >
-                  {{ 'shell.buttonFillBots' | translate }}
+                  @if (ui.lobbyFlow.isJoinInProgress()) {
+                    <span class="button-spinner" aria-hidden="true"></span>
+                    <span>{{ 'shell.buttonCreating' | translate }}</span>
+                  } @else {
+                    <span>{{ 'shell.buttonCreateLobby' | translate }}</span>
+                  }
                 </button>
+              </div>
+            </form>
+          }
+
+          @if (ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.Lobby) {
+            <div class="lobby-block">
+              <div class="lobby-meta">
+                <p>
+                  <span>{{ 'shell.metaLobby' | translate }}</span
+                  ><strong>{{ ui.activeLobbyCode() }}</strong>
+                </p>
+                <p>
+                  <span>{{ 'shell.metaActiveSeat' | translate }}</span
+                  ><strong>{{ ui.lobbyGameUi.activeSeatLabel() }}</strong>
+                </p>
+                <p>
+                  <span>{{ 'shell.metaPhase' | translate }}</span
+                  ><strong>{{ ui.lobbyGameUi.phaseLabel() }}</strong>
+                </p>
+              </div>
+
+              @if (ui.lobbyFlow.isJoinInProgress()) {
+                <p class="status">
+                  <span class="status-spinner" aria-hidden="true"></span>
+                  <span>{{ 'shell.statusJoinInProgress' | translate }}</span>
+                </p>
+              } @else if (ui.lobbyGameUi.isLobbyLoading()) {
+                <p class="status">
+                  <span class="status-spinner" aria-hidden="true"></span>
+                  <span>{{ 'shell.statusLoadingLobbyState' | translate }}</span>
+                </p>
               }
-              <button
-                type="button"
-                class="button--ghost"
-                [disabled]="ui.lobbyFlow.isJoinInProgress() || ui.lobbyGameUi.isLobbyLoading()"
-                (click)="ui.lobbyFlow.backToJoinLobby()"
-              >
-                {{ 'shell.buttonOtherLobby' | translate }}
-              </button>
-              <button
-                type="button"
-                class="button--danger"
-                [disabled]="ui.lobbyFlow.isJoinInProgress() || ui.lobbyGameUi.isLobbyLoading()"
-                (click)="ui.lobbyFlow.resetSession()"
-              >
-                {{ 'shell.buttonEndSession' | translate }}
-              </button>
+
+              <ul class="seat-list">
+                @for (seat of ui.lobbyGameUi.lobbyUiState()?.seats ?? []; track seat.seat) {
+                  <li class="seat-item">
+                    <div>
+                      <p class="seat-title">{{ seat.seatLabel }}</p>
+                      <p class="seat-name">{{ seat.playerName }}</p>
+                    </div>
+                    <div class="seat-badges">
+                      @if (seat.isSelf) {
+                        <span class="badge">{{ 'shell.badgeSelf' | translate }}</span>
+                      }
+                      @if (seat.isConnected) {
+                        <span class="badge badge--online">{{
+                          'shell.badgeOnline' | translate
+                        }}</span>
+                      } @else {
+                        <span class="badge badge--offline">{{
+                          'shell.badgeOffline' | translate
+                        }}</span>
+                      }
+                    </div>
+                  </li>
+                }
+              </ul>
+
+              <div class="button-row">
+                @if (ui.lobbyGameUi.canStartLobby()) {
+                  <button
+                    type="button"
+                    [disabled]="ui.lobbyFlow.isJoinInProgress() || ui.lobbyGameUi.isLobbyLoading()"
+                    (click)="ui.startLobby()"
+                  >
+                    {{ 'shell.buttonStartGame' | translate }}
+                  </button>
+                }
+                @if (ui.lobbyGameUi.canFillLobbyWithBots()) {
+                  <button
+                    type="button"
+                    [disabled]="ui.lobbyFlow.isJoinInProgress() || ui.lobbyGameUi.isLobbyLoading()"
+                    (click)="ui.fillLobbyWithBots()"
+                  >
+                    {{ 'shell.buttonFillBots' | translate }}
+                  </button>
+                }
+                <button
+                  type="button"
+                  class="button--ghost"
+                  [disabled]="ui.lobbyFlow.isJoinInProgress() || ui.lobbyGameUi.isLobbyLoading()"
+                  (click)="ui.lobbyFlow.backToJoinLobby()"
+                >
+                  {{ 'shell.buttonOtherLobby' | translate }}
+                </button>
+                <button
+                  type="button"
+                  class="button--danger"
+                  [disabled]="ui.lobbyFlow.isJoinInProgress() || ui.lobbyGameUi.isLobbyLoading()"
+                  (click)="ui.lobbyFlow.resetSession()"
+                >
+                  {{ 'shell.buttonEndSession' | translate }}
+                </button>
+              </div>
             </div>
-          </div>
-        }
-      </article>
+          }
+        </article>
       } @else {
         @if (ui.lobbyGameUi.announcerEntry().text.length > 0) {
           <aside class="hud-announcer" role="status" aria-live="polite">
@@ -204,14 +231,23 @@
             }
           </aside>
         }
-        <aside class="hud" [class.hud--spectator-paused]="ui.lobbyGameUi.hudChromeSpectatorPaused()">
+        <aside
+          class="hud"
+          [class.hud--spectator-paused]="ui.lobbyGameUi.hudChromeSpectatorPaused()"
+        >
           <div class="hud__chrome">
             @if (ui.shellFeedback.feedback() !== null) {
               <p
                 class="hud__feedback feedback"
-                [class.feedback--info]="ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Info"
-                [class.feedback--success]="ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Success"
-                [class.feedback--error]="ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Error"
+                [class.feedback--info]="
+                  ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Info
+                "
+                [class.feedback--success]="
+                  ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Success
+                "
+                [class.feedback--error]="
+                  ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Error
+                "
                 aria-live="polite"
               >
                 {{ ui.shellFeedback.feedback()?.message }}
@@ -256,16 +292,23 @@
                   </p>
                 } @else if (ui.lobbyGameUi.hudShowPassiveWait()) {
                   <p class="hud__play-wait">
-                    {{ 'shell.hudSpectateWait' | translate: { name: ui.lobbyGameUi.activeTurnPlayerName() } }}
+                    {{
+                      'shell.hudSpectateWait'
+                        | translate: { name: ui.lobbyGameUi.activeTurnPlayerName() }
+                    }}
                   </p>
                 }
               }
               <div class="hud__actions">
                 @if (ui.lobbyGameUi.canRollDice()) {
-                  <button type="button" (click)="ui.rollDice()">{{ 'shell.buttonRollDice' | translate }}</button>
+                  <button type="button" (click)="ui.rollDice()">
+                    {{ 'shell.buttonRollDice' | translate }}
+                  </button>
                 }
                 @if (ui.lobbyGameUi.canOpenTrade()) {
-                  <button type="button" (click)="ui.tradingPanel.openTrade()">{{ 'shell.buttonTrade' | translate }}</button>
+                  <button type="button" (click)="ui.tradingPanel.openTrade()">
+                    {{ 'shell.buttonTrade' | translate }}
+                  </button>
                 }
                 @if (ui.lobbyGameUi.canFinishTrading()) {
                   <button type="button" (click)="ui.finishTrading()">
@@ -278,7 +321,9 @@
                   </button>
                 }
                 @if (ui.lobbyGameUi.canEndTurn()) {
-                  <button type="button" (click)="ui.endTurn()">{{ 'shell.buttonEndTurn' | translate }}</button>
+                  <button type="button" (click)="ui.endTurn()">
+                    {{ 'shell.buttonEndTurn' | translate }}
+                  </button>
                 }
               </div>
 
@@ -289,9 +334,13 @@
                 <p class="hud__hint">{{ 'shell.hintRobber' | translate }}</p>
               }
               @if (
-                ui.lobbyGameUi.canBuildSettlement() || ui.lobbyGameUi.canBuildRoad() || ui.lobbyGameUi.canBuildCity()
+                ui.lobbyGameUi.canBuildSettlement() ||
+                ui.lobbyGameUi.canBuildRoad() ||
+                ui.lobbyGameUi.canBuildCity()
               ) {
-                <p class="hud__hint hud__hint--soft">{{ 'shell.hintBuildFromArsenal' | translate }}</p>
+                <p class="hud__hint hud__hint--soft">
+                  {{ 'shell.hintBuildFromArsenal' | translate }}
+                </p>
               }
             </div>
           </div>
@@ -328,8 +377,14 @@
       (confirm)="ui.buildFlow.confirmBuild()"
       (dismiss)="ui.buildFlow.cancelBuild()"
     />
-    <app-robber-victim-popover [model]="ui.robberFlow.robberVictim()" (pick)="ui.robberFlow.onRobberVictimPick($event)" />
-    <app-discard-modal [model]="ui.lobbyGameUi.discardModel()" (confirmed)="ui.onSubmitDiscard($event)" />
+    <app-robber-victim-popover
+      [model]="ui.robberFlow.robberVictim()"
+      (pick)="ui.robberFlow.onRobberVictimPick($event)"
+    />
+    <app-discard-modal
+      [model]="ui.lobbyGameUi.discardModel()"
+      (confirmed)="ui.onSubmitDiscard($event)"
+    />
     <app-trade-panel
       [open]="ui.tradingPanel.tradeOpen()"
       [selfSeat]="ui.lobbyGameUi.selfSeat()"

@@ -84,17 +84,15 @@ export class PlayerSessionService {
   private async postBootstrap(legacySessionId: string | undefined): Promise<void> {
     const url = this.buildSessionUrl(SessionHttpAction.Bootstrap);
     const body =
-      legacySessionId !== undefined
-        ? JSON.stringify({ legacySessionId })
-        : JSON.stringify({});
+      legacySessionId !== undefined ? JSON.stringify({ legacySessionId }) : JSON.stringify({});
     const req = new HttpRequest('POST', url, body, {
       headers: new HttpHeaders({ 'Content-Type': 'application/json' }),
     });
     try {
       const ev = await firstValueFrom(
-        this.backend.handle(req).pipe(
-          filter((e): e is HttpResponse<unknown> => e instanceof HttpResponse),
-        ),
+        this.backend
+          .handle(req)
+          .pipe(filter((e): e is HttpResponse<unknown> => e instanceof HttpResponse)),
       );
       const ok = this.applyBundleFromUnknown(ev.body);
       if (!ok) {

@@ -35,7 +35,9 @@ export interface DiscardModalModel {
       <div class="backdrop">
         <div class="modal">
           <h3>{{ 'discard.title' | translate }}</h3>
-          <p class="hint">{{ 'discard.hint' | translate: { required: m.required, selected: total() } }}</p>
+          <p class="hint">
+            {{ 'discard.hint' | translate: { required: m.required, selected: total() } }}
+          </p>
           <ul class="rows">
             @for (resource of order; track resource) {
               <li>
@@ -167,7 +169,7 @@ export interface DiscardModalModel {
   ],
 })
 export class DiscardModalComponent {
-    private readonly translate = inject(TranslateService);
+  private readonly translate = inject(TranslateService);
   private readonly instant: TranslateInstantFn = (key, params) =>
     this.translate.instant(marker(key), params);
 

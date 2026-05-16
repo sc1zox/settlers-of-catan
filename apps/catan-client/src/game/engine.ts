@@ -581,7 +581,7 @@ export class GameEngine {
       state.phase !== GamePhase.LobbyWaiting &&
       state.phase !== GamePhase.Finished
     ) {
-      this.orbitAid.applyMatchStartCameraFraming(this.camera, this.controls);
+      this.orbitAid.applyMatchStartCameraFraming(this.camera, this.controls, this.selfSeat);
       this.hasFramedBoardForActiveMatch = true;
     }
   }

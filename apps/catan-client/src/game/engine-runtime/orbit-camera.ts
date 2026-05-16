@@ -1,5 +1,6 @@
 import { PerspectiveCamera, Vector3 } from 'three';
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import type { PlayerSeat } from '@catan/api-interfaces';
 import {
   SPECTATOR_ORBIT_MAX_DISTANCE,
   SPECTATOR_ORBIT_MAX_POLAR,
@@ -8,6 +9,10 @@ import {
 } from './constants';
 
 export class OrbitCameraAid {
+  private static readonly MATCH_START_CAMERA_X = 0;
+  private static readonly MATCH_START_CAMERA_Y = 38;
+  private static readonly MATCH_START_CAMERA_Z = 46;
+
   private spectatorCameraActive = false;
   private orbitLimitsBackup: {
     minDistance: number;
@@ -17,6 +22,7 @@ export class OrbitCameraAid {
   } | null = null;
 
   private readonly orbitClampDelta = new Vector3();
+  private readonly matchStartCameraPosition = new Vector3();
 
   public isSpectatorActive(): boolean {
     return this.spectatorCameraActive;
@@ -66,9 +72,21 @@ export class OrbitCameraAid {
     this.spectatorCameraActive = false;
   }
 
-  public applyMatchStartCameraFraming(camera: PerspectiveCamera, controls: OrbitControls): void {
+  public applyMatchStartCameraFraming(
+    camera: PerspectiveCamera,
+    controls: OrbitControls,
+    selfSeat: PlayerSeat | null,
+  ): void {
     controls.target.set(0, 0, 0);
-    camera.position.set(0, 38, 46);
+    this.matchStartCameraPosition.set(
+      OrbitCameraAid.MATCH_START_CAMERA_X,
+      OrbitCameraAid.MATCH_START_CAMERA_Y,
+      OrbitCameraAid.MATCH_START_CAMERA_Z,
+    );
+    if (selfSeat !== null) {
+      this.matchStartCameraPosition.applyAxisAngle(Vector3.UP, selfSeat * (Math.PI / 2));
+    }
+    camera.position.copy(this.matchStartCameraPosition);
     controls.update();
   }
 

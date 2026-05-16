@@ -23,6 +23,7 @@ export class OrbitCameraAid {
 
   private readonly orbitClampDelta = new Vector3();
   private readonly matchStartCameraPosition = new Vector3();
+  private readonly worldUpAxis = new Vector3(0, 1, 0);
 
   public isSpectatorActive(): boolean {
     return this.spectatorCameraActive;
@@ -84,7 +85,7 @@ export class OrbitCameraAid {
       OrbitCameraAid.MATCH_START_CAMERA_Z,
     );
     if (selfSeat !== null) {
-      this.matchStartCameraPosition.applyAxisAngle(Vector3.UP, selfSeat * (Math.PI / 2));
+      this.matchStartCameraPosition.applyAxisAngle(this.worldUpAxis, selfSeat * (Math.PI / 2));
     }
     camera.position.copy(this.matchStartCameraPosition);
     controls.update();

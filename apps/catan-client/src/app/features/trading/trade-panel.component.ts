@@ -10,16 +10,25 @@ import {
 } from '@angular/core';
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { PlayerSeat, ResourceType, type TradeOfferDto } from '@catan/api-interfaces';
+import {
+  PlayerSeat,
+  ResourceType,
+  TradeRecipientStatus,
+  type TradeOfferDto,
+  type TradeRecipientResponse,
+} from '@catan/api-interfaces';
 import { TranslateInstantFn } from '../../../shared/i18n/translate-instant-fn';
 import type {
   BankTradeRequest,
+  CounterTradeRequest,
+  FinalizeTradeRequest,
   ProposeTradeRequest,
   TradePartner,
 } from '../../shared/types/trading-ui.types';
 import { RESOURCE_TYPE_ORDER, resourceTypeLabel } from '../../shared/resource-labels';
 
 type TradeView = 'bank' | 'player';
+type TradeMode = 'sender' | 'recipient' | 'composer' | 'counter';
 
 @Component({
   selector: 'app-trade-panel',
@@ -37,146 +46,558 @@ type TradeView = 'bank' | 'player';
         ></button>
         <div class="modal">
           <header>
-            <h3>{{ 'trade.title' | translate }}</h3>
-            <div class="tabs">
-              <button type="button" [class.active]="view() === 'bank'" (click)="view.set('bank')">
-                {{ 'trade.tabBank' | translate }}
-              </button>
-              <button
-                type="button"
-                [class.active]="view() === 'player'"
-                (click)="view.set('player')"
-              >
-                {{ 'trade.tabPlayers' | translate }}
-              </button>
-            </div>
-          </header>
-
-          @let incoming = pendingTrade();
-          @if (incoming && incoming.toSeat === selfSeat()) {
-            <div class="incoming">
-              <p>{{ 'trade.incomingTitle' | translate }}</p>
-              <div class="incoming-actions">
-                <button type="button" class="accept" (click)="accept.emit(incoming.id)">
-                  {{ 'trade.accept' | translate }}
+            <h3>{{ headerLabel() }}</h3>
+            @if (mode() === 'composer') {
+              <div class="tabs">
+                <button type="button" [class.active]="view() === 'bank'" (click)="view.set('bank')">
+                  {{ 'trade.tabBank' | translate }}
                 </button>
-                <button type="button" class="reject" (click)="reject.emit(incoming.id)">
-                  {{ 'trade.reject' | translate }}
-                </button>
-              </div>
-            </div>
-          }
-
-          @switch (view()) {
-            @case ('bank') {
-              <div class="bank">
-                <div class="field">
-                  <span>{{ 'trade.give' | translate }}</span>
-                  <div class="picker">
-                    @for (resource of order; track resource) {
-                      <button
-                        type="button"
-                        [class.active]="bankGive() === resource"
-                        (click)="bankGive.set(resource)"
-                      >
-                        {{ label(resource) }}
-                      </button>
-                    }
-                  </div>
-                </div>
-                <div class="field">
-                  <span>{{ 'trade.amount' | translate }}</span>
-                  <div class="stepper">
-                    <button type="button" (click)="bankAmount.set(max(2, bankAmount() - 1))">
-                      −
-                    </button>
-                    <span class="count">{{ bankAmount() }}</span>
-                    <button type="button" (click)="bankAmount.set(bankAmount() + 1)">+</button>
-                  </div>
-                </div>
-                <div class="field">
-                  <span>{{ 'trade.take' | translate }}</span>
-                  <div class="picker">
-                    @for (resource of order; track resource) {
-                      <button
-                        type="button"
-                        [class.active]="bankReceive() === resource"
-                        (click)="bankReceive.set(resource)"
-                      >
-                        {{ label(resource) }}
-                      </button>
-                    }
-                  </div>
-                </div>
                 <button
                   type="button"
-                  class="confirm"
-                  [disabled]="bankGive() === bankReceive()"
-                  (click)="
-                    bankTrade.emit({
-                      give: bankGive(),
-                      amount: bankAmount(),
-                      receive: bankReceive(),
-                    })
-                  "
+                  [class.active]="view() === 'player'"
+                  (click)="view.set('player')"
                 >
-                  {{ 'trade.bankExecute' | translate }}
+                  {{ 'trade.tabPlayers' | translate }}
                 </button>
               </div>
             }
-            @case ('player') {
-              <div class="player">
-                <div class="field">
-                  <span>{{ 'trade.to' | translate }}</span>
-                  <div class="picker">
-                    @for (partner of partners(); track partner.seat) {
+          </header>
+
+          @switch (mode()) {
+            @case ('sender') {
+              @let trade = pendingTrade()!;
+              <p class="sub-label">{{ 'trade.youOfferLabel' | translate }}</p>
+              <div class="trade-summary trade-summary--banner">
+                <div class="trade-summary__col">
+                  <p class="trade-summary__caption">{{ 'trade.youOffer' | translate }}</p>
+                  @if (isMapEmpty(trade.offer)) {
+                    <p class="trade-summary__row trade-summary__row--empty">
+                      {{ 'trade.nothing' | translate }}
+                    </p>
+                  }
+                  @for (resource of order; track resource) {
+                    @let c = readMap(trade.offer, resource);
+                    @if (c > 0) {
+                      <p class="trade-summary__row">
+                        <span>{{ label(resource) }}</span>
+                        <strong>{{ c }}</strong>
+                      </p>
+                    }
+                  }
+                </div>
+                <div class="trade-summary__col">
+                  <p class="trade-summary__caption">{{ 'trade.youAsk' | translate }}</p>
+                  @if (isMapEmpty(trade.request)) {
+                    <p class="trade-summary__row trade-summary__row--empty">
+                      {{ 'trade.nothing' | translate }}
+                    </p>
+                  }
+                  @for (resource of order; track resource) {
+                    @let c = readMap(trade.request, resource);
+                    @if (c > 0) {
+                      <p class="trade-summary__row">
+                        <span>{{ label(resource) }}</span>
+                        <strong>{{ c }}</strong>
+                      </p>
+                    }
+                  }
+                </div>
+              </div>
+
+              <p class="sub-label">{{ 'trade.responsesLabel' | translate }}</p>
+              <ul class="responses">
+                @for (resp of trade.recipients; track resp.seat) {
+                  <li
+                    class="response"
+                    [class.response--pending]="resp.status === recipientStatusEnum.Pending"
+                    [class.response--accepted]="resp.status === recipientStatusEnum.Accepted"
+                    [class.response--countered]="resp.status === recipientStatusEnum.Countered"
+                    [class.response--rejected]="resp.status === recipientStatusEnum.Rejected"
+                  >
+                    <div class="response__head">
+                      <span class="response__name">{{ partnerName(resp.seat) }}</span>
+                      <span class="response__status">{{ statusLabel(resp.status) }}</span>
+                    </div>
+                    @if (
+                      resp.status === recipientStatusEnum.Countered &&
+                      resp.counter !== undefined
+                    ) {
+                      <div class="trade-summary">
+                        <div class="trade-summary__col">
+                          <p class="trade-summary__caption">
+                            {{ 'trade.youWouldGive' | translate }}
+                          </p>
+                          @for (resource of order; track resource) {
+                            @let c = readMap(resp.counter.offer, resource);
+                            @if (c > 0) {
+                              <p class="trade-summary__row">
+                                <span>{{ label(resource) }}</span>
+                                <strong>{{ c }}</strong>
+                              </p>
+                            }
+                          }
+                        </div>
+                        <div class="trade-summary__col">
+                          <p class="trade-summary__caption">
+                            {{ 'trade.youWouldGet' | translate }}
+                          </p>
+                          @for (resource of order; track resource) {
+                            @let c = readMap(resp.counter.request, resource);
+                            @if (c > 0) {
+                              <p class="trade-summary__row">
+                                <span>{{ label(resource) }}</span>
+                                <strong>{{ c }}</strong>
+                              </p>
+                            }
+                          }
+                        </div>
+                      </div>
+                    }
+                    @if (
+                      resp.status === recipientStatusEnum.Accepted ||
+                      resp.status === recipientStatusEnum.Countered
+                    ) {
                       <button
                         type="button"
-                        [class.active]="targetSeat() === partner.seat"
-                        (click)="targetSeat.set(partner.seat)"
+                        class="accept response__finalize"
+                        [disabled]="!canFinalizeWith(resp)"
+                        (click)="
+                          finalize.emit({ tradeId: trade.id, recipientSeat: resp.seat })
+                        "
                       >
-                        {{ partner.name }}
+                        {{ 'trade.finalizeWith' | translate: { name: partnerName(resp.seat) } }}
                       </button>
                     }
-                  </div>
+                  </li>
+                }
+              </ul>
+
+              <div class="composer-actions">
+                <button
+                  type="button"
+                  class="reject"
+                  (click)="reject.emit(trade.id)"
+                >
+                  {{ 'trade.withdrawOffer' | translate }}
+                </button>
+              </div>
+            }
+
+            @case ('recipient') {
+              @let trade = pendingTrade()!;
+              @let mySlot = recipientSlot(trade)!;
+              <p class="sub-label">
+                {{
+                  'trade.incomingFrom'
+                    | translate: { name: partnerName(trade.fromSeat) }
+                }}
+              </p>
+              <div class="trade-summary trade-summary--banner">
+                <div class="trade-summary__col">
+                  <p class="trade-summary__caption">{{ 'trade.theyOffer' | translate }}</p>
+                  @if (isMapEmpty(trade.offer)) {
+                    <p class="trade-summary__row trade-summary__row--empty">
+                      {{ 'trade.nothing' | translate }}
+                    </p>
+                  }
+                  @for (resource of order; track resource) {
+                    @let c = readMap(trade.offer, resource);
+                    @if (c > 0) {
+                      <p class="trade-summary__row">
+                        <span>{{ label(resource) }}</span>
+                        <strong>{{ c }}</strong>
+                      </p>
+                    }
+                  }
                 </div>
-                <div class="trade-grid">
-                  <div class="col">
-                    <p>{{ 'trade.youGive' | translate }}</p>
+                <div class="trade-summary__col">
+                  <p class="trade-summary__caption">{{ 'trade.theyAsk' | translate }}</p>
+                  @if (isMapEmpty(trade.request)) {
+                    <p class="trade-summary__row trade-summary__row--empty">
+                      {{ 'trade.nothing' | translate }}
+                    </p>
+                  }
+                  @for (resource of order; track resource) {
+                    @let c = readMap(trade.request, resource);
+                    @let owned = ownedFor(resource);
+                    @if (c > 0) {
+                      <p
+                        class="trade-summary__row"
+                        [class.trade-summary__row--lacking]="owned < c"
+                      >
+                        <span>{{ label(resource) }}</span>
+                        <strong>{{ c }} / {{ owned }}</strong>
+                      </p>
+                    }
+                  }
+                </div>
+              </div>
+
+              <p class="sub-label">{{ 'trade.yourResponse' | translate }}</p>
+              <p class="own-status own-status--{{ mySlot.status }}">
+                {{ statusLabel(mySlot.status) }}
+              </p>
+              @if (mySlot.status === recipientStatusEnum.Countered && mySlot.counter !== undefined) {
+                <div class="trade-summary">
+                  <div class="trade-summary__col">
+                    <p class="trade-summary__caption">{{ 'trade.youWouldGive' | translate }}</p>
                     @for (resource of order; track resource) {
-                      <div class="grid-row">
-                        <span class="label">{{ label(resource) }}</span>
-                        <div class="stepper">
-                          <button type="button" (click)="adjust('offer', resource, -1)">−</button>
-                          <span class="count">{{ offer()[resource] }}</span>
-                          <button type="button" (click)="adjust('offer', resource, 1)">+</button>
-                        </div>
-                      </div>
+                      @let c = readMap(mySlot.counter.request, resource);
+                      @if (c > 0) {
+                        <p class="trade-summary__row">
+                          <span>{{ label(resource) }}</span>
+                          <strong>{{ c }}</strong>
+                        </p>
+                      }
                     }
                   </div>
-                  <div class="col">
-                    <p>{{ 'trade.youWant' | translate }}</p>
+                  <div class="trade-summary__col">
+                    <p class="trade-summary__caption">{{ 'trade.youWouldGet' | translate }}</p>
                     @for (resource of order; track resource) {
-                      <div class="grid-row">
-                        <span class="label">{{ label(resource) }}</span>
-                        <div class="stepper">
-                          <button type="button" (click)="adjust('request', resource, -1)">−</button>
-                          <span class="count">{{ request()[resource] }}</span>
-                          <button type="button" (click)="adjust('request', resource, 1)">+</button>
-                        </div>
-                      </div>
+                      @let c = readMap(mySlot.counter.offer, resource);
+                      @if (c > 0) {
+                        <p class="trade-summary__row">
+                          <span>{{ label(resource) }}</span>
+                          <strong>{{ c }}</strong>
+                        </p>
+                      }
                     }
                   </div>
                 </div>
+              }
+              @if (mySlot.status === recipientStatusEnum.Pending && !canAcceptIncoming()) {
+                <p class="hint hint--warn">{{ 'trade.cannotAfford' | translate }}</p>
+              }
+              <div class="incoming-actions">
+                <button
+                  type="button"
+                  class="accept"
+                  [disabled]="
+                    mySlot.status === recipientStatusEnum.Accepted ||
+                    !canAcceptIncoming()
+                  "
+                  (click)="accept.emit(trade.id)"
+                >
+                  {{ 'trade.accept' | translate }}
+                </button>
+                <button
+                  type="button"
+                  class="reject"
+                  [disabled]="mySlot.status === recipientStatusEnum.Rejected"
+                  (click)="reject.emit(trade.id)"
+                >
+                  {{ 'trade.reject' | translate }}
+                </button>
+                <button
+                  type="button"
+                  class="revise"
+                  (click)="enterCounterMode()"
+                >
+                  {{ 'trade.revise' | translate }}
+                </button>
+              </div>
+
+              @if (otherRecipients(trade).length > 0) {
+                <p class="sub-label">{{ 'trade.otherResponses' | translate }}</p>
+                <ul class="responses responses--compact">
+                  @for (resp of otherRecipients(trade); track resp.seat) {
+                    <li
+                      class="response response--compact"
+                      [class.response--pending]="resp.status === recipientStatusEnum.Pending"
+                      [class.response--accepted]="resp.status === recipientStatusEnum.Accepted"
+                      [class.response--countered]="resp.status === recipientStatusEnum.Countered"
+                      [class.response--rejected]="resp.status === recipientStatusEnum.Rejected"
+                    >
+                      <div class="response__head">
+                        <span class="response__name">{{ partnerName(resp.seat) }}</span>
+                        <span class="response__status">{{ statusLabel(resp.status) }}</span>
+                      </div>
+                      @if (
+                        resp.status === recipientStatusEnum.Countered &&
+                        resp.counter !== undefined
+                      ) {
+                        <div class="trade-summary trade-summary--mini">
+                          <div class="trade-summary__col">
+                            <p class="trade-summary__caption">
+                              {{ 'trade.senderWouldGive' | translate }}
+                            </p>
+                            @for (resource of order; track resource) {
+                              @let c = readMap(resp.counter.offer, resource);
+                              @if (c > 0) {
+                                <p class="trade-summary__row">
+                                  <span>{{ label(resource) }}</span>
+                                  <strong>{{ c }}</strong>
+                                </p>
+                              }
+                            }
+                          </div>
+                          <div class="trade-summary__col">
+                            <p class="trade-summary__caption">
+                              {{ 'trade.senderWouldGet' | translate }}
+                            </p>
+                            @for (resource of order; track resource) {
+                              @let c = readMap(resp.counter.request, resource);
+                              @if (c > 0) {
+                                <p class="trade-summary__row">
+                                  <span>{{ label(resource) }}</span>
+                                  <strong>{{ c }}</strong>
+                                </p>
+                              }
+                            }
+                          </div>
+                        </div>
+                      }
+                    </li>
+                  }
+                </ul>
+              }
+            }
+
+            @case ('counter') {
+              @let trade = pendingTrade()!;
+              <p class="hint hint--info">
+                {{ 'trade.counterHint' | translate: { name: partnerName(trade.fromSeat) } }}
+              </p>
+              <div class="trade-grid">
+                <div class="col">
+                  <p>{{ 'trade.youGive' | translate }}</p>
+                  @for (resource of order; track resource) {
+                    @let offerCount = offer()[resource];
+                    @let owned = ownedFor(resource);
+                    <div class="grid-row">
+                      <span class="label">{{ label(resource) }}</span>
+                      <span class="owned" aria-hidden="true">/ {{ owned }}</span>
+                      <div class="stepper">
+                        <button
+                          type="button"
+                          [disabled]="offerCount <= 0"
+                          (click)="adjust('offer', resource, -1)"
+                        >
+                          −
+                        </button>
+                        <span class="count">{{ offerCount }}</span>
+                        <button
+                          type="button"
+                          [disabled]="offerCount >= owned"
+                          (click)="adjust('offer', resource, 1)"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  }
+                </div>
+                <div class="col">
+                  <p>{{ 'trade.youWant' | translate }}</p>
+                  @for (resource of order; track resource) {
+                    @let requestCount = request()[resource];
+                    <div class="grid-row">
+                      <span class="label">{{ label(resource) }}</span>
+                      <div class="stepper">
+                        <button
+                          type="button"
+                          [disabled]="requestCount <= 0"
+                          (click)="adjust('request', resource, -1)"
+                        >
+                          −
+                        </button>
+                        <span class="count">{{ requestCount }}</span>
+                        <button
+                          type="button"
+                          (click)="adjust('request', resource, 1)"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  }
+                </div>
+              </div>
+              @if (!canSubmitCounter()) {
+                <p class="hint hint--soft">{{ 'trade.proposeHint' | translate }}</p>
+              }
+              <div class="composer-actions">
+                <button type="button" class="back" (click)="exitCounterMode()">
+                  {{ 'trade.cancelRevise' | translate }}
+                </button>
                 <button
                   type="button"
                   class="confirm"
-                  [disabled]="targetSeat() === null"
-                  (click)="emitPropose()"
+                  [disabled]="!canSubmitCounter()"
+                  (click)="emitCounter()"
                 >
-                  {{ 'trade.sendOffer' | translate }}
+                  {{ 'trade.sendCounter' | translate }}
                 </button>
               </div>
+            }
+
+            @case ('composer') {
+              @switch (view()) {
+                @case ('bank') {
+                  <div class="bank">
+                    <div class="field">
+                      <span>{{ 'trade.give' | translate }}</span>
+                      <div class="picker">
+                        @for (resource of order; track resource) {
+                          <button
+                            type="button"
+                            [class.active]="bankGive() === resource"
+                            [disabled]="ownedFor(resource) <= 0"
+                            (click)="bankGive.set(resource)"
+                          >
+                            {{ label(resource) }} ({{ ownedFor(resource) }})
+                          </button>
+                        }
+                      </div>
+                    </div>
+                    <div class="field">
+                      <span>{{ 'trade.amount' | translate }}</span>
+                      <div class="stepper">
+                        <button type="button" (click)="bankAmount.set(max(2, bankAmount() - 1))">
+                          −
+                        </button>
+                        <span class="count">{{ bankAmount() }}</span>
+                        <button
+                          type="button"
+                          [disabled]="bankAmount() >= ownedFor(bankGive())"
+                          (click)="bankAmount.set(bankAmount() + 1)"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                    <div class="field">
+                      <span>{{ 'trade.take' | translate }}</span>
+                      <div class="picker">
+                        @for (resource of order; track resource) {
+                          <button
+                            type="button"
+                            [class.active]="bankReceive() === resource"
+                            (click)="bankReceive.set(resource)"
+                          >
+                            {{ label(resource) }}
+                          </button>
+                        }
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      class="confirm"
+                      [disabled]="!canSubmitBank()"
+                      (click)="
+                        bankTrade.emit({
+                          give: bankGive(),
+                          amount: bankAmount(),
+                          receive: bankReceive(),
+                        })
+                      "
+                    >
+                      {{ 'trade.bankExecute' | translate }}
+                    </button>
+                  </div>
+                }
+                @case ('player') {
+                  <div class="player">
+                    <div class="field">
+                      <span>{{ 'trade.recipients' | translate }}</span>
+                      <label class="toggle">
+                        <input
+                          type="checkbox"
+                          [checked]="broadcastMode()"
+                          (change)="onBroadcastToggle($event)"
+                        />
+                        <span>{{ 'trade.broadcastToggle' | translate }}</span>
+                      </label>
+                      @if (!broadcastMode()) {
+                        <div class="picker">
+                          @for (partner of partners(); track partner.seat) {
+                            <button
+                              type="button"
+                              [class.active]="targetSeat() === partner.seat"
+                              (click)="targetSeat.set(partner.seat)"
+                            >
+                              {{ partner.name }}
+                            </button>
+                          }
+                        </div>
+                      } @else {
+                        <p class="hint hint--soft">
+                          {{
+                            'trade.broadcastHint'
+                              | translate: { count: partners().length }
+                          }}
+                        </p>
+                      }
+                    </div>
+                    <div class="trade-grid">
+                      <div class="col">
+                        <p>{{ 'trade.youGive' | translate }}</p>
+                        @for (resource of order; track resource) {
+                          @let offerCount = offer()[resource];
+                          @let owned = ownedFor(resource);
+                          <div class="grid-row">
+                            <span class="label">{{ label(resource) }}</span>
+                            <span class="owned" aria-hidden="true">/ {{ owned }}</span>
+                            <div class="stepper">
+                              <button
+                                type="button"
+                                [disabled]="offerCount <= 0"
+                                (click)="adjust('offer', resource, -1)"
+                              >
+                                −
+                              </button>
+                              <span class="count">{{ offerCount }}</span>
+                              <button
+                                type="button"
+                                [disabled]="offerCount >= owned"
+                                (click)="adjust('offer', resource, 1)"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        }
+                      </div>
+                      <div class="col">
+                        <p>{{ 'trade.youWant' | translate }}</p>
+                        @for (resource of order; track resource) {
+                          @let requestCount = request()[resource];
+                          <div class="grid-row">
+                            <span class="label">{{ label(resource) }}</span>
+                            <div class="stepper">
+                              <button
+                                type="button"
+                                [disabled]="requestCount <= 0"
+                                (click)="adjust('request', resource, -1)"
+                              >
+                                −
+                              </button>
+                              <span class="count">{{ requestCount }}</span>
+                              <button
+                                type="button"
+                                (click)="adjust('request', resource, 1)"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        }
+                      </div>
+                    </div>
+                    @if (!canSubmitPropose()) {
+                      <p class="hint hint--soft">{{ 'trade.proposeHint' | translate }}</p>
+                    }
+                    <button
+                      type="button"
+                      class="confirm"
+                      [disabled]="!canSubmitPropose()"
+                      (click)="emitPropose()"
+                    >
+                      {{ 'trade.sendOffer' | translate }}
+                    </button>
+                  </div>
+                }
+              }
             }
           }
 
@@ -214,7 +635,7 @@ type TradeView = 'bank' | 'player';
       }
       .modal {
         position: relative;
-        width: min(94vw, 32rem);
+        width: min(94vw, 34rem);
         max-height: 88vh;
         overflow-y: auto;
         background: rgba(20, 16, 12, 0.97);
@@ -239,24 +660,125 @@ type TradeView = 'bank' | 'player';
         display: flex;
         gap: 0.35rem;
       }
-      .incoming {
-        background: rgba(120, 200, 140, 0.12);
-        border: 1px solid rgba(120, 200, 140, 0.4);
-        border-radius: 10px;
-        padding: 0.55rem 0.7rem;
-        margin-bottom: 0.9rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.6rem;
-      }
-      .incoming p {
-        margin: 0;
-        font-size: 0.82rem;
+      .sub-label {
+        margin: 0.5rem 0 0.3rem;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: rgba(247, 241, 225, 0.55);
       }
       .incoming-actions {
-        display: flex;
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
         gap: 0.4rem;
+        margin-top: 0.4rem;
+      }
+      .trade-summary {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.7rem;
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 10px;
+        padding: 0.55rem 0.7rem;
+      }
+      .trade-summary--banner {
+        background: rgba(120, 160, 220, 0.12);
+        border: 1px solid rgba(120, 160, 220, 0.3);
+      }
+      .trade-summary--mini {
+        padding: 0.3rem 0.5rem;
+        margin-top: 0.35rem;
+        font-size: 0.78rem;
+      }
+      .trade-summary__caption {
+        margin: 0 0 0.3rem;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: rgba(247, 241, 225, 0.55);
+      }
+      .trade-summary__row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: 0;
+        padding: 0.12rem 0;
+        font-size: 0.82rem;
+      }
+      .trade-summary__row--empty {
+        color: rgba(247, 241, 225, 0.4);
+        font-style: italic;
+      }
+      .trade-summary__row--lacking {
+        color: #f7a98a;
+      }
+      .responses {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+      }
+      .response {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        padding: 0.55rem 0.7rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+      }
+      .response--compact {
+        padding: 0.4rem 0.6rem;
+      }
+      .response--pending {
+        border-color: rgba(255, 255, 255, 0.12);
+      }
+      .response--accepted {
+        border-color: rgba(92, 194, 122, 0.55);
+        background: rgba(92, 194, 122, 0.08);
+      }
+      .response--countered {
+        border-color: rgba(213, 154, 58, 0.55);
+        background: rgba(213, 154, 58, 0.08);
+      }
+      .response--rejected {
+        border-color: rgba(220, 90, 80, 0.45);
+        background: rgba(220, 90, 80, 0.06);
+        opacity: 0.75;
+      }
+      .response__head {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.85rem;
+      }
+      .response__name {
+        font-weight: 600;
+      }
+      .response__status {
+        font-size: 0.74rem;
+        color: rgba(247, 241, 225, 0.65);
+      }
+      .response__finalize {
+        margin-top: 0.2rem;
+      }
+      .own-status {
+        margin: 0 0 0.35rem;
+        font-size: 0.86rem;
+        font-weight: 600;
+      }
+      .own-status--pending {
+        color: rgba(247, 241, 225, 0.7);
+      }
+      .own-status--accepted {
+        color: #b5e9c4;
+      }
+      .own-status--countered {
+        color: #f3d196;
+      }
+      .own-status--rejected {
+        color: #f3a5a0;
       }
       .field {
         margin-bottom: 0.7rem;
@@ -269,6 +791,20 @@ type TradeView = 'bank' | 'player';
         color: rgba(247, 241, 225, 0.55);
         margin-bottom: 0.3rem;
       }
+      .toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        margin-bottom: 0.45rem;
+        font-size: 0.78rem;
+        cursor: pointer;
+        user-select: none;
+      }
+      .toggle input {
+        accent-color: #d59a3a;
+        width: 0.95rem;
+        height: 0.95rem;
+      }
       .picker {
         display: flex;
         flex-wrap: wrap;
@@ -278,7 +814,7 @@ type TradeView = 'bank' | 'player';
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 0.8rem;
-        margin: 0.4rem 0 0.8rem;
+        margin: 0.4rem 0 0.6rem;
       }
       .col p {
         margin: 0 0 0.4rem;
@@ -286,14 +822,21 @@ type TradeView = 'bank' | 'player';
         font-weight: 600;
       }
       .grid-row {
-        display: flex;
+        display: grid;
+        grid-template-columns: auto auto 1fr;
         align-items: center;
-        justify-content: space-between;
-        gap: 0.4rem;
+        gap: 0.35rem;
         margin-bottom: 0.32rem;
       }
       .grid-row .label {
         font-size: 0.78rem;
+      }
+      .grid-row .owned {
+        font-size: 0.7rem;
+        color: rgba(247, 241, 225, 0.45);
+      }
+      .grid-row .stepper {
+        justify-self: end;
       }
       .stepper {
         display: flex;
@@ -322,6 +865,11 @@ type TradeView = 'bank' | 'player';
         font-size: 0.8rem;
         font-weight: 600;
         padding: 0.32rem 0.7rem;
+        transition: opacity 0.12s ease, background 0.12s ease;
+      }
+      button:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
       }
       button.active,
       .tabs button.active {
@@ -339,22 +887,50 @@ type TradeView = 'bank' | 'player';
         border-color: transparent;
         color: #fff;
       }
+      .revise {
+        background: linear-gradient(180deg, #d59a3a, #a16f1d);
+        border-color: transparent;
+        color: #1f1408;
+      }
+      .composer-actions {
+        display: flex;
+        gap: 0.45rem;
+        margin-top: 0.4rem;
+      }
+      .back {
+        flex: 0 0 auto;
+        background: transparent;
+        border-color: rgba(255, 255, 255, 0.18);
+      }
       .confirm {
-        width: 100%;
+        flex: 1 1 auto;
         background: linear-gradient(180deg, #4f8be0, #3563b4);
         border-color: transparent;
         color: #fff;
         padding: 0.55rem;
         margin-bottom: 0.5rem;
       }
-      .confirm:disabled {
-        opacity: 0.4;
-        cursor: not-allowed;
+      .composer-actions .confirm {
+        margin-bottom: 0;
+      }
+      .hint {
+        margin: 0 0 0.45rem;
+        font-size: 0.76rem;
+      }
+      .hint--soft {
+        color: rgba(247, 241, 225, 0.5);
+      }
+      .hint--warn {
+        color: #f7a98a;
+      }
+      .hint--info {
+        color: #f3d196;
       }
       .dismiss {
         width: 100%;
         background: transparent;
         border-color: rgba(255, 255, 255, 0.18);
+        margin-top: 0.4rem;
       }
     `,
   ],
@@ -366,20 +942,44 @@ export class TradePanelComponent {
 
   readonly open = input<boolean>(false);
   readonly selfSeat = input<PlayerSeat | null>(null);
+  readonly selfResources = input<Readonly<Record<ResourceType, number>>>(this.zeroCounts());
   readonly partnerList = input<readonly TradePartner[]>([]);
   readonly pendingTrade = input<TradeOfferDto | null>(null);
 
   readonly bankTrade = output<BankTradeRequest>();
   readonly propose = output<ProposeTradeRequest>();
+  readonly counter = output<CounterTradeRequest>();
   readonly accept = output<string>();
   readonly reject = output<string>();
+  readonly finalize = output<FinalizeTradeRequest>();
   readonly closed = output<void>();
 
   protected readonly order = RESOURCE_TYPE_ORDER;
+  protected readonly recipientStatusEnum = TradeRecipientStatus;
   protected readonly partners = computed<readonly TradePartner[]>(() => this.partnerList());
 
-  protected readonly view = linkedSignal<boolean, TradeView>({
-    source: () => this.open(),
+  /** Composer↔counter toggle (only set true while a trade is open and self is a recipient). */
+  private readonly counterRequested = linkedSignal<string, boolean>({
+    source: () => `${this.open() ? '1' : '0'}|${this.pendingTrade()?.id ?? ''}`,
+    computation: () => false,
+  });
+
+  protected readonly mode = computed<TradeMode>(() => {
+    const trade = this.pendingTrade();
+    const seat = this.selfSeat();
+    if (trade !== null && seat !== null) {
+      if (trade.fromSeat === seat) {
+        return 'sender';
+      }
+      if (this.isRecipient(trade, seat)) {
+        return this.counterRequested() ? 'counter' : 'recipient';
+      }
+    }
+    return 'composer';
+  });
+
+  protected readonly view = linkedSignal<TradeMode, TradeView>({
+    source: () => this.mode(),
     computation: () => 'bank',
   });
 
@@ -387,40 +987,275 @@ export class TradePanelComponent {
   protected readonly bankReceive = signal<ResourceType>(ResourceType.Brick);
   protected readonly bankAmount = signal<number>(4);
 
-  protected readonly targetSeat = linkedSignal<boolean, PlayerSeat | null>({
-    source: () => this.open(),
-    computation: () => this.partnerList()[0]?.seat ?? null,
+  protected readonly broadcastMode = signal<boolean>(true);
+
+  protected readonly targetSeat = linkedSignal<readonly TradePartner[], PlayerSeat | null>({
+    source: () => this.partnerList(),
+    computation: (partners) => partners[0]?.seat ?? null,
   });
-  protected readonly offer = linkedSignal<boolean, Record<ResourceType, number>>({
-    source: () => this.open(),
-    computation: () => this.zeroCounts(),
+
+  protected readonly offer = linkedSignal<string, Record<ResourceType, number>>({
+    source: () => `${this.mode()}|${this.pendingTrade()?.id ?? ''}`,
+    computation: () => {
+      if (this.mode() === 'counter') {
+        const trade = this.pendingTrade();
+        if (trade !== null) {
+          // Recipient perspective: prefill "Du gibst" with what the sender
+          // originally requested from me — clamped to what I own.
+          return this.fromMap(trade.request);
+        }
+      }
+      return this.zeroCounts();
+    },
   });
-  protected readonly request = linkedSignal<boolean, Record<ResourceType, number>>({
-    source: () => this.open(),
-    computation: () => this.zeroCounts(),
+
+  protected readonly request = linkedSignal<string, Record<ResourceType, number>>({
+    source: () => `${this.mode()}|${this.pendingTrade()?.id ?? ''}`,
+    computation: () => {
+      if (this.mode() === 'counter') {
+        const trade = this.pendingTrade();
+        if (trade !== null) {
+          // Recipient perspective: prefill "Du erhältst" with what the sender
+          // originally offered.
+          return this.fromMap(trade.offer);
+        }
+      }
+      return this.zeroCounts();
+    },
   });
+
+  protected readonly canAcceptIncoming = computed<boolean>(() => {
+    const trade = this.pendingTrade();
+    if (trade === null) {
+      return false;
+    }
+    return this.canPay(trade.request);
+  });
+
+  protected readonly canSubmitPropose = computed<boolean>(() => {
+    if (this.broadcastMode()) {
+      if (this.partnerList().length === 0) {
+        return false;
+      }
+    } else if (this.targetSeat() === null) {
+      return false;
+    }
+    return this.hasAnyMovementInComposer();
+  });
+
+  protected readonly canSubmitCounter = computed<boolean>(() => {
+    return this.hasAnyMovementInComposer();
+  });
+
+  protected readonly canSubmitBank = computed<boolean>(() => {
+    if (this.bankGive() === this.bankReceive()) {
+      return false;
+    }
+    return this.ownedFor(this.bankGive()) >= this.bankAmount();
+  });
+
+  protected headerLabel(): string {
+    switch (this.mode()) {
+      case 'sender':
+        return this.instant(marker('trade.senderHeader'));
+      case 'recipient':
+        return this.instant(marker('trade.incomingHeader'));
+      case 'counter':
+        return this.instant(marker('trade.counterHeader'));
+      default:
+        return this.instant(marker('trade.title'));
+    }
+  }
+
+  protected statusLabel(status: TradeRecipientStatus): string {
+    switch (status) {
+      case TradeRecipientStatus.Pending:
+        return this.instant(marker('trade.statusPending'));
+      case TradeRecipientStatus.Accepted:
+        return this.instant(marker('trade.statusAccepted'));
+      case TradeRecipientStatus.Countered:
+        return this.instant(marker('trade.statusCountered'));
+      case TradeRecipientStatus.Rejected:
+        return this.instant(marker('trade.statusRejected'));
+    }
+  }
 
   protected label(resource: ResourceType): string {
     return resourceTypeLabel(this.instant, resource);
+  }
+
+  protected partnerName(seat: PlayerSeat | null): string {
+    if (seat === null) {
+      return '';
+    }
+    const partners = this.partnerList();
+    for (let i = 0; i < partners.length; i += 1) {
+      if (partners[i].seat === seat) {
+        return partners[i].name;
+      }
+    }
+    return '';
+  }
+
+  protected ownedFor(resource: ResourceType): number {
+    return this.selfResources()[resource] ?? 0;
+  }
+
+  protected readMap(
+    map: Readonly<Partial<Record<ResourceType, number>>>,
+    resource: ResourceType,
+  ): number {
+    return map[resource] ?? 0;
+  }
+
+  protected isMapEmpty(map: Readonly<Partial<Record<ResourceType, number>>>): boolean {
+    const keys = Object.keys(map) as ResourceType[];
+    for (let i = 0; i < keys.length; i += 1) {
+      if ((map[keys[i]] ?? 0) > 0) {
+        return false;
+      }
+    }
+    return true;
   }
 
   protected max(a: number, b: number): number {
     return Math.max(a, b);
   }
 
+  protected recipientSlot(trade: TradeOfferDto): TradeRecipientResponse | null {
+    const seat = this.selfSeat();
+    if (seat === null) {
+      return null;
+    }
+    for (let i = 0; i < trade.recipients.length; i += 1) {
+      if (trade.recipients[i].seat === seat) {
+        return trade.recipients[i];
+      }
+    }
+    return null;
+  }
+
+  protected otherRecipients(trade: TradeOfferDto): readonly TradeRecipientResponse[] {
+    const seat = this.selfSeat();
+    return trade.recipients.filter((r) => r.seat !== seat);
+  }
+
+  protected canFinalizeWith(slot: TradeRecipientResponse): boolean {
+    const trade = this.pendingTrade();
+    if (trade === null) {
+      return false;
+    }
+    if (slot.status === TradeRecipientStatus.Accepted) {
+      // sender must own offer.offer, recipient must own offer.request — sender
+      // can only check own side; recipient side server-validated.
+      return this.canPay(trade.offer);
+    }
+    if (slot.status === TradeRecipientStatus.Countered && slot.counter !== undefined) {
+      return this.canPay(slot.counter.offer);
+    }
+    return false;
+  }
+
+  protected onBroadcastToggle(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.broadcastMode.set(input.checked);
+  }
+
   protected adjust(side: 'offer' | 'request', resource: ResourceType, delta: number): void {
     const target = side === 'offer' ? this.offer : this.request;
     const counts = { ...target() };
-    counts[resource] = Math.max(0, counts[resource] + delta);
+    const next = Math.max(0, counts[resource] + delta);
+    if (side === 'offer' && next > this.ownedFor(resource)) {
+      return;
+    }
+    counts[resource] = next;
     target.set(counts);
   }
 
+  protected enterCounterMode(): void {
+    this.counterRequested.set(true);
+  }
+
+  protected exitCounterMode(): void {
+    this.counterRequested.set(false);
+  }
+
   protected emitPropose(): void {
-    const toSeat = this.targetSeat();
-    if (toSeat === null) {
+    const recipients = this.broadcastMode()
+      ? this.partnerList().map((p) => p.seat)
+      : (() => {
+          const seat = this.targetSeat();
+          return seat === null ? [] : [seat];
+        })();
+    if (recipients.length === 0) {
       return;
     }
-    this.propose.emit({ toSeat, offer: this.offer(), request: this.request() });
+    this.propose.emit({ recipients, offer: this.offer(), request: this.request() });
+  }
+
+  protected emitCounter(): void {
+    const trade = this.pendingTrade();
+    if (trade === null) {
+      return;
+    }
+    // Panel uses recipient perspective; server stores sender perspective.
+    // Recipient's "I give" (offer) = sender's "I receive" (request);
+    // Recipient's "I receive" (request) = sender's "I give" (offer).
+    this.counter.emit({
+      tradeId: trade.id,
+      offer: this.request(),
+      request: this.offer(),
+    });
+  }
+
+  private hasAnyMovementInComposer(): boolean {
+    const offer = this.offer();
+    const request = this.request();
+    const owned = this.selfResources();
+    let anyOffer = 0;
+    let anyRequest = 0;
+    for (let i = 0; i < this.order.length; i += 1) {
+      const r = this.order[i];
+      if (offer[r] > (owned[r] ?? 0)) {
+        return false;
+      }
+      anyOffer += offer[r];
+      anyRequest += request[r];
+    }
+    return anyOffer + anyRequest > 0;
+  }
+
+  private canPay(cost: Readonly<Partial<Record<ResourceType, number>>>): boolean {
+    const owned = this.selfResources();
+    const keys = Object.keys(cost) as ResourceType[];
+    for (let i = 0; i < keys.length; i += 1) {
+      const key = keys[i];
+      const need = cost[key] ?? 0;
+      if ((owned[key] ?? 0) < need) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private isRecipient(trade: TradeOfferDto, seat: PlayerSeat): boolean {
+    for (let i = 0; i < trade.recipients.length; i += 1) {
+      if (trade.recipients[i].seat === seat) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private fromMap(map: Readonly<Partial<Record<ResourceType, number>>>): Record<ResourceType, number> {
+    const owned = this.selfResources();
+    const out = this.zeroCounts();
+    for (let i = 0; i < this.order.length; i += 1) {
+      const r = this.order[i];
+      const want = map[r] ?? 0;
+      out[r] = Math.min(want, owned[r] ?? 0);
+    }
+    return out;
   }
 
   private zeroCounts(): Record<ResourceType, number> {

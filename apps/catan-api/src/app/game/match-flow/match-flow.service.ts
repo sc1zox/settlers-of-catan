@@ -4,6 +4,7 @@ import {
   DiceRolledPayload,
   GamePhase,
   GameSocketServerEvent,
+  TradeStatus,
   TradeUpdatedPayload,
   formatSocketIoLobbyRoomId,
 } from '@catan/api-interfaces';
@@ -85,7 +86,7 @@ export class MatchFlowService {
   }
 
   private emitExpiredTradeOffers(lobbyId: string, server: Server): void {
-    const expired = this.tradeService.expireOpenOffersForLobby(lobbyId);
+    const expired = this.tradeService.closeOpenOffersForLobby(lobbyId, TradeStatus.Rejected);
     if (expired.length === 0) {
       return;
     }

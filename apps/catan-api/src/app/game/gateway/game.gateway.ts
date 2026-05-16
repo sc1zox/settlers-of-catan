@@ -21,6 +21,8 @@ import {
   SocketGatewayNamespace,
   StartLobbyPayload,
   TradeAcceptPayload,
+  TradeCounterPayload,
+  TradeFinalizePayload,
   TradeProposePayload,
   TradeRejectPayload,
 } from '@catan/api-interfaces';
@@ -336,6 +338,30 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ): void {
     try {
       this.tradeHandlers.tradeReject(this.server, client, payload);
+    } catch (e) {
+      this.reject.emit(client, e);
+    }
+  }
+
+  @SubscribeMessage(GameSocketClientEvent.TradeCounter)
+  public handleTradeCounter(
+    @MessageBody() payload: TradeCounterPayload,
+    @ConnectedSocket() client: Socket,
+  ): void {
+    try {
+      this.tradeHandlers.tradeCounter(this.server, client, payload);
+    } catch (e) {
+      this.reject.emit(client, e);
+    }
+  }
+
+  @SubscribeMessage(GameSocketClientEvent.TradeFinalize)
+  public handleTradeFinalize(
+    @MessageBody() payload: TradeFinalizePayload,
+    @ConnectedSocket() client: Socket,
+  ): void {
+    try {
+      this.tradeHandlers.tradeFinalize(this.server, client, payload);
     } catch (e) {
       this.reject.emit(client, e);
     }

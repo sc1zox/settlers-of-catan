@@ -130,6 +130,8 @@ export enum GameSocketClientEvent {
   TradePropose = 'game:tradePropose',
   TradeAccept = 'game:tradeAccept',
   TradeReject = 'game:tradeReject',
+  TradeCounter = 'game:tradeCounter',
+  TradeFinalize = 'game:tradeFinalize',
 }
 
 export enum GameSocketServerEvent {

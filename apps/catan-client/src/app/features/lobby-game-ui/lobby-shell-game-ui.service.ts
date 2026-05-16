@@ -51,4 +51,6 @@ export class LobbyShellGameUiService {
   public readonly discardModel = this.discardUi.discardModel;
   public readonly tradePartners = this.tradeUi.tradePartners;
   public readonly pendingTrade = this.tradeUi.pendingTrade;
+  public readonly selfTradeResources = this.tradeUi.selfResources;
+  public readonly selfHasOpenTrade = this.tradeUi.selfHasOpenTrade;
 }

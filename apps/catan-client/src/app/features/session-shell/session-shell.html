@@ -344,7 +344,11 @@
                   </button>
                 }
                 @if (ui.lobbyGameUi.canOpenTrade()) {
-                  <button type="button" (click)="ui.tradingPanel.openTrade()">
+                  <button
+                    type="button"
+                    [class.active]="ui.tradingPanel.tradeOpen()"
+                    (click)="ui.tradingPanel.toggleTrade()"
+                  >
                     {{ 'shell.buttonTrade' | translate }}
                   </button>
                 }
@@ -412,12 +416,15 @@
     <app-trade-panel
       [open]="ui.tradingPanel.tradeOpen()"
       [selfSeat]="ui.lobbyGameUi.selfSeat()"
+      [selfResources]="ui.lobbyGameUi.selfTradeResources()"
       [partnerList]="ui.lobbyGameUi.tradePartners()"
       [pendingTrade]="ui.lobbyGameUi.pendingTrade()"
       (bankTrade)="ui.tradingPanel.onBankTrade($event)"
       (propose)="ui.tradingPanel.onProposeTrade($event)"
+      (counter)="ui.tradingPanel.onCounterTrade($event)"
       (accept)="ui.tradingPanel.onAcceptTrade($event)"
       (reject)="ui.tradingPanel.onRejectTrade($event)"
+      (finalize)="ui.tradingPanel.onFinalizeTrade($event)"
       (closed)="ui.tradingPanel.closeTrade()"
     />
     <app-dev-card-modal

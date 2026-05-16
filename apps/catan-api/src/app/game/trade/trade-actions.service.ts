@@ -2,9 +2,13 @@ import { Injectable } from '@nestjs/common';
 import {
   ActionRejectCode,
   GamePhase,
+  PlayerSeat,
   ResourceType,
+  TradeRecipientStatus,
   TradeStatus,
   type TradeAcceptPayload,
+  type TradeCounterPayload,
+  type TradeFinalizePayload,
   type TradeProposePayload,
   type TradeRejectPayload,
   type TradeUpdatedPayload,
@@ -17,6 +21,12 @@ export interface TradeActionContext {
   broadcastLobby(lobby: LobbyRuntime): void;
 }
 
+export interface TradeActionResult {
+  readonly cancelled: readonly TradeUpdatedPayload[];
+  readonly updates: readonly TradeUpdatedPayload[];
+  readonly lobbyId: string;
+}
+
 @Injectable()
 export class TradeActionsService {
   public constructor(private readonly tradeService: TradeService) {}
@@ -25,67 +35,93 @@ export class TradeActionsService {
     context: TradeActionContext,
     sessionToken: string,
     payload: TradeProposePayload,
-  ): TradeUpdatedPayload {
-    const lobby = context.getLobby(payload.lobbyId);
-    if (!lobby) {
-      throw new Error(ActionRejectCode.UnknownLobby);
-    }
-    this.assertLobbyOpen(lobby);
-    const from = lobby.findPlayerByToken(sessionToken);
-    if (!from) {
-      throw new Error(ActionRejectCode.PlayerNotInLobby);
-    }
-    if (lobby.fsm.getPhase() !== GamePhase.Trading) {
-      throw new Error(ActionRejectCode.WrongPhase);
-    }
+  ): TradeActionResult {
+    const lobby = this.requireOpenLobby(context, payload.lobbyId);
+    const from = this.requirePlayer(lobby, sessionToken);
+    this.requireTradingPhase(lobby);
     if (from.seat !== lobby.currentSeat) {
       throw new Error(ActionRejectCode.NotYourTurn);
     }
-    const trade = this.tradeService.createOpenOffer(lobby, from, payload);
-    return { lobbyId: lobby.lobbyId, trade };
+    const recipients = this.normalizeRecipients(lobby, from.seat, payload.recipients);
+    this.assertCanPayMap(from, payload.offer);
+    // Supersede previous open offers FIRST so order on the wire is
+    // Superseded→Open (Socket.IO preserves order). Superseded is distinct
+    // from Cancelled so receivers don't briefly close the panel.
+    const cancelledOffers = this.tradeService.closeOpenOffersForLobby(
+      lobby.lobbyId,
+      TradeStatus.Superseded,
+    );
+    const trade = this.tradeService.createOpenOffer(
+      lobby,
+      from.seat,
+      recipients,
+      payload.offer,
+      payload.request,
+    );
+    const cancelled: TradeUpdatedPayload[] = cancelledOffers.map((offer) => ({
+      lobbyId: lobby.lobbyId,
+      trade: offer,
+    }));
+    return {
+      cancelled,
+      updates: [{ lobbyId: lobby.lobbyId, trade }],
+      lobbyId: lobby.lobbyId,
+    };
   }
 
   public acceptTrade(
     context: TradeActionContext,
     sessionToken: string,
     payload: TradeAcceptPayload,
-  ): { tradeUpdated: TradeUpdatedPayload | null; lobbyId: string } {
-    const lobby = context.getLobby(payload.lobbyId);
-    if (!lobby) {
-      throw new Error(ActionRejectCode.UnknownLobby);
+  ): TradeActionResult {
+    const lobby = this.requireOpenLobby(context, payload.lobbyId);
+    const actor = this.requirePlayer(lobby, sessionToken);
+    this.requireTradingPhase(lobby);
+    const offer = this.requireOpenOffer(payload.tradeId);
+    const slot = this.requireRecipientSlot(offer, actor.seat);
+    if (slot.status === TradeRecipientStatus.Accepted) {
+      // No-op idempotency.
+      return { cancelled: [], updates: [], lobbyId: lobby.lobbyId };
     }
-    this.assertLobbyOpen(lobby);
-    const accepter = lobby.findPlayerByToken(sessionToken);
-    if (!accepter) {
-      throw new Error(ActionRejectCode.PlayerNotInLobby);
-    }
-    if (lobby.fsm.getPhase() !== GamePhase.Trading) {
-      throw new Error(ActionRejectCode.WrongPhase);
-    }
-    const offer = this.tradeService.getOffer(payload.tradeId);
-    if (!offer || offer.status !== TradeStatus.Open) {
-      throw new Error(ActionRejectCode.TradeNotOpen);
-    }
-    if (offer.toSeat !== accepter.seat) {
-      throw new Error(ActionRejectCode.NotYourTurn);
-    }
-    const from = lobby.findPlayerBySeat(offer.fromSeat);
-    if (!from) {
-      throw new Error(ActionRejectCode.PlayerNotInLobby);
-    }
-    this.assertCanPayMap(from, offer.offer);
-    this.assertCanPayMap(accepter, offer.request);
-    this.applyResourceDelta(from, offer.offer, -1);
-    this.applyResourceDelta(from, offer.request, 1);
-    this.applyResourceDelta(accepter, offer.request, -1);
-    this.applyResourceDelta(accepter, offer.offer, 1);
-    const updated = this.tradeService.setStatus(offer.id, TradeStatus.Accepted);
-    context.broadcastLobby(lobby);
+    // Accept-as-recipient just records intent; resources move on finalize.
+    this.assertCanPayMap(actor, offer.request);
+    const updated = this.tradeService.updateRecipient(offer.id, actor.seat, {
+      status: TradeRecipientStatus.Accepted,
+      counter: undefined,
+    });
     if (!updated) {
-      return { tradeUpdated: null, lobbyId: lobby.lobbyId };
+      return { cancelled: [], updates: [], lobbyId: lobby.lobbyId };
     }
     return {
-      tradeUpdated: { lobbyId: lobby.lobbyId, trade: updated },
+      cancelled: [],
+      updates: [{ lobbyId: lobby.lobbyId, trade: updated }],
+      lobbyId: lobby.lobbyId,
+    };
+  }
+
+  public counterTrade(
+    context: TradeActionContext,
+    sessionToken: string,
+    payload: TradeCounterPayload,
+  ): TradeActionResult {
+    const lobby = this.requireOpenLobby(context, payload.lobbyId);
+    const actor = this.requirePlayer(lobby, sessionToken);
+    this.requireTradingPhase(lobby);
+    const offer = this.requireOpenOffer(payload.tradeId);
+    this.requireRecipientSlot(offer, actor.seat);
+    // counter.offer = what sender gives, counter.request = what sender receives
+    // → recipient must own counter.request.
+    this.assertCanPayMap(actor, payload.request);
+    const updated = this.tradeService.updateRecipient(offer.id, actor.seat, {
+      status: TradeRecipientStatus.Countered,
+      counter: { offer: { ...payload.offer }, request: { ...payload.request } },
+    });
+    if (!updated) {
+      return { cancelled: [], updates: [], lobbyId: lobby.lobbyId };
+    }
+    return {
+      cancelled: [],
+      updates: [{ lobbyId: lobby.lobbyId, trade: updated }],
       lobbyId: lobby.lobbyId,
     };
   }
@@ -94,34 +130,159 @@ export class TradeActionsService {
     context: TradeActionContext,
     sessionToken: string,
     payload: TradeRejectPayload,
-  ): { tradeUpdated: TradeUpdatedPayload | null; lobbyId: string } {
-    const lobby = context.getLobby(payload.lobbyId);
+  ): TradeActionResult {
+    const lobby = this.requireOpenLobby(context, payload.lobbyId);
+    const actor = this.requirePlayer(lobby, sessionToken);
+    this.requireTradingPhase(lobby);
+    const offer = this.requireOpenOffer(payload.tradeId);
+    if (offer.fromSeat === actor.seat) {
+      // Sender cancels the entire thread.
+      const updated = this.tradeService.setStatus(offer.id, TradeStatus.Cancelled);
+      if (!updated) {
+        return { cancelled: [], updates: [], lobbyId: lobby.lobbyId };
+      }
+      return {
+        cancelled: [],
+        updates: [{ lobbyId: lobby.lobbyId, trade: updated }],
+        lobbyId: lobby.lobbyId,
+      };
+    }
+    // Recipient rejects own slot.
+    this.requireRecipientSlot(offer, actor.seat);
+    const updated = this.tradeService.updateRecipient(offer.id, actor.seat, {
+      status: TradeRecipientStatus.Rejected,
+      counter: undefined,
+    });
+    if (!updated) {
+      return { cancelled: [], updates: [], lobbyId: lobby.lobbyId };
+    }
+    return {
+      cancelled: [],
+      updates: [{ lobbyId: lobby.lobbyId, trade: updated }],
+      lobbyId: lobby.lobbyId,
+    };
+  }
+
+  public finalizeTrade(
+    context: TradeActionContext,
+    sessionToken: string,
+    payload: TradeFinalizePayload,
+  ): TradeActionResult {
+    const lobby = this.requireOpenLobby(context, payload.lobbyId);
+    const actor = this.requirePlayer(lobby, sessionToken);
+    this.requireTradingPhase(lobby);
+    const offer = this.requireOpenOffer(payload.tradeId);
+    if (offer.fromSeat !== actor.seat) {
+      throw new Error(ActionRejectCode.NotYourTurn);
+    }
+    const slot = this.requireRecipientSlot(offer, payload.recipientSeat);
+    const recipient = lobby.findPlayerBySeat(payload.recipientSeat);
+    if (!recipient) {
+      throw new Error(ActionRejectCode.PlayerNotInLobby);
+    }
+    let giveMap: Readonly<Partial<Record<ResourceType, number>>>;
+    let takeMap: Readonly<Partial<Record<ResourceType, number>>>;
+    if (slot.status === TradeRecipientStatus.Countered && slot.counter !== undefined) {
+      giveMap = slot.counter.offer;
+      takeMap = slot.counter.request;
+    } else if (slot.status === TradeRecipientStatus.Accepted) {
+      giveMap = offer.offer;
+      takeMap = offer.request;
+    } else {
+      throw new Error(ActionRejectCode.TradeNotOpen);
+    }
+    this.assertCanPayMap(actor, giveMap);
+    this.assertCanPayMap(recipient, takeMap);
+    this.applyResourceDelta(actor, giveMap, -1);
+    this.applyResourceDelta(actor, takeMap, 1);
+    this.applyResourceDelta(recipient, takeMap, -1);
+    this.applyResourceDelta(recipient, giveMap, 1);
+    const updated = this.tradeService.finalize(offer.id, payload.recipientSeat);
+    context.broadcastLobby(lobby);
+    if (!updated) {
+      return { cancelled: [], updates: [], lobbyId: lobby.lobbyId };
+    }
+    return {
+      cancelled: [],
+      updates: [{ lobbyId: lobby.lobbyId, trade: updated }],
+      lobbyId: lobby.lobbyId,
+    };
+  }
+
+  private normalizeRecipients(
+    lobby: LobbyRuntime,
+    fromSeat: PlayerSeat,
+    requested: readonly PlayerSeat[],
+  ): PlayerSeat[] {
+    if (requested.length === 0) {
+      throw new Error(ActionRejectCode.InvalidPayload);
+    }
+    const seen = new Set<PlayerSeat>();
+    const out: PlayerSeat[] = [];
+    for (let i = 0; i < requested.length; i += 1) {
+      const seat = requested[i];
+      if (seat === fromSeat) {
+        throw new Error(ActionRejectCode.NotYourTurn);
+      }
+      if (seen.has(seat)) {
+        continue;
+      }
+      const player = lobby.findPlayerBySeat(seat);
+      if (!player) {
+        throw new Error(ActionRejectCode.PlayerNotInLobby);
+      }
+      seen.add(seat);
+      out.push(seat);
+    }
+    return out;
+  }
+
+  private requireOpenLobby(context: TradeActionContext, lobbyId: string): LobbyRuntime {
+    const lobby = context.getLobby(lobbyId);
     if (!lobby) {
       throw new Error(ActionRejectCode.UnknownLobby);
     }
-    this.assertLobbyOpen(lobby);
-    const actor = lobby.findPlayerByToken(sessionToken);
-    if (!actor) {
+    if (lobby.fsm.isFinished()) {
+      throw new Error(ActionRejectCode.GameFinished);
+    }
+    return lobby;
+  }
+
+  private requirePlayer(lobby: LobbyRuntime, sessionToken: string): LobbyPlayerSlot {
+    const player = lobby.findPlayerByToken(sessionToken);
+    if (!player) {
       throw new Error(ActionRejectCode.PlayerNotInLobby);
     }
+    return player;
+  }
+
+  private requireTradingPhase(lobby: LobbyRuntime): void {
     if (lobby.fsm.getPhase() !== GamePhase.Trading) {
       throw new Error(ActionRejectCode.WrongPhase);
     }
-    const offer = this.tradeService.getOffer(payload.tradeId);
+  }
+
+  private requireOpenOffer(tradeId: string) {
+    const offer = this.tradeService.getOffer(tradeId);
     if (!offer || offer.status !== TradeStatus.Open) {
       throw new Error(ActionRejectCode.TradeNotOpen);
     }
-    if (offer.fromSeat !== actor.seat && offer.toSeat !== actor.seat) {
-      throw new Error(ActionRejectCode.NotYourTurn);
+    return offer;
+  }
+
+  private requireRecipientSlot(
+    offer: ReturnType<TradeService['getOffer']> & object,
+    seat: PlayerSeat,
+  ) {
+    if (!offer) {
+      throw new Error(ActionRejectCode.TradeNotOpen);
     }
-    const updated = this.tradeService.setStatus(offer.id, TradeStatus.Rejected);
-    if (!updated) {
-      return { tradeUpdated: null, lobbyId: lobby.lobbyId };
+    for (let i = 0; i < offer.recipients.length; i += 1) {
+      if (offer.recipients[i].seat === seat) {
+        return offer.recipients[i];
+      }
     }
-    return {
-      tradeUpdated: { lobbyId: lobby.lobbyId, trade: updated },
-      lobbyId: lobby.lobbyId,
-    };
+    throw new Error(ActionRejectCode.NotYourTurn);
   }
 
   private assertCanPayMap(
@@ -148,12 +309,6 @@ export class TradeActionsService {
       const k = keys[i];
       const v = delta[k] ?? 0;
       player.resources[k] = (player.resources[k] ?? 0) + sign * v;
-    }
-  }
-
-  private assertLobbyOpen(lobby: LobbyRuntime): void {
-    if (lobby.fsm.isFinished()) {
-      throw new Error(ActionRejectCode.GameFinished);
     }
   }
 }

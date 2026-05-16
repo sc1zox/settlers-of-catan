@@ -36,6 +36,8 @@ import {
   SocketIoUrlPathSegment,
   StartLobbyPayload,
   TradeAcceptPayload,
+  TradeCounterPayload,
+  TradeFinalizePayload,
   TradeProposePayload,
   TradeRejectPayload,
   TradeUpdatedPayload,
@@ -215,11 +217,11 @@ export class GameSocketService implements OnDestroy {
 
   public proposeTrade(
     lobbyId: string,
-    toSeat: PlayerSeat,
+    recipients: readonly PlayerSeat[],
     offer: Readonly<Partial<Record<ResourceType, number>>>,
     request: Readonly<Partial<Record<ResourceType, number>>>,
   ): void {
-    const payload: TradeProposePayload = { lobbyId, toSeat, offer, request };
+    const payload: TradeProposePayload = { lobbyId, recipients, offer, request };
     this.socket?.emit(GameSocketClientEvent.TradePropose, payload);
   }
 
@@ -231,6 +233,21 @@ export class GameSocketService implements OnDestroy {
   public rejectTrade(lobbyId: string, tradeId: string): void {
     const payload: TradeRejectPayload = { lobbyId, tradeId };
     this.socket?.emit(GameSocketClientEvent.TradeReject, payload);
+  }
+
+  public counterTrade(
+    lobbyId: string,
+    tradeId: string,
+    offer: Readonly<Partial<Record<ResourceType, number>>>,
+    request: Readonly<Partial<Record<ResourceType, number>>>,
+  ): void {
+    const payload: TradeCounterPayload = { lobbyId, tradeId, offer, request };
+    this.socket?.emit(GameSocketClientEvent.TradeCounter, payload);
+  }
+
+  public finalizeTrade(lobbyId: string, tradeId: string, recipientSeat: PlayerSeat): void {
+    const payload: TradeFinalizePayload = { lobbyId, tradeId, recipientSeat };
+    this.socket?.emit(GameSocketClientEvent.TradeFinalize, payload);
   }
 
   private attachGamePayloadHandlers(s: Socket): void {

@@ -3,8 +3,11 @@ import {
   BankTradePayload,
   FinishTradingPayload,
   TradeAcceptPayload,
+  TradeCounterPayload,
+  TradeFinalizePayload,
   TradeProposePayload,
   TradeRejectPayload,
+  TradeUpdatedPayload,
   formatSocketIoLobbyRoomId,
   GameSocketServerEvent,
 } from '@catan/api-interfaces';
@@ -12,7 +15,7 @@ import { Server } from 'socket.io';
 import { GameService } from '../core/game.service';
 import { DemoBotService } from '../demo-bot/demo-bot.service';
 import type { LobbyRuntime } from '../lobby/lobby-runtime';
-import { TradeActionsService } from './trade-actions.service';
+import { TradeActionsService, type TradeActionResult } from './trade-actions.service';
 
 @Injectable()
 export class TradeSocketFacade {
@@ -38,35 +41,40 @@ export class TradeSocketFacade {
   }
 
   public proposeTrade(server: Server, payload: TradeProposePayload, sessionToken: string): void {
-    const body = this.tradeActions.proposeTrade(
+    const result = this.tradeActions.proposeTrade(
       this.tradeActionContext(server),
       sessionToken,
       payload,
     );
-    const roomId = formatSocketIoLobbyRoomId(body.lobbyId);
-    server.to(roomId).emit(GameSocketServerEvent.TradeUpdated, body);
-    const botSession = this.demoBots.resolveDemoBotTradeAcceptorSessionToken(
-      this.gameService.getLobby(payload.lobbyId),
-      body.trade.toSeat,
-    );
-    if (botSession !== null) {
+    this.broadcastResult(server, result);
+    const tradeUpdate = result.updates[0];
+    if (tradeUpdate === undefined) {
+      return;
+    }
+    // Demo bots auto-respond to fresh proposes only.
+    const lobby = this.gameService.getLobby(payload.lobbyId);
+    if (lobby === undefined) {
+      return;
+    }
+    for (let i = 0; i < tradeUpdate.trade.recipients.length; i += 1) {
+      const slot = tradeUpdate.trade.recipients[i];
+      const botSession = this.demoBots.resolveDemoBotTradeAcceptorSessionToken(lobby, slot.seat);
+      if (botSession === null) {
+        continue;
+      }
       const ctx = this.tradeActionContext(server);
       try {
         const accepted = this.tradeActions.acceptTrade(ctx, botSession, {
           lobbyId: payload.lobbyId,
-          tradeId: body.trade.id,
+          tradeId: tradeUpdate.trade.id,
         });
-        if (accepted.tradeUpdated !== null) {
-          server.to(roomId).emit(GameSocketServerEvent.TradeUpdated, accepted.tradeUpdated);
-        }
+        this.broadcastResult(server, accepted);
       } catch {
         const rejected = this.tradeActions.rejectTrade(ctx, botSession, {
           lobbyId: payload.lobbyId,
-          tradeId: body.trade.id,
+          tradeId: tradeUpdate.trade.id,
         });
-        if (rejected.tradeUpdated !== null) {
-          server.to(roomId).emit(GameSocketServerEvent.TradeUpdated, rejected.tradeUpdated);
-        }
+        this.broadcastResult(server, rejected);
       }
     }
   }
@@ -77,11 +85,7 @@ export class TradeSocketFacade {
       sessionToken,
       payload,
     );
-    if (result.tradeUpdated !== null) {
-      server
-        .to(formatSocketIoLobbyRoomId(result.lobbyId))
-        .emit(GameSocketServerEvent.TradeUpdated, result.tradeUpdated);
-    }
+    this.broadcastResult(server, result);
   }
 
   public rejectTrade(server: Server, payload: TradeRejectPayload, sessionToken: string): void {
@@ -90,11 +94,39 @@ export class TradeSocketFacade {
       sessionToken,
       payload,
     );
-    if (result.tradeUpdated !== null) {
-      server
-        .to(formatSocketIoLobbyRoomId(result.lobbyId))
-        .emit(GameSocketServerEvent.TradeUpdated, result.tradeUpdated);
+    this.broadcastResult(server, result);
+  }
+
+  public counterTrade(server: Server, payload: TradeCounterPayload, sessionToken: string): void {
+    const result = this.tradeActions.counterTrade(
+      this.tradeActionContext(server),
+      sessionToken,
+      payload,
+    );
+    this.broadcastResult(server, result);
+  }
+
+  public finalizeTrade(server: Server, payload: TradeFinalizePayload, sessionToken: string): void {
+    const result = this.tradeActions.finalizeTrade(
+      this.tradeActionContext(server),
+      sessionToken,
+      payload,
+    );
+    this.broadcastResult(server, result);
+  }
+
+  private broadcastResult(server: Server, result: TradeActionResult): void {
+    const roomId = formatSocketIoLobbyRoomId(result.lobbyId);
+    for (let i = 0; i < result.cancelled.length; i += 1) {
+      this.emitTradeUpdated(server, roomId, result.cancelled[i]);
     }
+    for (let i = 0; i < result.updates.length; i += 1) {
+      this.emitTradeUpdated(server, roomId, result.updates[i]);
+    }
+  }
+
+  private emitTradeUpdated(server: Server, roomId: string, payload: TradeUpdatedPayload): void {
+    server.to(roomId).emit(GameSocketServerEvent.TradeUpdated, payload);
   }
 
   private tradeActionContext(server: Server): {

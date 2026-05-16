@@ -12,7 +12,20 @@ export interface BankTradeRequest {
 }
 
 export interface ProposeTradeRequest {
-  readonly toSeat: PlayerSeat;
+  readonly recipients: readonly PlayerSeat[];
   readonly offer: Readonly<Record<ResourceType, number>>;
   readonly request: Readonly<Record<ResourceType, number>>;
+}
+
+export interface CounterTradeRequest {
+  readonly tradeId: string;
+  /** Sender perspective: what the sender would give. */
+  readonly offer: Readonly<Record<ResourceType, number>>;
+  /** Sender perspective: what the sender would receive. */
+  readonly request: Readonly<Record<ResourceType, number>>;
+}
+
+export interface FinalizeTradeRequest {
+  readonly tradeId: string;
+  readonly recipientSeat: PlayerSeat;
 }

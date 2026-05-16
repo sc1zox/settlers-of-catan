@@ -4,6 +4,8 @@ import {
   BankTradePayload,
   FinishTradingPayload,
   TradeAcceptPayload,
+  TradeCounterPayload,
+  TradeFinalizePayload,
   TradeProposePayload,
   TradeRejectPayload,
 } from '@catan/api-interfaces';
@@ -40,5 +42,15 @@ export class GatewayTradeHandlers {
   public tradeReject(server: Server, client: Socket, payload: TradeRejectPayload): void {
     const sessionToken = this.sessions.requireSessionToken(client);
     this.tradeSocket.rejectTrade(server, payload, sessionToken);
+  }
+
+  public tradeCounter(server: Server, client: Socket, payload: TradeCounterPayload): void {
+    const sessionToken = this.sessions.requireSessionToken(client);
+    this.tradeSocket.counterTrade(server, payload, sessionToken);
+  }
+
+  public tradeFinalize(server: Server, client: Socket, payload: TradeFinalizePayload): void {
+    const sessionToken = this.sessions.requireSessionToken(client);
+    this.tradeSocket.finalizeTrade(server, payload, sessionToken);
   }
 }

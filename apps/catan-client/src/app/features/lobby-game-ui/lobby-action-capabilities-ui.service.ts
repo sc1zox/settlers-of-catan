@@ -1,10 +1,12 @@
 import { computed, inject, Injectable } from '@angular/core';
 import { GamePhase } from '@catan/api-interfaces';
 import { LobbyGameUiStateService } from './lobby-game-ui-state.service';
+import { LobbyTradeUiService } from './lobby-trade-ui.service';
 
 @Injectable({ providedIn: 'root' })
 export class LobbyActionCapabilitiesUiService {
   private readonly state = inject(LobbyGameUiStateService);
+  private readonly tradeUi = inject(LobbyTradeUiService);
 
   private readonly setupPendingRoadVertexId = computed<string | null>(() => {
     const lobbyUi = this.state.lobbyUiState();
@@ -40,8 +42,17 @@ export class LobbyActionCapabilitiesUiService {
     () => this.state.isSelfTurn() && this.state.lobbyUiState()?.phase === GamePhase.Building,
   );
 
-  public readonly canOpenTrade = computed<boolean>(
+  /** True when the user can compose a fresh proposal (their turn in Trading). */
+  public readonly canComposeNewTrade = computed<boolean>(
     () => this.state.isSelfTurn() && this.state.lobbyUiState()?.phase === GamePhase.Trading,
+  );
+
+  /**
+   * True when the HUD Trade button should be visible. Includes receivers of
+   * an open offer so they can re-open the panel after dismissing it.
+   */
+  public readonly canOpenTrade = computed<boolean>(
+    () => this.canComposeNewTrade() || this.tradeUi.selfHasOpenTrade(),
   );
 
   public readonly canMoveRobber = computed<boolean>(

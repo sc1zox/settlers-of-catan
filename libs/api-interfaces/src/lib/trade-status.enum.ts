@@ -3,4 +3,6 @@ export enum TradeStatus {
   Accepted = 'accepted',
   Rejected = 'rejected',
   Cancelled = 'cancelled',
+  /** Server-internal: a fresh propose replaced this one — client should not flash close. */
+  Superseded = 'superseded',
 }

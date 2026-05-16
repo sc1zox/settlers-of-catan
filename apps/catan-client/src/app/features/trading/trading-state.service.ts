@@ -50,7 +50,7 @@ export class TradingStateService {
   }
 
   public proposeTrade(
-    toSeat: PlayerSeat,
+    recipients: readonly PlayerSeat[],
     offer: Readonly<Partial<Record<ResourceType, number>>>,
     request: Readonly<Partial<Record<ResourceType, number>>>,
   ): void {
@@ -58,7 +58,7 @@ export class TradingStateService {
     if (params === undefined) {
       return;
     }
-    this.sockets.proposeTrade(params.lobbyId, toSeat, offer, request);
+    this.sockets.proposeTrade(params.lobbyId, recipients, offer, request);
   }
 
   public acceptTrade(tradeId: string): void {
@@ -75,5 +75,25 @@ export class TradingStateService {
       return;
     }
     this.sockets.rejectTrade(params.lobbyId, tradeId);
+  }
+
+  public counterTrade(
+    tradeId: string,
+    offer: Readonly<Partial<Record<ResourceType, number>>>,
+    request: Readonly<Partial<Record<ResourceType, number>>>,
+  ): void {
+    const params = this.gameState.connection();
+    if (params === undefined) {
+      return;
+    }
+    this.sockets.counterTrade(params.lobbyId, tradeId, offer, request);
+  }
+
+  public finalizeTrade(tradeId: string, recipientSeat: PlayerSeat): void {
+    const params = this.gameState.connection();
+    if (params === undefined) {
+      return;
+    }
+    this.sockets.finalizeTrade(params.lobbyId, tradeId, recipientSeat);
   }
 }

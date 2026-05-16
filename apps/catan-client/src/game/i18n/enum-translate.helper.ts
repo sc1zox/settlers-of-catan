@@ -162,6 +162,8 @@ export class EnumTranslate {
         return 'reject.robberSameTile';
       case ActionRejectCode.GameFinished:
         return 'reject.gameFinished';
+      case ActionRejectCode.Unknown:
+        return 'reject.unknown';
     }
   }
 

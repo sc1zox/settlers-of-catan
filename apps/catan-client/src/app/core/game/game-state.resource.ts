@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import {
   PlayerSeat,
@@ -18,25 +18,50 @@ import type { LobbyConnectionParams } from '../../shared/types/lobby-connection-
 
 export type { LobbyConnectionParams };
 
+interface LobbySubscriptionParams {
+  readonly lobbyCode: string;
+  readonly displayName: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class GameStateResource {
   private readonly sockets = inject(GameSocketService);
 
-  private readonly lobbyParams = signal<LobbyConnectionParams | undefined>(undefined);
+  private readonly subscriptionParamsSignal = signal<LobbySubscriptionParams | undefined>(undefined);
+  private readonly canonicalLobbyIdSignal = signal<string>('');
 
-  public readonly connection = this.lobbyParams.asReadonly();
+  public readonly subscriptionParams = this.subscriptionParamsSignal.asReadonly();
+  public readonly canonicalLobbyId = this.canonicalLobbyIdSignal.asReadonly();
+
+  public readonly connection = computed<LobbyConnectionParams | undefined>(() => {
+    const subscription = this.subscriptionParams();
+    if (subscription === undefined) {
+      return undefined;
+    }
+    return {
+      lobbyId: this.canonicalLobbyId(),
+      lobbyCode: subscription.lobbyCode,
+      displayName: subscription.displayName,
+    };
+  });
 
   public readonly lobby = rxResource<
     LobbyFullStatePayload | undefined,
-    LobbyConnectionParams | undefined
+    LobbySubscriptionParams | undefined
   >({
-    params: () => this.lobbyParams(),
+    params: () => this.subscriptionParams(),
     stream: ({ params, abortSignal }) => {
       if (params === undefined) {
         return EMPTY;
       }
       return this.sockets.fullState$.pipe(
-        filter((state) => matchesLobbyConnection(state.lobbyId, state.lobbyCode, params)),
+        filter((state) =>
+          matchesLobbyConnection(state.lobbyId, state.lobbyCode, {
+            lobbyId: '',
+            lobbyCode: params.lobbyCode,
+            displayName: params.displayName,
+          }),
+        ),
         takeUntil(observeAbort(abortSignal)),
       );
     },
@@ -45,15 +70,22 @@ export class GameStateResource {
 
   public readonly diceRolled = rxResource<
     DiceRolledPayload | undefined,
-    LobbyConnectionParams | undefined
+    LobbySubscriptionParams | undefined
   >({
-    params: () => this.lobbyParams(),
+    params: () => this.subscriptionParams(),
     stream: ({ params, abortSignal }) => {
       if (params === undefined) {
         return EMPTY;
       }
+      const lobbyCode = params.lobbyCode;
       return this.sockets.diceRolled$.pipe(
-        filter((payload) => params.lobbyId.length > 0 && payload.lobbyId === params.lobbyId),
+        filter((payload) => {
+          const canonical = this.canonicalLobbyId();
+          if (canonical.length === 0) {
+            return false;
+          }
+          return payload.lobbyId === canonical && lobbyCode.length > 0;
+        }),
         takeUntil(observeAbort(abortSignal)),
       );
     },
@@ -62,15 +94,22 @@ export class GameStateResource {
 
   public readonly bonusAwarded = rxResource<
     BonusAwardedPayload | undefined,
-    LobbyConnectionParams | undefined
+    LobbySubscriptionParams | undefined
   >({
-    params: () => this.lobbyParams(),
+    params: () => this.subscriptionParams(),
     stream: ({ params, abortSignal }) => {
       if (params === undefined) {
         return EMPTY;
       }
+      const lobbyCode = params.lobbyCode;
       return this.sockets.bonusAwarded$.pipe(
-        filter((payload) => params.lobbyId.length > 0 && payload.lobbyId === params.lobbyId),
+        filter((payload) => {
+          const canonical = this.canonicalLobbyId();
+          if (canonical.length === 0) {
+            return false;
+          }
+          return payload.lobbyId === canonical && lobbyCode.length > 0;
+        }),
         takeUntil(observeAbort(abortSignal)),
       );
     },
@@ -96,7 +135,8 @@ export class GameStateResource {
     const lobbyCode = normalizeLobbyCode(lobbyCodeInput);
     try {
       await this.sockets.connect();
-      this.lobbyParams.set({ lobbyId: '', lobbyCode, displayName });
+      this.canonicalLobbyIdSignal.set('');
+      this.subscriptionParamsSignal.set({ lobbyCode, displayName });
       if (mode === 'create') {
         this.sockets.createLobby(lobbyCodeInput.trim(), displayName);
       } else {
@@ -109,139 +149,137 @@ export class GameStateResource {
           timeout(15_000),
         ),
       );
-      this.lobbyParams.set({
-        lobbyId: joined.lobbyId,
-        lobbyCode: joined.lobbyCode,
-        displayName,
-      });
+      this.canonicalLobbyIdSignal.set(joined.lobbyId);
       return joined;
     } catch (error) {
-      this.lobbyParams.set(undefined);
+      this.subscriptionParamsSignal.set(undefined);
+      this.canonicalLobbyIdSignal.set('');
       throw error;
     }
   }
 
   public startLobby(): void {
-    const params = this.lobbyParams();
-    if (params === undefined) {
+    const lobbyId = this.canonicalLobbyId();
+    if (lobbyId.length === 0) {
       return;
     }
-    this.sockets.startLobby(params.lobbyId);
+    this.sockets.startLobby(lobbyId);
   }
 
   public fillLobbyWithBots(): void {
-    const params = this.lobbyParams();
-    if (params === undefined) {
+    const lobbyId = this.canonicalLobbyId();
+    if (lobbyId.length === 0) {
       return;
     }
-    this.sockets.fillLobbyWithBots(params.lobbyId);
+    this.sockets.fillLobbyWithBots(lobbyId);
   }
 
   public rollDice(): void {
-    const params = this.lobbyParams();
-    if (params === undefined) {
+    const lobbyId = this.canonicalLobbyId();
+    if (lobbyId.length === 0) {
       return;
     }
-    this.sockets.rollDice(params.lobbyId);
+    this.sockets.rollDice(lobbyId);
   }
 
   public endTurn(): void {
-    const params = this.lobbyParams();
-    if (params === undefined) {
+    const lobbyId = this.canonicalLobbyId();
+    if (lobbyId.length === 0) {
       return;
     }
-    this.sockets.endTurn(params.lobbyId);
+    this.sockets.endTurn(lobbyId);
   }
 
   public buildSettlement(vertexId: string): void {
-    const params = this.lobbyParams();
-    if (params === undefined) {
+    const lobbyId = this.canonicalLobbyId();
+    if (lobbyId.length === 0) {
       return;
     }
-    this.sockets.buildSettlement(params.lobbyId, vertexId);
+    this.sockets.buildSettlement(lobbyId, vertexId);
   }
 
   public buildRoad(edgeId: string): void {
-    const params = this.lobbyParams();
-    if (params === undefined) {
+    const lobbyId = this.canonicalLobbyId();
+    if (lobbyId.length === 0) {
       return;
     }
-    this.sockets.buildRoad(params.lobbyId, edgeId);
+    this.sockets.buildRoad(lobbyId, edgeId);
   }
 
   public buildCity(vertexId: string): void {
-    const params = this.lobbyParams();
-    if (params === undefined) {
+    const lobbyId = this.canonicalLobbyId();
+    if (lobbyId.length === 0) {
       return;
     }
-    this.sockets.buildCity(params.lobbyId, vertexId);
+    this.sockets.buildCity(lobbyId, vertexId);
   }
 
   public buyDevCard(): void {
-    const params = this.lobbyParams();
-    if (params === undefined) {
+    const lobbyId = this.canonicalLobbyId();
+    if (lobbyId.length === 0) {
       return;
     }
-    this.sockets.buyDevCard(params.lobbyId);
+    this.sockets.buyDevCard(lobbyId);
   }
 
   public submitRobberDiscard(discard: Readonly<Partial<Record<ResourceType, number>>>): void {
-    const params = this.lobbyParams();
-    if (params === undefined) {
+    const lobbyId = this.canonicalLobbyId();
+    if (lobbyId.length === 0) {
       return;
     }
-    this.sockets.submitRobberDiscard(params.lobbyId, discard);
+    this.sockets.submitRobberDiscard(lobbyId, discard);
   }
 
   public moveRobber(q: number, r: number, victimSeat?: PlayerSeat): void {
-    const params = this.lobbyParams();
-    if (params === undefined) {
+    const lobbyId = this.canonicalLobbyId();
+    if (lobbyId.length === 0) {
       return;
     }
-    this.sockets.moveRobber(params.lobbyId, q, r, victimSeat);
+    this.sockets.moveRobber(lobbyId, q, r, victimSeat);
   }
 
   public playKnight(q: number, r: number, victimSeat?: PlayerSeat): void {
-    const params = this.lobbyParams();
-    if (params === undefined) {
+    const lobbyId = this.canonicalLobbyId();
+    if (lobbyId.length === 0) {
       return;
     }
-    this.sockets.playKnight(params.lobbyId, q, r, victimSeat);
+    this.sockets.playKnight(lobbyId, q, r, victimSeat);
   }
 
   public playMonopoly(resource: ResourceType): void {
-    const params = this.lobbyParams();
-    if (params === undefined) {
+    const lobbyId = this.canonicalLobbyId();
+    if (lobbyId.length === 0) {
       return;
     }
-    this.sockets.playMonopoly(params.lobbyId, resource);
+    this.sockets.playMonopoly(lobbyId, resource);
   }
 
   public playYearOfPlenty(first: ResourceType, second: ResourceType): void {
-    const params = this.lobbyParams();
-    if (params === undefined) {
+    const lobbyId = this.canonicalLobbyId();
+    if (lobbyId.length === 0) {
       return;
     }
-    this.sockets.playYearOfPlenty(params.lobbyId, first, second);
+    this.sockets.playYearOfPlenty(lobbyId, first, second);
   }
 
   public playRoadBuilding(firstEdgeId: string, secondEdgeId?: string): void {
-    const params = this.lobbyParams();
-    if (params === undefined) {
+    const lobbyId = this.canonicalLobbyId();
+    if (lobbyId.length === 0) {
       return;
     }
-    this.sockets.playRoadBuilding(params.lobbyId, firstEdgeId, secondEdgeId);
+    this.sockets.playRoadBuilding(lobbyId, firstEdgeId, secondEdgeId);
   }
 
   public leaveLobby(): void {
-    const params = this.lobbyParams();
-    if (params === undefined || params.lobbyId.length === 0) {
+    const lobbyId = this.canonicalLobbyId();
+    if (lobbyId.length === 0) {
       return;
     }
-    this.sockets.leaveLobby(params.lobbyId);
+    this.sockets.leaveLobby(lobbyId);
   }
 
   public disconnectLobby(): void {
-    this.lobbyParams.set(undefined);
+    this.subscriptionParamsSignal.set(undefined);
+    this.canonicalLobbyIdSignal.set('');
   }
 }

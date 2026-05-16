@@ -24,6 +24,7 @@ const REJECT_KEY: Record<ActionRejectCode, string> = {
   [ActionRejectCode.VictimRequired]: 'reject.victimRequired',
   [ActionRejectCode.RobberSameTile]: 'reject.robberSameTile',
   [ActionRejectCode.GameFinished]: 'reject.gameFinished',
+  [ActionRejectCode.Unknown]: 'reject.unknown',
 };
 
 export function actionRejectMessage(

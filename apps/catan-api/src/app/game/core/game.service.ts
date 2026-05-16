@@ -29,7 +29,25 @@ function asRejectCode(message: string): ActionRejectCode {
       return message as ActionRejectCode;
     }
   }
-  return ActionRejectCode.WrongPhase;
+  return ActionRejectCode.Unknown;
+}
+
+function extractBadRequestMessage(response: string | object): string {
+  if (typeof response === 'string') {
+    return response;
+  }
+  const indexed = response as Record<string, unknown>;
+  const rawMessage = indexed['message'];
+  if (typeof rawMessage === 'string') {
+    return rawMessage;
+  }
+  if (Array.isArray(rawMessage)) {
+    const first = rawMessage[0];
+    if (typeof first === 'string') {
+      return first;
+    }
+  }
+  return JSON.stringify(response);
 }
 
 @Injectable()
@@ -328,14 +346,14 @@ export class GameService {
   public describeError(e: unknown): { code: ActionRejectCode; message: string } {
     if (e instanceof BadRequestException) {
       const response = e.getResponse();
-      const message = typeof response === 'string' ? response : JSON.stringify(response);
+      const message = extractBadRequestMessage(response);
       return { code: asRejectCode(message), message };
     }
     if (e instanceof Error) {
       return { code: asRejectCode(e.message), message: e.message };
     }
     return {
-      code: ActionRejectCode.WrongPhase,
+      code: ActionRejectCode.Unknown,
       message: DescribeErrorMessage.UnknownError,
     };
   }

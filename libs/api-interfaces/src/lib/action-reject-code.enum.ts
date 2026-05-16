@@ -20,4 +20,5 @@ export enum ActionRejectCode {
   VictimRequired = 'victim_required',
   RobberSameTile = 'robber_same_tile',
   GameFinished = 'game_finished',
+  Unknown = 'unknown',
 }

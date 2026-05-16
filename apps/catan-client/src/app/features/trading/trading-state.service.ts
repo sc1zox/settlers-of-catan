@@ -6,24 +6,23 @@ import { filter, takeUntil } from 'rxjs/operators';
 import { GameStateResource } from '../../core/game/game-state.resource';
 import { GameSocketService } from '../../core/socket/game-socket.service';
 import { observeAbort } from '../../shared/helper/http/observe-abort';
-import type { LobbyConnectionParams } from '../../shared/types/lobby-connection-params';
 
 @Injectable({ providedIn: 'root' })
 export class TradingStateService {
   private readonly sockets = inject(GameSocketService);
   private readonly gameState = inject(GameStateResource);
 
-  public readonly tradeUpdated = rxResource<
-    TradeUpdatedPayload | undefined,
-    LobbyConnectionParams | undefined
-  >({
-    params: () => this.gameState.connection(),
-    stream: ({ params, abortSignal }) => {
-      if (params === undefined) {
+  public readonly tradeUpdated = rxResource<TradeUpdatedPayload | undefined, boolean>({
+    params: () => this.gameState.subscriptionParams() !== undefined,
+    stream: ({ params: active, abortSignal }) => {
+      if (!active) {
         return EMPTY;
       }
       return this.sockets.tradeUpdated$.pipe(
-        filter((payload) => params.lobbyId.length > 0 && payload.lobbyId === params.lobbyId),
+        filter((payload) => {
+          const canonical = this.gameState.canonicalLobbyId();
+          return canonical.length > 0 && payload.lobbyId === canonical;
+        }),
         takeUntil(observeAbort(abortSignal)),
       );
     },

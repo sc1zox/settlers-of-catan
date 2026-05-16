@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import {
   ActionRejectCode,
   GamePhase,
-  KnownLobbyId,
   PlayerSeat,
   ResourceType,
   TileType,
@@ -10,9 +9,13 @@ import {
 import { collectRobberVictimSeats } from '@catan/shared-game-field';
 import { Server } from 'socket.io';
 import { GameActionValidationService } from '../validation/game-action-validation.service';
-import { CLOCKWISE_SEATS, type LobbyPlayerSlot, LobbyRuntime } from '../lobby/lobby-runtime';
+import {
+  CLOCKWISE_SEATS,
+  type LobbyPlayerSlot,
+  LobbyRuntime,
+} from '../lobby/lobby-runtime';
 
-const DEMO_BOT_SESSION_TOKEN_PREFIX = 'demo-bot-';
+const BOT_SESSION_TOKEN_PREFIX = 'bot-';
 const DEMO_SETUP_AUTOPLAY_MAX_STEPS = 16;
 const DEMO_MAIN_GAME_DRAIN_MAX_STEPS = 150;
 
@@ -59,7 +62,7 @@ export class DemoBotService {
     callbacks: DemoMainGameCallbacks,
   ): void {
     const lobby = callbacks.getLobby(lobbyId);
-    if (!lobby || !this.isDemoLobby(lobby)) {
+    if (!lobby) {
       return;
     }
     if (this.mainGameDrainActive) {
@@ -77,41 +80,10 @@ export class DemoBotService {
     }
   }
 
-  public pruneDemoLobbyStaleHumans(
-    lobby: LobbyRuntime,
-    joiningSessionToken: string,
-  ): void {
-    if (!this.isDemoLobby(lobby) || lobby.fsm.getPhase() !== GamePhase.LobbyWaiting) {
-      return;
-    }
-    let removedAdmin = false;
-    for (let i = lobby.players.length - 1; i >= 0; i -= 1) {
-      const player = lobby.players[i];
-      if (
-        this.isDemoBotSessionToken(player.sessionToken) ||
-        player.sessionToken === joiningSessionToken ||
-        player.socketId !== null
-      ) {
-        continue;
-      }
-      lobby.clearDisconnectTimer(player);
-      if (lobby.adminSessionToken === player.sessionToken) {
-        removedAdmin = true;
-      }
-      lobby.players.splice(i, 1);
-    }
-    if (removedAdmin) {
-      lobby.adminSessionToken = null;
-    }
-  }
-
   public fillDemoLobbyWithBots(lobby: LobbyRuntime): void {
-    if (!this.isDemoLobby(lobby)) {
-      return;
-    }
     let nextSeat = lobby.nextFreeSeat();
     while (nextSeat !== undefined) {
-      const botSessionToken = `${DEMO_BOT_SESSION_TOKEN_PREFIX}${nextSeat}`;
+      const botSessionToken = `${BOT_SESSION_TOKEN_PREFIX}${nextSeat}`;
       if (lobby.findPlayerByToken(botSessionToken)) {
         break;
       }
@@ -134,9 +106,7 @@ export class DemoBotService {
   }
 
   public getMinimumStartPlayerCount(lobby: LobbyRuntime): number {
-    if (this.isDemoLobby(lobby)) {
-      return 1;
-    }
+    void lobby;
     return 3;
   }
 
@@ -160,7 +130,7 @@ export class DemoBotService {
     callbacks: DemoSetupBotCallbacks,
   ): void {
     const lobby = callbacks.getLobby(lobbyId);
-    if (!lobby || !this.isDemoLobby(lobby)) {
+    if (!lobby) {
       return;
     }
     if (this.autoplayLobbyIds.has(lobbyId)) {
@@ -228,7 +198,7 @@ export class DemoBotService {
     callbacks: DemoMainGameCallbacks,
   ): boolean {
     const lobby = callbacks.getLobby(lobbyId);
-    if (!lobby || !this.isDemoLobby(lobby)) {
+    if (!lobby) {
       return false;
     }
     const phase = lobby.fsm.getPhase();
@@ -417,12 +387,8 @@ export class DemoBotService {
     return namesBySeat[seat];
   }
 
-  private isDemoLobby(lobby: LobbyRuntime): boolean {
-    return lobby.lobbyId === KnownLobbyId.DemoClient;
-  }
-
   private isDemoBotSessionToken(sessionToken: string): boolean {
-    return sessionToken.startsWith(DEMO_BOT_SESSION_TOKEN_PREFIX);
+    return sessionToken.startsWith(BOT_SESSION_TOKEN_PREFIX);
   }
 
   private isSetupPhase(phase: GamePhase): boolean {

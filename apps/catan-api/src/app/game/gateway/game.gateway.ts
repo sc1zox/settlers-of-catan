@@ -1,35 +1,28 @@
 import {
-  ActionRejectCode,
-  ActionRejectedPayload,
   BankTradePayload,
   BuildCityPayload,
   BuildRoadPayload,
   BuildSettlementPayload,
   BuyDevCardPayload,
+  CreateLobbyPayload,
   EndTurnPayload,
+  FillLobbyWithBotsPayload,
+  FinishTradingPayload,
+  GameSocketClientEvent,
+  JoinLobbyPayload,
+  LeaveLobbyPayload,
+  MoveRobberPayload,
   PlayKnightPayload,
   PlayMonopolyPayload,
   PlayRoadBuildingPayload,
   PlayYearOfPlentyPayload,
-  DefaultDisplayName,
-  FinishTradingPayload,
-  formatSocketIoLobbyRoomId,
-  GameSocketClientEvent,
-  GameSocketServerEvent,
-  MoveRobberPayload,
-  HttpHeaderNameLowercase,
-  JoinLobbyPayload,
-  KnownLobbyId,
-  LobbyJoinedPayload,
   RobberDiscardPayload,
   RollDicePayload,
-  SocketAuthPayloadKey,
   SocketGatewayNamespace,
   StartLobbyPayload,
   TradeAcceptPayload,
   TradeProposePayload,
   TradeRejectPayload,
-  parseAuthorizationBearerFromUnknown,
 } from '@catan/api-interfaces';
 import {
   ConnectedSocket,
@@ -42,13 +35,13 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { GameService } from '../core/game.service';
-import { DemoBotService } from '../demo-bot/demo-bot.service';
-import type { LobbyRuntime } from '../lobby/lobby-runtime';
 import { SocketConnectionRegistry } from './socket-connection.registry';
-import { TradeActionsService } from '../trade/trade-actions.service';
-import { PlayerSessionJwtService } from '../../session/player-session-jwt.service';
-import { isUuid } from '../utils/uuid.util';
 import { resolveSocketIoCors } from '../../http/cors-env.util';
+import { GatewayActionRejectService, GatewaySocketSessionService } from './gateway-common.services';
+import { GatewayAuthService } from './gateway-auth.service';
+import { GatewayGameplayHandlers } from './gateway-gameplay.handlers';
+import { GatewayLobbyHandlers } from './gateway-lobby.handlers';
+import { GatewayTradeHandlers } from './gateway-trade.handlers';
 
 const GAME_SOCKET_CORS = resolveSocketIoCors();
 
@@ -63,40 +56,18 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   public constructor(
     private readonly gameService: GameService,
     private readonly registry: SocketConnectionRegistry,
-    private readonly tradeActions: TradeActionsService,
-    private readonly demoBots: DemoBotService,
-    private readonly playerJwt: PlayerSessionJwtService,
+    private readonly gatewayAuth: GatewayAuthService,
+    private readonly reject: GatewayActionRejectService,
+    private readonly sessions: GatewaySocketSessionService,
+    private readonly lobbyHandlers: GatewayLobbyHandlers,
+    private readonly gameplayHandlers: GatewayGameplayHandlers,
+    private readonly tradeHandlers: GatewayTradeHandlers,
   ) {}
 
   public async handleConnection(client: Socket): Promise<void> {
-    let sessionId: string | undefined;
-    const raw = client.handshake.auth as Record<string, unknown>;
-    const accessKey = SocketAuthPayloadKey.AccessToken;
-    const jwtFromAuth = typeof raw[accessKey] === 'string' ? raw[accessKey] : '';
-    const headerRaw = client.handshake.headers[HttpHeaderNameLowercase.Authorization];
-    const headerValue = Array.isArray(headerRaw) ? headerRaw[0] : headerRaw;
-    const jwtFromBearer = parseAuthorizationBearerFromUnknown(headerValue) ?? '';
-    const jwtCandidate =
-      jwtFromAuth.length > 0 ? jwtFromAuth : jwtFromBearer;
-    if (jwtCandidate.length > 0) {
-      try {
-        sessionId = this.playerJwt.verifyAccessToken(jwtCandidate);
-      } catch {
-        sessionId = undefined;
-      }
-    }
-    if (sessionId === undefined) {
-      const legacyKey = SocketAuthPayloadKey.SessionToken;
-      const legacy = raw[legacyKey];
-      if (typeof legacy === 'string' && isUuid(legacy)) {
-        sessionId = legacy;
-      }
-    }
-    if (sessionId === undefined) {
+    if (!this.gatewayAuth.bindHandshakeSession(client, this.registry)) {
       client.disconnect(true);
-      return;
     }
-    this.registry.bind(client.id, sessionId);
   }
 
   public handleDisconnect(client: Socket): void {
@@ -112,25 +83,21 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ): Promise<void> {
     try {
-      const sessionToken = this.registry.getSessionToken(client.id);
-      if (!sessionToken) {
-        return;
-      }
-      const lobbyCode = payload.lobbyCode.trim() || KnownLobbyId.ServerDefault;
-      const displayName =
-        payload.displayName.trim() || DefaultDisplayName.PlayerEn;
-      const { lobby, joined } = await this.gameService.joinLobby(
-        lobbyCode,
-        sessionToken,
-        displayName,
-        client.id,
-      );
-      await client.join(formatSocketIoLobbyRoomId(lobby.lobbyId));
-      const joinedPayload: LobbyJoinedPayload = joined;
-      client.emit(GameSocketServerEvent.LobbyJoined, joinedPayload);
-      this.gameService.broadcastFullState(this.server, lobby);
+      await this.lobbyHandlers.joinLobby(this.server, client, payload);
     } catch (e) {
-      this.emitRejected(client, e);
+      this.reject.emit(client, e);
+    }
+  }
+
+  @SubscribeMessage(GameSocketClientEvent.CreateLobby)
+  public async handleCreateLobby(
+    @MessageBody() payload: CreateLobbyPayload,
+    @ConnectedSocket() client: Socket,
+  ): Promise<void> {
+    try {
+      await this.lobbyHandlers.createLobby(this.server, client, payload);
+    } catch (e) {
+      this.reject.emit(client, e);
     }
   }
 
@@ -140,18 +107,21 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ): void {
     try {
-      const sessionToken = this.registry.getSessionToken(client.id);
-      if (!sessionToken) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      this.gameService.buildSettlement(
-        payload.lobbyId,
-        sessionToken,
-        payload.vertexId,
-        this.server,
-      );
+      this.gameplayHandlers.buildSettlement(this.server, client, payload);
     } catch (e) {
-      this.emitRejected(client, e);
+      this.reject.emit(client, e);
+    }
+  }
+
+  @SubscribeMessage(GameSocketClientEvent.LeaveLobby)
+  public async handleLeaveLobby(
+    @MessageBody() payload: LeaveLobbyPayload,
+    @ConnectedSocket() client: Socket,
+  ): Promise<void> {
+    try {
+      await this.lobbyHandlers.leaveLobby(this.server, client, payload);
+    } catch (e) {
+      this.reject.emit(client, e);
     }
   }
 
@@ -161,13 +131,21 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ): void {
     try {
-      const sessionToken = this.registry.getSessionToken(client.id);
-      if (!sessionToken) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      this.gameService.startLobby(payload.lobbyId, sessionToken, this.server);
+      this.lobbyHandlers.startLobby(this.server, client, payload);
     } catch (e) {
-      this.emitRejected(client, e);
+      this.reject.emit(client, e);
+    }
+  }
+
+  @SubscribeMessage(GameSocketClientEvent.FillLobbyWithBots)
+  public handleFillLobbyWithBots(
+    @MessageBody() payload: FillLobbyWithBotsPayload,
+    @ConnectedSocket() client: Socket,
+  ): void {
+    try {
+      this.lobbyHandlers.fillLobbyWithBots(this.server, client, payload);
+    } catch (e) {
+      this.reject.emit(client, e);
     }
   }
 
@@ -177,13 +155,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ): void {
     try {
-      const sessionToken = this.registry.getSessionToken(client.id);
-      if (!sessionToken) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      this.gameService.buildRoad(payload.lobbyId, sessionToken, payload.edgeId, this.server);
+      this.gameplayHandlers.buildRoad(this.server, client, payload);
     } catch (e) {
-      this.emitRejected(client, e);
+      this.reject.emit(client, e);
     }
   }
 
@@ -193,13 +167,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ): void {
     try {
-      const sessionToken = this.registry.getSessionToken(client.id);
-      if (!sessionToken) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      this.gameService.buildCity(payload.lobbyId, sessionToken, payload.vertexId, this.server);
+      this.gameplayHandlers.buildCity(this.server, client, payload);
     } catch (e) {
-      this.emitRejected(client, e);
+      this.reject.emit(client, e);
     }
   }
 
@@ -209,13 +179,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ): void {
     try {
-      const sessionToken = this.registry.getSessionToken(client.id);
-      if (!sessionToken) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      this.gameService.buyDevCard(payload.lobbyId, sessionToken, this.server);
+      this.gameplayHandlers.buyDevCard(this.server, client, payload);
     } catch (e) {
-      this.emitRejected(client, e);
+      this.reject.emit(client, e);
     }
   }
 
@@ -225,20 +191,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ): void {
     try {
-      const sessionToken = this.registry.getSessionToken(client.id);
-      if (!sessionToken) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      this.gameService.playKnight(
-        payload.lobbyId,
-        sessionToken,
-        payload.q,
-        payload.r,
-        payload.victimSeat,
-        this.server,
-      );
+      this.gameplayHandlers.playKnight(this.server, client, payload);
     } catch (e) {
-      this.emitRejected(client, e);
+      this.reject.emit(client, e);
     }
   }
 
@@ -248,13 +203,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ): void {
     try {
-      const sessionToken = this.registry.getSessionToken(client.id);
-      if (!sessionToken) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      this.gameService.playMonopoly(payload.lobbyId, sessionToken, payload.resource, this.server);
+      this.gameplayHandlers.playMonopoly(this.server, client, payload);
     } catch (e) {
-      this.emitRejected(client, e);
+      this.reject.emit(client, e);
     }
   }
 
@@ -264,19 +215,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ): void {
     try {
-      const sessionToken = this.registry.getSessionToken(client.id);
-      if (!sessionToken) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      this.gameService.playYearOfPlenty(
-        payload.lobbyId,
-        sessionToken,
-        payload.first,
-        payload.second,
-        this.server,
-      );
+      this.gameplayHandlers.playYearOfPlenty(this.server, client, payload);
     } catch (e) {
-      this.emitRejected(client, e);
+      this.reject.emit(client, e);
     }
   }
 
@@ -286,19 +227,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ): void {
     try {
-      const sessionToken = this.registry.getSessionToken(client.id);
-      if (!sessionToken) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      this.gameService.playRoadBuilding(
-        payload.lobbyId,
-        sessionToken,
-        payload.firstEdgeId,
-        payload.secondEdgeId,
-        this.server,
-      );
+      this.gameplayHandlers.playRoadBuilding(this.server, client, payload);
     } catch (e) {
-      this.emitRejected(client, e);
+      this.reject.emit(client, e);
     }
   }
 
@@ -308,20 +239,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ): void {
     try {
-      const sessionToken = this.registry.getSessionToken(client.id);
-      if (!sessionToken) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      this.gameService.bankTrade(
-        payload.lobbyId,
-        sessionToken,
-        payload.giveResource,
-        payload.giveAmount,
-        payload.receiveResource,
-        this.server,
-      );
+      this.tradeHandlers.bankTrade(this.server, client, payload);
     } catch (e) {
-      this.emitRejected(client, e);
+      this.reject.emit(client, e);
     }
   }
 
@@ -331,13 +251,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ): void {
     try {
-      const sessionToken = this.registry.getSessionToken(client.id);
-      if (!sessionToken) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      this.gameService.rollDice(payload.lobbyId, sessionToken, this.server);
+      this.gameplayHandlers.rollDice(this.server, client, payload);
     } catch (e) {
-      this.emitRejected(client, e);
+      this.reject.emit(client, e);
     }
   }
 
@@ -347,18 +263,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ): void {
     try {
-      const sessionToken = this.registry.getSessionToken(client.id);
-      if (!sessionToken) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      this.gameService.submitRobberDiscard(
-        payload.lobbyId,
-        sessionToken,
-        payload.discard,
-        this.server,
-      );
+      this.gameplayHandlers.robberDiscard(this.server, client, payload);
     } catch (e) {
-      this.emitRejected(client, e);
+      this.reject.emit(client, e);
     }
   }
 
@@ -368,20 +275,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ): void {
     try {
-      const sessionToken = this.registry.getSessionToken(client.id);
-      if (!sessionToken) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      this.gameService.moveRobber(
-        payload.lobbyId,
-        sessionToken,
-        payload.q,
-        payload.r,
-        payload.victimSeat,
-        this.server,
-      );
+      this.gameplayHandlers.moveRobber(this.server, client, payload);
     } catch (e) {
-      this.emitRejected(client, e);
+      this.reject.emit(client, e);
     }
   }
 
@@ -391,13 +287,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ): void {
     try {
-      const sessionToken = this.registry.getSessionToken(client.id);
-      if (!sessionToken) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      this.gameService.finishTrading(payload.lobbyId, sessionToken, this.server);
+      this.tradeHandlers.finishTrading(this.server, client, payload);
     } catch (e) {
-      this.emitRejected(client, e);
+      this.reject.emit(client, e);
     }
   }
 
@@ -407,13 +299,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ): void {
     try {
-      const sessionToken = this.registry.getSessionToken(client.id);
-      if (!sessionToken) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      this.gameService.endTurn(payload.lobbyId, sessionToken, this.server);
+      this.gameplayHandlers.endTurn(this.server, client, payload);
     } catch (e) {
-      this.emitRejected(client, e);
+      this.reject.emit(client, e);
     }
   }
 
@@ -423,39 +311,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ): void {
     try {
-      const sessionToken = this.registry.getSessionToken(client.id);
-      if (!sessionToken) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      const body = this.tradeActions.proposeTrade(this.tradeActionContext(), sessionToken, payload);
-      const roomId = formatSocketIoLobbyRoomId(body.lobbyId);
-      this.server.to(roomId).emit(GameSocketServerEvent.TradeUpdated, body);
-      const botSession = this.demoBots.resolveDemoBotTradeAcceptorSessionToken(
-        this.gameService.getLobby(payload.lobbyId),
-        body.trade.toSeat,
-      );
-      if (botSession !== null) {
-        const ctx = this.tradeActionContext();
-        try {
-          const accepted = this.tradeActions.acceptTrade(ctx, botSession, {
-            lobbyId: payload.lobbyId,
-            tradeId: body.trade.id,
-          });
-          if (accepted.tradeUpdated !== null) {
-            this.server.to(roomId).emit(GameSocketServerEvent.TradeUpdated, accepted.tradeUpdated);
-          }
-        } catch {
-          const rejected = this.tradeActions.rejectTrade(ctx, botSession, {
-            lobbyId: payload.lobbyId,
-            tradeId: body.trade.id,
-          });
-          if (rejected.tradeUpdated !== null) {
-            this.server.to(roomId).emit(GameSocketServerEvent.TradeUpdated, rejected.tradeUpdated);
-          }
-        }
-      }
+      this.tradeHandlers.tradePropose(this.server, client, payload);
     } catch (e) {
-      this.emitRejected(client, e);
+      this.reject.emit(client, e);
     }
   }
 
@@ -465,18 +323,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ): void {
     try {
-      const sessionToken = this.registry.getSessionToken(client.id);
-      if (!sessionToken) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      const result = this.tradeActions.acceptTrade(this.tradeActionContext(), sessionToken, payload);
-      if (result.tradeUpdated !== null) {
-        this.server
-          .to(formatSocketIoLobbyRoomId(result.lobbyId))
-          .emit(GameSocketServerEvent.TradeUpdated, result.tradeUpdated);
-      }
+      this.tradeHandlers.tradeAccept(this.server, client, payload);
     } catch (e) {
-      this.emitRejected(client, e);
+      this.reject.emit(client, e);
     }
   }
 
@@ -486,34 +335,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ): void {
     try {
-      const sessionToken = this.registry.getSessionToken(client.id);
-      if (!sessionToken) {
-        throw new Error(ActionRejectCode.PlayerNotInLobby);
-      }
-      const result = this.tradeActions.rejectTrade(this.tradeActionContext(), sessionToken, payload);
-      if (result.tradeUpdated !== null) {
-        this.server
-          .to(formatSocketIoLobbyRoomId(result.lobbyId))
-          .emit(GameSocketServerEvent.TradeUpdated, result.tradeUpdated);
-      }
+      this.tradeHandlers.tradeReject(this.server, client, payload);
     } catch (e) {
-      this.emitRejected(client, e);
+      this.reject.emit(client, e);
     }
-  }
-
-  private emitRejected(client: Socket, e: unknown): void {
-    const { code, message } = this.gameService.describeError(e);
-    const payload: ActionRejectedPayload = { code, message };
-    client.emit(GameSocketServerEvent.ActionRejected, payload);
-  }
-
-  private tradeActionContext(): {
-    getLobby: (lobbyId: string) => LobbyRuntime | undefined;
-    broadcastLobby: (lobby: LobbyRuntime) => void;
-  } {
-    return {
-      getLobby: (lobbyId: string) => this.gameService.getLobby(lobbyId),
-      broadcastLobby: (lobby: LobbyRuntime) => this.gameService.broadcastFullState(this.server, lobby),
-    };
   }
 }

@@ -116,6 +116,7 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
   private readonly headVideoSync = effect(() => {
     this.liveKit.localVideoElement();
     this.liveKit.remoteVideoRevision();
+    this.gameSettings.webcamEnabled();
     const state = this.gameState.lobby.value();
     if (!this.engine || state === undefined) {
       return;
@@ -253,14 +254,18 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
     for (let i = 0; i < state.players.length; i += 1) {
       const player = state.players[i];
       if (player.isBot) {
-        this.engine.setHeadVideoForSeat(player.seat, null);
+        this.engine.setHeadVideoForSeat(player.seat, null, false);
         continue;
       }
       if (player.isSelf) {
-        this.engine.setHeadVideoForSeat(player.seat, this.liveKit.localVideoElement());
+        const localVideo = this.liveKit.localVideoElement();
+        const showPlaceholder = this.gameSettings.webcamEnabled() && localVideo === null;
+        this.engine.setHeadVideoForSeat(player.seat, localVideo, showPlaceholder);
         continue;
       }
-      this.engine.setHeadVideoForSeat(player.seat, this.liveKit.getRemoteVideoForSeat(player.seat));
+      const remoteVideo = this.liveKit.getRemoteVideoForSeat(player.seat);
+      const remotePlaceholder = remoteVideo === null;
+      this.engine.setHeadVideoForSeat(player.seat, remoteVideo, remotePlaceholder);
     }
   }
 

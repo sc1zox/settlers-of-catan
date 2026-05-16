@@ -2,7 +2,6 @@ import {
   BufferGeometry,
   Float32BufferAttribute,
   Group,
-  MeshStandardMaterial,
   NormalBlending,
   Points,
   PointsMaterial,

@@ -9,6 +9,8 @@ import {
   BuildSettlementPayload,
   BuyDevCardPayload,
   ClientConnectErrorCode,
+  CreateLobbyPayload,
+  FillLobbyWithBotsPayload,
   PlayKnightPayload,
   PlayMonopolyPayload,
   PlayRoadBuildingPayload,
@@ -20,6 +22,7 @@ import {
   GameSocketClientEvent,
   GameSocketServerEvent,
   JoinLobbyPayload,
+  LeaveLobbyPayload,
   LobbyFullStatePayload,
   LobbyJoinedPayload,
   MoveRobberPayload,
@@ -106,9 +109,27 @@ export class GameSocketService implements OnDestroy {
     this.socket?.emit(GameSocketClientEvent.JoinLobby, payload);
   }
 
+  public createLobby(lobbyCode: string, displayName: string): void {
+    const payload: CreateLobbyPayload = { lobbyCode, displayName };
+    this.socket?.emit(GameSocketClientEvent.CreateLobby, payload);
+  }
+
   public startLobby(lobbyId: string): void {
     const payload: StartLobbyPayload = { lobbyId };
     this.socket?.emit(GameSocketClientEvent.StartLobby, payload);
+  }
+
+  public fillLobbyWithBots(lobbyId: string): void {
+    const payload: FillLobbyWithBotsPayload = { lobbyId };
+    this.socket?.emit(GameSocketClientEvent.FillLobbyWithBots, payload);
+  }
+
+  public leaveLobby(lobbyId: string): void {
+    if (lobbyId.length === 0) {
+      return;
+    }
+    const payload: LeaveLobbyPayload = { lobbyId };
+    this.socket?.emit(GameSocketClientEvent.LeaveLobby, payload);
   }
 
   public buildSettlement(lobbyId: string, vertexId: string): void {

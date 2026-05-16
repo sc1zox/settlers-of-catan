@@ -54,6 +54,7 @@ services:
       NX_DAEMON: "false"
       CHOKIDAR_USEPOLLING: "1"
       REDIS_URL: redis://redis:6379
+      LOBBY_IDLE_TTL_SECONDS: "300"
       LIVEKIT_API_KEY: devkey
       LIVEKIT_API_SECRET: devsecret
       LIVEKIT_HTTP_URL: http://livekit:7880

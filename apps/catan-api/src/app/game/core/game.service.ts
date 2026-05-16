@@ -4,7 +4,6 @@ import {
   DescribeErrorMessage,
   DiceRolledPayload,
   GameSocketServerEvent,
-  KnownLobbyId,
   PlayerSeat,
   ResourceType,
   formatSocketIoLobbyRoomId,
@@ -19,6 +18,7 @@ import { DevCardsService } from '../dev-cards/dev-cards.service';
 import { EconomyService } from '../economy/economy.service';
 import { LobbyRuntime } from '../lobby/lobby-runtime';
 import { LobbyService } from '../lobby/lobby.service';
+import { LobbyOrchestratorService } from '../lobby-orchestrator/lobby-orchestrator.service';
 import { MatchFlowService } from '../match-flow/match-flow.service';
 import { RobberService } from '../robber/robber.service';
 
@@ -36,6 +36,7 @@ function asRejectCode(message: string): ActionRejectCode {
 export class GameService {
   public constructor(
     private readonly lobby: LobbyService,
+    private readonly lobbyOrchestrator: LobbyOrchestratorService,
     private readonly matchFlow: MatchFlowService,
     private readonly buildActions: BuildActionService,
     private readonly economy: EconomyService,
@@ -48,13 +49,22 @@ export class GameService {
     return this.lobby.getLobby(lobbyId);
   }
 
-  public async joinLobby(
-    lobbyId: string,
+  public async createLobby(
+    lobbyCode: string,
     sessionToken: string,
     displayName: string,
     socketId: string,
   ): Promise<{ lobby: LobbyRuntime; joined: LobbyJoinedPayload }> {
-    return this.lobby.joinLobby(lobbyId, sessionToken, displayName, socketId);
+    return this.lobbyOrchestrator.createLobby(lobbyCode, sessionToken, displayName, socketId);
+  }
+
+  public async joinLobby(
+    lobbyCode: string,
+    sessionToken: string,
+    displayName: string,
+    socketId: string,
+  ): Promise<{ lobby: LobbyRuntime; joined: LobbyJoinedPayload }> {
+    return this.lobbyOrchestrator.joinLobby(lobbyCode, sessionToken, displayName, socketId);
   }
 
   public toFullState(lobby: LobbyRuntime, viewerSessionToken: string): LobbyFullStatePayload {
@@ -64,44 +74,45 @@ export class GameService {
   public broadcastFullState(server: Server, lobby: LobbyRuntime): void {
     this.lobby.broadcastFullState(server, lobby);
     const lobbyId = lobby.lobbyId;
-    const runDemoDrain = (): void => {
-      this.demoBots.afterLobbyBroadcast(lobbyId, server, {
-        getLobby: (id: string) => this.lobby.getLobby(id),
-        rollDice: (id, sessionToken, srv) => {
-          this.rollDice(id, sessionToken, srv);
-        },
-        finishTrading: (id, sessionToken, srv) => {
-          this.finishTrading(id, sessionToken, srv);
-        },
-        endTurn: (id, sessionToken, srv) => {
-          this.endTurn(id, sessionToken, srv);
-        },
-        submitRobberDiscard: (id, sessionToken, discard, srv) => {
-          this.submitRobberDiscard(id, sessionToken, discard, srv);
-        },
-        moveRobber: (id, sessionToken, q, r, victimSeat, srv) => {
-          this.moveRobber(id, sessionToken, q, r, victimSeat, srv);
-        },
-        buildSettlement: (id, sessionToken, vertexId, srv) => {
-          this.buildSettlement(id, sessionToken, vertexId, srv);
-        },
-        buildRoad: (id, sessionToken, edgeId, srv) => {
-          this.buildRoad(id, sessionToken, edgeId, srv);
-        },
-        buildCity: (id, sessionToken, vertexId, srv) => {
-          this.buildCity(id, sessionToken, vertexId, srv);
-        },
-      });
-    };
-    if (lobbyId === KnownLobbyId.DemoClient) {
-      setImmediate(runDemoDrain);
-    } else {
-      runDemoDrain();
-    }
+    this.demoBots.afterLobbyBroadcast(lobbyId, server, {
+      getLobby: (id: string) => this.lobby.getLobby(id),
+      rollDice: (id, sessionToken, srv) => {
+        this.rollDice(id, sessionToken, srv);
+      },
+      finishTrading: (id, sessionToken, srv) => {
+        this.finishTrading(id, sessionToken, srv);
+      },
+      endTurn: (id, sessionToken, srv) => {
+        this.endTurn(id, sessionToken, srv);
+      },
+      submitRobberDiscard: (id, sessionToken, discard, srv) => {
+        this.submitRobberDiscard(id, sessionToken, discard, srv);
+      },
+      moveRobber: (id, sessionToken, q, r, victimSeat, srv) => {
+        this.moveRobber(id, sessionToken, q, r, victimSeat, srv);
+      },
+      buildSettlement: (id, sessionToken, vertexId, srv) => {
+        this.buildSettlement(id, sessionToken, vertexId, srv);
+      },
+      buildRoad: (id, sessionToken, edgeId, srv) => {
+        this.buildRoad(id, sessionToken, edgeId, srv);
+      },
+      buildCity: (id, sessionToken, vertexId, srv) => {
+        this.buildCity(id, sessionToken, vertexId, srv);
+      },
+    });
   }
 
   public onDisconnect(sessionToken: string, server: Server): void {
-    this.lobby.onDisconnect(sessionToken, server);
+    this.lobbyOrchestrator.onDisconnect(sessionToken, server);
+  }
+
+  public async leaveLobby(
+    lobbyId: string,
+    sessionToken: string,
+    server: Server,
+  ): Promise<void> {
+    await this.lobbyOrchestrator.leaveLobby(lobbyId, sessionToken, server);
   }
 
   public buildSettlement(
@@ -154,6 +165,7 @@ export class GameService {
   public startLobby(lobbyId: string, sessionToken: string, server: Server): void {
     const lobby = this.lobby.requireLobby(lobbyId);
     this.lobby.assertLobbyOpen(lobby);
+    this.lobby.ensureLobbyAdminConsistent(lobby);
     this.matchFlow.startLobby(lobby, sessionToken);
     this.broadcastFullState(server, lobby);
     this.demoBots.runDemoSetupAutoplay(lobbyId, server, {
@@ -175,6 +187,10 @@ export class GameService {
         this.buildRoad(requestedLobbyId, botSessionToken, edgeId, requestedServer);
       },
     });
+  }
+
+  public fillLobbyWithBots(lobbyId: string, sessionToken: string, server: Server): void {
+    this.lobbyOrchestrator.fillLobbyWithBots(lobbyId, sessionToken, server);
   }
 
   public rollDice(lobbyId: string, sessionToken: string, server: Server): DiceRolledPayload {

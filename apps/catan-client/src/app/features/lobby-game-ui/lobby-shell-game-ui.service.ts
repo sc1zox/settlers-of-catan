@@ -11,8 +11,9 @@ import { TranslateService } from '@ngx-translate/core';
 import { TranslateInstantFn } from '../../../shared/i18n/translate-instant-fn';
 import { EnumTranslate } from '../../../game/i18n/enum-translate.helper';
 import { GameStateResource } from '../../core/game/game-state.resource';
+import { TradingStateService } from '../trading/trading-state.service';
 import { DiscardModalModel } from '../../game-canvas/discard-modal';
-import { TradePartner } from '../../game-canvas/trade-panel';
+import type { TradePartner } from '../../shared/types/trading-ui.types';
 import { LobbyUiState, LobbyUiStep } from '../../shared/types/lobby-ui-state';
 import {
   computeHudChromeSpectatorPaused,
@@ -31,6 +32,7 @@ import { buildTurnAnnouncerText } from '../../shared/helper/lobby-game-ui/turn-a
 @Injectable({ providedIn: 'root' })
 export class LobbyShellGameUiService {
   private readonly gameState = inject(GameStateResource);
+  private readonly tradingState = inject(TradingStateService);
   private readonly translate = inject(TranslateService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly uiStepHolder = signal<Signal<LobbyUiStep> | null>(null);
@@ -188,6 +190,15 @@ export class LobbyShellGameUiService {
     () => this.isLobbyAdmin() && this.lobbyUiState()?.phase === GamePhase.LobbyWaiting,
   );
 
+  public readonly canFillLobbyWithBots = computed<boolean>(() => {
+    const state = this.lobbyUiState();
+    const raw = this.rawLobbyState();
+    if (!this.isLobbyAdmin() || state === null || raw === undefined) {
+      return false;
+    }
+    return state.phase === GamePhase.LobbyWaiting && raw.players.length < 4;
+  });
+
   public readonly canRollDice = computed<boolean>(
     () => this.isSelfTurn() && this.lobbyUiState()?.phase === GamePhase.Rolling,
   );
@@ -279,7 +290,7 @@ export class LobbyShellGameUiService {
   });
 
   public readonly pendingTrade = computed<TradeOfferDto | null>(() => {
-    const trade = this.gameState.tradeUpdated.value();
+    const trade = this.tradingState.tradeUpdated.value();
     return trade === undefined ? null : trade.trade;
   });
 

@@ -1,21 +1,21 @@
 <main class="shell">
   <app-game-canvas
     class="canvas-layer"
-    [buildMode]="buildMode()"
-    [freeRoadMode]="freeRoadMode()"
+    [buildMode]="buildFlow.buildMode()"
+    [freeRoadMode]="buildFlow.freeRoadMode()"
     [robberMode]="robberMode()"
     [diceRollClickEnabled]="lobbyGameUi.canRollDice() && !spectatorCamService.mode()"
     [uiChromeHidden]="spectatorCamService.mode()"
-    (arsenalBuild)="onArsenalBuild($event)"
-    (buildSpotPicked)="onBuildSpotPicked($event)"
-    (robberTilePicked)="onRobberTilePicked($event)"
-    (buildModeCancelled)="onBuildModeCancelled()"
-    (devCardClicked)="onDevCardClicked()"
+    (arsenalBuild)="buildFlow.onArsenalBuild($event)"
+    (buildSpotPicked)="buildFlow.onBuildSpotPicked($event)"
+    (robberTilePicked)="robberFlow.onRobberTilePicked($event)"
+    (buildModeCancelled)="buildFlow.onBuildModeCancelled()"
+    (devCardClicked)="devOverlay.onDevCardClicked()"
     (rollDiceRequested)="rollDice()"
   />
   <section class="ui-layer">
     @if (!spectatorCamService.mode()) {
-      @if (uiStep() !== lobbyUiStep.InGame) {
+      @if (lobbyFlow.uiStep() !== lobbyUiStep.InGame) {
         <article class="panel">
         <header class="panel__header">
           <h1>{{ 'shell.appTitle' | translate }}</h1>
@@ -34,7 +34,7 @@
           </p>
         }
 
-        @if (uiStep() === lobbyUiStep.SignIn) {
+        @if (lobbyFlow.uiStep() === lobbyUiStep.SignIn) {
           <form class="form-block" [formGroup]="sessionForm" (ngSubmit)="startSession()">
             <label for="displayName">{{ 'shell.labelDisplayName' | translate }}</label>
             <input id="displayName" type="text" autocomplete="nickname" formControlName="displayName" />
@@ -68,10 +68,10 @@
           </form>
         }
 
-        @if (uiStep() === lobbyUiStep.JoinLobby) {
+        @if (lobbyFlow.uiStep() === lobbyUiStep.JoinLobby) {
           <form class="form-block" [formGroup]="lobbyForm" (ngSubmit)="joinLobby()">
             <p class="session-pill">
-              {{ 'shell.sessionPill' | translate: { displayName: sessionState()?.displayName ?? '' } }}
+              {{ 'shell.sessionPill' | translate: { displayName: lobbyFlow.sessionState()?.displayName ?? '' } }}
             </p>
             <label for="lobbyCode">{{ 'shell.labelLobbyCode' | translate }}</label>
             <input id="lobbyCode" type="text" autocomplete="off" formControlName="lobbyCode" />
@@ -82,24 +82,32 @@
               <button
                 type="button"
                 class="button--ghost"
-                [disabled]="isJoinInProgress()"
-                (click)="backToSignIn()"
+                [disabled]="lobbyFlow.isJoinInProgress()"
+                (click)="lobbyFlow.backToSignIn()"
               >
                 {{ 'shell.buttonChangeName' | translate }}
               </button>
-              <button type="submit" [disabled]="isJoinInProgress()">
-                @if (isJoinInProgress()) {
+              <button type="submit" [disabled]="lobbyFlow.isJoinInProgress()">
+                @if (lobbyFlow.isJoinInProgress()) {
                   <span class="button-spinner" aria-hidden="true"></span>
                   <span>{{ 'shell.buttonJoining' | translate }}</span>
                 } @else {
                   <span>{{ 'shell.buttonJoinGame' | translate }}</span>
                 }
               </button>
+              <button type="button" [disabled]="lobbyFlow.isJoinInProgress()" (click)="createLobby()">
+                @if (lobbyFlow.isJoinInProgress()) {
+                  <span class="button-spinner" aria-hidden="true"></span>
+                  <span>{{ 'shell.buttonCreating' | translate }}</span>
+                } @else {
+                  <span>{{ 'shell.buttonCreateLobby' | translate }}</span>
+                }
+              </button>
             </div>
           </form>
         }
 
-        @if (uiStep() === lobbyUiStep.Lobby) {
+        @if (lobbyFlow.uiStep() === lobbyUiStep.Lobby) {
           <div class="lobby-block">
             <div class="lobby-meta">
               <p>
@@ -116,10 +124,15 @@
               </p>
             </div>
 
-            @if (lobbyGameUi.isLobbyLoading() || isJoinInProgress()) {
+            @if (lobbyFlow.isJoinInProgress()) {
               <p class="status">
                 <span class="status-spinner" aria-hidden="true"></span>
-                <span>{{ 'shell.statusConnecting' | translate }}</span>
+                <span>{{ 'shell.statusJoinInProgress' | translate }}</span>
+              </p>
+            } @else if (lobbyGameUi.isLobbyLoading()) {
+              <p class="status">
+                <span class="status-spinner" aria-hidden="true"></span>
+                <span>{{ 'shell.statusLoadingLobbyState' | translate }}</span>
               </p>
             }
 
@@ -148,25 +161,34 @@
               @if (lobbyGameUi.canStartLobby()) {
                 <button
                   type="button"
-                  [disabled]="isJoinInProgress() || lobbyGameUi.isLobbyLoading()"
+                  [disabled]="lobbyFlow.isJoinInProgress() || lobbyGameUi.isLobbyLoading()"
                   (click)="startLobby()"
                 >
                   {{ 'shell.buttonStartGame' | translate }}
                 </button>
               }
+              @if (lobbyGameUi.canFillLobbyWithBots()) {
+                <button
+                  type="button"
+                  [disabled]="lobbyFlow.isJoinInProgress() || lobbyGameUi.isLobbyLoading()"
+                  (click)="fillLobbyWithBots()"
+                >
+                  {{ 'shell.buttonFillBots' | translate }}
+                </button>
+              }
               <button
                 type="button"
                 class="button--ghost"
-                [disabled]="isJoinInProgress() || lobbyGameUi.isLobbyLoading()"
-                (click)="backToJoinLobby()"
+                [disabled]="lobbyFlow.isJoinInProgress() || lobbyGameUi.isLobbyLoading()"
+                (click)="lobbyFlow.backToJoinLobby()"
               >
                 {{ 'shell.buttonOtherLobby' | translate }}
               </button>
               <button
                 type="button"
                 class="button--danger"
-                [disabled]="isJoinInProgress() || lobbyGameUi.isLobbyLoading()"
-                (click)="resetSession()"
+                [disabled]="lobbyFlow.isJoinInProgress() || lobbyGameUi.isLobbyLoading()"
+                (click)="lobbyFlow.resetSession()"
               >
                 {{ 'shell.buttonEndSession' | translate }}
               </button>
@@ -243,7 +265,7 @@
                   <button type="button" (click)="rollDice()">{{ 'shell.buttonRollDice' | translate }}</button>
                 }
                 @if (lobbyGameUi.canOpenTrade()) {
-                  <button type="button" (click)="openTrade()">{{ 'shell.buttonTrade' | translate }}</button>
+                  <button type="button" (click)="tradingPanel.openTrade()">{{ 'shell.buttonTrade' | translate }}</button>
                 }
                 @if (lobbyGameUi.canFinishTrading()) {
                   <button type="button" (click)="finishTrading()">
@@ -260,7 +282,7 @@
                 }
               </div>
 
-              @if (buildMode() !== null) {
+              @if (buildFlow.buildMode() !== null) {
                 <p class="hud__hint">{{ 'shell.hintBuildSpot' | translate }}</p>
               }
               @if (robberMode()) {
@@ -278,16 +300,16 @@
             <button
               type="button"
               class="button--ghost"
-              [disabled]="isJoinInProgress() || lobbyGameUi.isLobbyLoading()"
-              (click)="backToJoinLobby()"
+              [disabled]="lobbyFlow.isJoinInProgress() || lobbyGameUi.isLobbyLoading()"
+              (click)="lobbyFlow.backToJoinLobby()"
             >
               {{ 'shell.buttonOtherLobbyHud' | translate }}
             </button>
             <button
               type="button"
               class="button--danger"
-              [disabled]="isJoinInProgress() || lobbyGameUi.isLobbyLoading()"
-              (click)="resetSession()"
+              [disabled]="lobbyFlow.isJoinInProgress() || lobbyGameUi.isLobbyLoading()"
+              (click)="lobbyFlow.resetSession()"
             >
               {{ 'shell.buttonEndSessionHud' | translate }}
             </button>
@@ -298,34 +320,34 @@
   </section>
 
   <app-spectator-camera-toggle [visible]="true" />
-  <app-game-settings-toggle [visible]="uiStep() === lobbyUiStep.InGame" />
+  <app-game-settings-toggle [visible]="lobbyFlow.uiStep() === lobbyUiStep.InGame" />
 
-  @if (uiStep() === lobbyUiStep.InGame && !spectatorCamService.mode()) {
+  @if (lobbyFlow.uiStep() === lobbyUiStep.InGame && !spectatorCamService.mode()) {
     <app-build-confirm-popover
-      [model]="buildConfirm()"
-      (confirm)="confirmBuild()"
-      (dismiss)="cancelBuild()"
+      [model]="buildFlow.buildConfirm()"
+      (confirm)="buildFlow.confirmBuild()"
+      (dismiss)="buildFlow.cancelBuild()"
     />
-    <app-robber-victim-popover [model]="robberVictim()" (pick)="onRobberVictimPick($event)" />
+    <app-robber-victim-popover [model]="robberFlow.robberVictim()" (pick)="robberFlow.onRobberVictimPick($event)" />
     <app-discard-modal [model]="lobbyGameUi.discardModel()" (confirmed)="onSubmitDiscard($event)" />
     <app-trade-panel
-      [open]="tradeOpen()"
+      [open]="tradingPanel.tradeOpen()"
       [selfSeat]="lobbyGameUi.selfSeat()"
       [partnerList]="lobbyGameUi.tradePartners()"
       [pendingTrade]="lobbyGameUi.pendingTrade()"
-      (bankTrade)="onBankTrade($event)"
-      (propose)="onProposeTrade($event)"
-      (accept)="onAcceptTrade($event)"
-      (reject)="onRejectTrade($event)"
-      (closed)="closeTrade()"
+      (bankTrade)="tradingPanel.onBankTrade($event)"
+      (propose)="tradingPanel.onProposeTrade($event)"
+      (accept)="tradingPanel.onAcceptTrade($event)"
+      (reject)="tradingPanel.onRejectTrade($event)"
+      (closed)="tradingPanel.closeTrade()"
     />
     <app-dev-card-modal
-      [open]="devCardOpen()"
-      (playKnight)="onPlayKnight()"
-      (playMonopoly)="onPlayMonopoly($event)"
-      (playYearOfPlenty)="onPlayYearOfPlenty($event)"
-      (playRoadBuilding)="onPlayRoadBuilding()"
-      (closed)="closeDevCard()"
+      [open]="devOverlay.devCardOpen()"
+      (playKnight)="devOverlay.onPlayKnight()"
+      (playMonopoly)="devOverlay.onPlayMonopoly($event)"
+      (playYearOfPlenty)="devOverlay.onPlayYearOfPlenty($event)"
+      (playRoadBuilding)="devOverlay.onPlayRoadBuilding()"
+      (closed)="devOverlay.closeDevCard()"
     />
   }
 </main>

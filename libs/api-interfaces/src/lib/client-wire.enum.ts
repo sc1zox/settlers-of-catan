@@ -18,7 +18,6 @@ export enum UiLocale {
 }
 
 export enum KnownLobbyId {
-  DemoClient = 'demo',
   ServerDefault = 'default',
 }
 

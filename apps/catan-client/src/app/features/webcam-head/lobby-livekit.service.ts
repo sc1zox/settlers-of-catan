@@ -14,6 +14,7 @@ import {
 } from 'livekit-client';
 import type { VideoCaptureOptions } from 'livekit-client';
 import { GameSettingsService } from '../game-settings/game-settings.service';
+import { isLikelyMobileWebcamHost } from '../../shared/helper/webcam/mobile-webcam-host';
 import { webcamQualityPreset } from '../../shared/helper/webcam/webcam-quality-preset';
 
 interface LiveKitParticipantMetadata {
@@ -42,6 +43,9 @@ export class LobbyLiveKitService implements OnDestroy {
 
   public beginLocalVideoCaptureFromUserGesture(): void {
     if (!this.gameSettings.webcamEnabled()) {
+      return;
+    }
+    if (LobbyLiveKitService.isFirefoxUserAgent()) {
       return;
     }
     if (this.primedLocalVideo !== null) {
@@ -308,11 +312,10 @@ export class LobbyLiveKitService implements OnDestroy {
     height: number,
     frameRate: number,
   ): Promise<LocalVideoTrack> {
-    const attempts: VideoCaptureOptions[] = [
-      { resolution: { width, height, frameRate } },
-      { resolution: VideoPresets.h180.resolution },
-      { resolution: { width: 320, height: 240, frameRate: Math.min(frameRate, 15) } },
-    ];
+    const mobile = isLikelyMobileWebcamHost();
+    const attempts = LobbyLiveKitService.isFirefoxUserAgent()
+      ? LobbyLiveKitService.firefoxVideoCaptureAttempts(width, height, frameRate, mobile)
+      : LobbyLiveKitService.nonFirefoxVideoCaptureAttempts(width, height, frameRate, mobile);
     let lastError: unknown;
     for (let i = 0; i < attempts.length; i += 1) {
       try {
@@ -322,6 +325,63 @@ export class LobbyLiveKitService implements OnDestroy {
       }
     }
     throw lastError;
+  }
+
+  private static firefoxVideoCaptureAttempts(
+    width: number,
+    height: number,
+    frameRate: number,
+    mobile: boolean,
+  ): VideoCaptureOptions[] {
+    if (mobile) {
+      return [
+        { facingMode: 'user' },
+        { facingMode: 'user', resolution: VideoPresets.h90.resolution },
+        { facingMode: 'user', resolution: VideoPresets.h180.resolution },
+        {
+          facingMode: 'user',
+          resolution: { width: 320, height: 240, frameRate: Math.min(frameRate, 15) },
+        },
+        { facingMode: 'user', resolution: { width, height, frameRate } },
+        {},
+        { resolution: { width, height, frameRate } },
+      ];
+    }
+    return [
+      {},
+      { facingMode: 'user' },
+      { resolution: VideoPresets.h90.resolution },
+      { resolution: VideoPresets.h180.resolution },
+      { resolution: { width: 320, height: 240, frameRate: Math.min(frameRate, 15) } },
+      { resolution: { width, height, frameRate } },
+    ];
+  }
+
+  private static nonFirefoxVideoCaptureAttempts(
+    width: number,
+    height: number,
+    frameRate: number,
+    mobile: boolean,
+  ): VideoCaptureOptions[] {
+    if (mobile) {
+      return [
+        { facingMode: 'user', resolution: { width, height, frameRate } },
+        { facingMode: 'user', resolution: VideoPresets.h180.resolution },
+        {
+          facingMode: 'user',
+          resolution: { width: 320, height: 240, frameRate: Math.min(frameRate, 15) },
+        },
+        { facingMode: 'user' },
+        { resolution: { width, height, frameRate } },
+        { resolution: VideoPresets.h180.resolution },
+        { resolution: { width: 320, height: 240, frameRate: Math.min(frameRate, 15) } },
+      ];
+    }
+    return [
+      { resolution: { width, height, frameRate } },
+      { resolution: VideoPresets.h180.resolution },
+      { resolution: { width: 320, height: 240, frameRate: Math.min(frameRate, 15) } },
+    ];
   }
 
   private delay(ms: number): Promise<void> {

@@ -18,7 +18,7 @@ export function getTotalVictoryPoints(player: LobbyPlayerSlot): number {
   return player.visibleVictoryPoints + hiddenVictoryCards + bonus;
 }
 
-export function recomputeWinner(lobby: LobbyRuntime): void {
+function recomputeWinner(lobby: LobbyRuntime): void {
   if (lobby.winnerSeat !== null) {
     return;
   }
@@ -47,7 +47,7 @@ export function applyPostActionScoring(lobby: LobbyRuntime): void {
   }
 }
 
-export function recomputeLargestArmy(lobby: LobbyRuntime): void {
+function recomputeLargestArmy(lobby: LobbyRuntime): void {
   let bestSeat: PlayerSeat | null = null;
   let bestCount = 2;
   for (let i = 0; i < lobby.players.length; i += 1) {
@@ -64,7 +64,7 @@ export function recomputeLargestArmy(lobby: LobbyRuntime): void {
   }
 }
 
-export function recomputeLongestRoad(lobby: LobbyRuntime): void {
+function recomputeLongestRoad(lobby: LobbyRuntime): void {
   let bestSeat: PlayerSeat | null = null;
   let bestLength = 4;
   for (let i = 0; i < lobby.players.length; i += 1) {

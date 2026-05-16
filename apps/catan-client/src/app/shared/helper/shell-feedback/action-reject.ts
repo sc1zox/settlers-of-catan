@@ -11,6 +11,8 @@ const REJECT_KEY: Record<ActionRejectCode, string> = {
   [ActionRejectCode.InvalidPayload]: 'reject.invalidPayload',
   [ActionRejectCode.LobbyFull]: 'reject.lobbyFull',
   [ActionRejectCode.UnknownLobby]: 'reject.unknownLobby',
+  [ActionRejectCode.LobbyAlreadyExists]: 'reject.lobbyAlreadyExists',
+  [ActionRejectCode.LobbyHostOnly]: 'reject.lobbyHostOnly',
   [ActionRejectCode.PlayerNotInLobby]: 'reject.playerNotInLobby',
   [ActionRejectCode.UnknownTrade]: 'reject.unknownTrade',
   [ActionRejectCode.TradeNotOpen]: 'reject.tradeNotOpen',

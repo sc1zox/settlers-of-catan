@@ -7,6 +7,8 @@ export enum ActionRejectCode {
   InvalidPayload = 'invalid_payload',
   LobbyFull = 'lobby_full',
   UnknownLobby = 'unknown_lobby',
+  LobbyAlreadyExists = 'lobby_already_exists',
+  LobbyHostOnly = 'lobby_host_only',
   PlayerNotInLobby = 'player_not_in_lobby',
   UnknownTrade = 'unknown_trade',
   TradeNotOpen = 'trade_not_open',

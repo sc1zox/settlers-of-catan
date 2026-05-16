@@ -1,15 +1,11 @@
 import {
   Color,
   Fog,
-  Frustum,
-  Matrix4,
   Object3D,
   PerspectiveCamera,
   Quaternion,
   Scene,
-  Sphere,
   Timer,
-  Vector2,
   Vector3,
   DirectionalLight,
   VSMShadowMap,
@@ -22,7 +18,6 @@ import {
   BuildKind,
   GamePhase,
   PlayerSeat,
-  ResourceType,
   SceneUserDataKey,
   type LobbyFullStatePayload,
 } from '@catan/api-interfaces';
@@ -46,29 +41,30 @@ import { Table } from './table/table';
 import { Tile } from './tiles/tile';
 import { createHarbors, HarborSystem } from './world/harbors';
 import { World } from './world/world';
+import { legalIdsForKind } from './engine-runtime/build-flow';
+import {
+  BOARD_OVERLAY_UPDATE_BOUNDS_RADIUS,
+  DICE_UPDATE_BOUNDS_RADIUS,
+  INNER_STRIP_Z,
+  OUTER_STRIP_Z,
+  PLAYER_UPDATE_BOUNDS_RADIUS,
+  TABLE_SIZE,
+  TABLE_TOP_Y,
+  TILE_UPDATE_BOUNDS_RADIUS,
+} from './engine-runtime/constants';
+import { FocusCardFan } from './engine-runtime/focus-cards';
+import { FrustumCull } from './engine-runtime/frustum-cull';
+import { OrbitCameraAid } from './engine-runtime/orbit-camera';
+import { PerfStatsAggregator } from './engine-runtime/perf-stats';
+import { computeHandSignature, expandResourceHand } from './engine-runtime/resource-hand';
+import type { PerformanceStatsHandler } from './engine-runtime/types';
+
+export type { PerformanceSnapshot, PerformanceStatsHandler } from './engine-runtime/types';
 
 export interface EngineOptions {
   readonly seed?: number;
 }
 
-export interface PerformanceSnapshot {
-  readonly fps: number;
-  readonly frameMs: number;
-  readonly drawCalls: number;
-  readonly triangles: number;
-  readonly geometries: number;
-  readonly textures: number;
-  readonly visibleTiles: number;
-  readonly totalTiles: number;
-  readonly visibleHarbors: number;
-  readonly totalHarbors: number;
-  readonly visiblePlayers: number;
-  readonly totalPlayers: number;
-  readonly boardOverlayVisible: boolean;
-  readonly diceVisible: boolean;
-}
-
-/** Engine-level callback signatures for the build / robber interaction flows. */
 export type ArsenalBuildHandler = (kind: BuildKind) => void;
 export type BuildSpotPickHandler = (
   kind: BuildKind,
@@ -83,73 +79,6 @@ export type RobberTilePickHandler = (
   screenY: number,
 ) => void;
 export type BuildModeCancelHandler = () => void;
-export type PerformanceStatsHandler = (snapshot: PerformanceSnapshot) => void;
-
-const TABLE_TOP_Y = -3.5;
-const TABLE_SIZE = 44;
-const INNER_STRIP_Z = 17.2;
-const OUTER_STRIP_Z = 21.4;
-
-/** Rotation that maps a card's local -Y face into the camera's local +Z view direction. */
-const CARD_FACE_TO_CAMERA = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), -Math.PI / 2);
-/** Fraction of the view dimensions for focused hands. */
-const FOCUS_FILL_RATIO_HAND = 0.52;
-/** Single focused card can fill more screen space (e.g. Baukosten). */
-const FOCUS_FILL_RATIO_SINGLE = 0.9;
-/** Spacing between siblings in a focused group, expressed as a fraction of card-X width. */
-const FOCUS_GROUP_SPACING_FACTOR = 0.38;
-/** Hard floor on focus distance to keep cards out of the camera's near plane. */
-const FOCUS_MIN_DISTANCE = 0.9;
-/** NDC margin so focused cards never clip at screen edges. */
-const FOCUS_NDC_MARGIN = 0.08;
-/** Vertical NDC center for a focused hand. Negative means lower half. */
-const FOCUS_CENTER_NDC_HAND = -0.32;
-/** Single focused card is centered for maximum readability. */
-const FOCUS_CENTER_NDC_SINGLE = 0;
-/** Total opening angle of the hand fan in focused mode. */
-const FOCUS_FAN_TOTAL_ANGLE_RAD = Math.PI * 0.34;
-/** Multiplier converting card width to a fan radius. */
-const FOCUS_FAN_RADIUS_FACTOR = 1.1;
-/** Roll factor for card orientation in the fan. */
-const FOCUS_FAN_ROLL_FACTOR = 0.35;
-/** Additional lift when hovering a focused card so it "comes out" from the hand fan. */
-const FOCUS_HOVER_POP_UP = 0.24;
-/** Additional lateral spread when hovering a focused card in hand mode. */
-const FOCUS_HOVER_POP_SIDEWAYS = 0.34;
-
-const SPECTATOR_ORBIT_MIN_DISTANCE = 4;
-const SPECTATOR_ORBIT_MAX_DISTANCE = 145;
-const SPECTATOR_ORBIT_MIN_POLAR = 0.04;
-const SPECTATOR_ORBIT_MAX_POLAR = Math.PI * 0.49;
-const TILE_UPDATE_BOUNDS_RADIUS = HEX_SIZE * 1.65;
-const PLAYER_UPDATE_BOUNDS_RADIUS = 9.2;
-const DICE_UPDATE_BOUNDS_RADIUS = 3.6;
-const BOARD_OVERLAY_UPDATE_BOUNDS_RADIUS = HEX_SIZE * 4.9;
-
-/** Wire resource enum → procedural card texture kind. */
-const RESOURCE_TYPE_TO_KIND: Readonly<Record<ResourceType, ResourceKind>> = {
-  [ResourceType.Wood]: ResourceKind.Wood,
-  [ResourceType.Brick]: ResourceKind.Brick,
-  [ResourceType.Wheat]: ResourceKind.Grain,
-  [ResourceType.Wool]: ResourceKind.Wool,
-  [ResourceType.Ore]: ResourceKind.Ore,
-};
-
-/** Flatten a resource count map into the per-card list a hand renders. */
-function expandResourceHand(
-  resources: Readonly<Record<ResourceType, number>>,
-): ResourceKind[] {
-  const hand: ResourceKind[] = [];
-  const types = Object.keys(RESOURCE_TYPE_TO_KIND) as ResourceType[];
-  for (let i = 0; i < types.length; i += 1) {
-    const type = types[i];
-    const count = resources[type] ?? 0;
-    for (let n = 0; n < count; n += 1) {
-      hand.push(RESOURCE_TYPE_TO_KIND[type]);
-    }
-  }
-  return hand;
-}
 
 export class GameEngine {
   private readonly container: HTMLElement;
@@ -173,28 +102,26 @@ export class GameEngine {
   private readonly hover: HoverSystem;
   private readonly resizeObserver: ResizeObserver;
 
-  /** Board seed currently rendered; board is rebuilt when lobby state differs. */
+  private readonly frustumCull = new FrustumCull();
+  private readonly orbitAid = new OrbitCameraAid();
+  private readonly perfAggregator = new PerfStatsAggregator();
+  private readonly focusFan = new FocusCardFan();
+
   private currentSeed: number | null = null;
 
   private rafId: number | null = null;
   private running = false;
-  private focusedGroup: Card[] = [];
   private focusChangeHandler: ((focused: boolean) => void) | null = null;
 
-  /** Local player's seat, resolved from lobby state — drives ghost colour + arsenal hoverables. */
   private selfSeat: PlayerSeat | null = null;
   private legalSettlementVertexIds: readonly string[] = [];
   private legalRoadEdgeIds: readonly string[] = [];
   private legalCityVertexIds: readonly string[] = [];
   private legalRoadBuildingEdgeIds: readonly string[] = [];
-  /** Active build mode; non-null means ghost figures are shown for that kind. */
   private buildMode: BuildKind | null = null;
-  /** When true, road ghosts come from the cost-free road-building dev-card list. */
   private buildModeFreeRoad = false;
   private arsenalBuildHandler: ArsenalBuildHandler | null = null;
-  /** Last arsenal figure the player clicked — lifted into the air in build mode. */
   private pendingArsenalFigure: Object3D | null = null;
-  /** Scratch transforms for handing a board piece's world pose to the fly-in. */
   private readonly flyInScratchPos = new Vector3();
   private readonly flyInScratchQuat = new Quaternion();
   private readonly flyInScratchScale = new Vector3();
@@ -202,56 +129,17 @@ export class GameEngine {
   private robberTilePickHandler: RobberTilePickHandler | null = null;
   private buildModeCancelHandler: BuildModeCancelHandler | null = null;
   private devCardClickHandler: (() => void) | null = null;
-  /** Fired when the player clicks a physical die — Angular forwards it to the server. */
   private diceRollRequestHandler: (() => void) | null = null;
   private diceRollClickEnabled = false;
-  private spectatorCameraActive = false;
-  private orbitLimitsBackup: {
-    minDistance: number;
-    maxDistance: number;
-    minPolarAngle: number;
-    maxPolarAngle: number;
-  } | null = null;
   private hasFramedBoardForActiveMatch = false;
 
-  // Reusable scratch values for the per-frame focused-card pose calculation.
-  private readonly camForward = new Vector3();
-  private readonly camRight = new Vector3();
-  private readonly camUp = new Vector3();
-  private readonly worldUp = new Vector3(0, 1, 0);
-  private readonly worldTargetPos = new Vector3();
-  private readonly worldTargetQuat = new Quaternion();
-  private readonly parentInvMatrix = new Matrix4();
-  private readonly parentInvQuat = new Quaternion();
-  private readonly localTargetPos = new Vector3();
-  private readonly localTargetQuat = new Quaternion();
-  private readonly fan2D = new Vector2();
-  private readonly worldCardQuat = new Quaternion();
-  private readonly fanRollQuat = new Quaternion();
-  private readonly orbitClampDelta = new Vector3();
-  private readonly viewFrustum = new Frustum();
-  private readonly viewProjectionMatrix = new Matrix4();
-  private readonly cullCenter = new Vector3();
-  private readonly cullSphere = new Sphere();
   private readonly handSignatureBySeat: string[] = ['', '', '', ''];
   private readonly playerAreaActiveAtTable: boolean[] = [false, false, false, false];
-  private perfHandler: PerformanceStatsHandler | null = null;
-  private perfAccumFrames = 0;
-  private perfAccumSeconds = 0;
-  private perfAccumFrameMs = 0;
-  private perfLastVisibleTiles = 0;
-  private perfLastVisibleHarbors = 0;
-  private perfLastVisiblePlayers = 0;
-  private perfLastActivePlayersTotal = 0;
-  private perfLastBoardOverlayVisible = true;
-  private perfLastDiceVisible = true;
 
   constructor(container: HTMLElement, options: EngineOptions = {}) {
     this.container = container;
 
     this.scene = new Scene();
-    // Warm hazy daylight backdrop — a lit sky instead of a near-black void is
-    // the single biggest lift against "the scene is too dark".
     this.scene.background = new Color(0xb89a78);
     this.scene.fog = new Fog(0xb89a78, 70, 200);
 
@@ -271,15 +159,12 @@ export class GameEngine {
     const lighting = addLighting(this.scene, this.renderer);
     this.sunLight = lighting.sun;
 
-    // Warm light shafts streaming down onto the table.
     this.sunShafts = new SunShafts();
     this.scene.add(this.sunShafts.group);
 
-    // Bushy low-poly clouds drifting at a moderate altitude around the board.
     this.clouds = new CloudField();
     this.scene.add(this.clouds.group);
 
-    // Tabletop the disc hovers over.
     const discRadius = HEX_SIZE * 6.4;
     this.table = new Table({
       size: TABLE_SIZE,
@@ -297,24 +182,22 @@ export class GameEngine {
     this.harbors = createHarbors();
     this.scene.add(this.harbors.group);
 
-    // Four players around the table with starter hands.
     this.players = this.createPlayers();
-    for (const p of this.players) this.scene.add(p.group);
+    for (const p of this.players) {
+      this.scene.add(p.group);
+    }
 
-    // Dice rest on the tabletop in a corner clear of the disc and player strips.
     this.diceTray = new DiceTray({
       tableTopY: TABLE_TOP_Y,
       anchor: { x: 14.5, z: 14.5 },
     });
     this.scene.add(this.diceTray.group);
 
-    // Server-authoritative board overlay (settlements / roads / cities).
     this.buildings = new BoardBuildings();
     this.scene.add(this.buildings.group);
     this.robberFigure = new RobberFigure(this.buildings.group);
     this.scene.add(this.robberFigure.group);
 
-    // Translucent ghost figures shown while the player is in build mode.
     this.buildPreview = new BuildPreview();
     this.scene.add(this.buildPreview.group);
 
@@ -331,9 +214,12 @@ export class GameEngine {
       this.diceRollRequestHandler?.();
     });
     this.hover.setBackgroundClickHandler(() => {
-      if (this.focusedGroup.length > 0) this.clearFocusedCard();
-      // Build mode is owned by Angular — only notify, let it drive the clear.
-      if (this.buildMode !== null) this.buildModeCancelHandler?.();
+      if (this.focusFan.getFocusedGroup().length > 0) {
+        this.clearFocusedCard();
+      }
+      if (this.buildMode !== null) {
+        this.buildModeCancelHandler?.();
+      }
     });
     this.hover.setBuildSpotHoverHandler((figure) => this.buildPreview.setHovered(figure));
     this.hover.setArsenalClickHandler((figure) => {
@@ -355,8 +241,10 @@ export class GameEngine {
     this.resizeObserver.observe(container);
   }
 
-  start(): void {
-    if (this.running) return;
+  public start(): void {
+    if (this.running) {
+      return;
+    }
     this.running = true;
     const timer = new Timer();
     timer.connect(this.container.ownerDocument);
@@ -364,7 +252,7 @@ export class GameEngine {
     this.loop(performance.now());
   }
 
-  stop(): void {
+  public stop(): void {
     this.running = false;
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
@@ -374,21 +262,19 @@ export class GameEngine {
     this.timer = null;
   }
 
-  setHoverHandler(handler: HoverHandler | null): void {
+  public setHoverHandler(handler: HoverHandler | null): void {
     this.hover.setHandler(handler);
   }
 
-  setDiceResultHandler(handler: DiceResultHandler | null): void {
+  public setDiceResultHandler(handler: DiceResultHandler | null): void {
     this.diceTray.setResultHandler(handler);
   }
 
-  /** Notified when a card is focused / unfocused — used to drive a backdrop. */
-  setFocusChangeHandler(handler: ((focused: boolean) => void) | null): void {
+  public setFocusChangeHandler(handler: ((focused: boolean) => void) | null): void {
     this.focusChangeHandler = handler;
   }
 
-  /** Notified when the player clicks a physical die — forwards a roll request. */
-  setDiceRollRequestHandler(handler: (() => void) | null): void {
+  public setDiceRollRequestHandler(handler: (() => void) | null): void {
     this.diceRollRequestHandler = handler;
   }
 
@@ -396,12 +282,16 @@ export class GameEngine {
     this.diceRollClickEnabled = enabled;
   }
 
-  public setHeadVideoForSeat(seat: PlayerSeat, video: HTMLVideoElement | null): void {
+  public setHeadVideoForSeat(
+    seat: PlayerSeat,
+    video: HTMLVideoElement | null,
+    showNoCameraPlaceholder = false,
+  ): void {
     const area = this.players[seat];
     if (!area) {
       return;
     }
-    area.setHeadVideo(video);
+    area.setHeadVideo(video, showNoCameraPlaceholder);
   }
 
   public setHeadVideoDisplayGamma(gamma: number): void {
@@ -414,38 +304,32 @@ export class GameEngine {
     this.renderer.toneMappingExposure = brightness;
   }
 
-  /** Tumble the dice towards the server-authoritative roll. */
-  rollDiceTo(a: number, b: number): void {
+  public rollDiceTo(a: number, b: number): void {
     this.diceTray.rollTo(a, b);
   }
 
-  /** Fired when the player clicks a figure in their own arsenal stash. */
-  setArsenalBuildHandler(handler: ArsenalBuildHandler | null): void {
+  public setArsenalBuildHandler(handler: ArsenalBuildHandler | null): void {
     this.arsenalBuildHandler = handler;
   }
 
-  /** Fired when the player clicks a ghost build-spot (drives the confirm popover). */
-  setBuildSpotPickHandler(handler: BuildSpotPickHandler | null): void {
+  public setBuildSpotPickHandler(handler: BuildSpotPickHandler | null): void {
     this.buildSpotPickHandler = handler;
   }
 
-  /** Fired when the player clicks a board tile while robber mode is active. */
-  setRobberTilePickHandler(handler: RobberTilePickHandler | null): void {
+  public setRobberTilePickHandler(handler: RobberTilePickHandler | null): void {
     this.robberTilePickHandler = handler;
   }
 
-  /** Fired when build mode is cancelled from inside the scene (background click). */
-  setBuildModeCancelHandler(handler: BuildModeCancelHandler | null): void {
+  public setBuildModeCancelHandler(handler: BuildModeCancelHandler | null): void {
     this.buildModeCancelHandler = handler;
   }
 
-  /** Fired when the local player clicks one of their own dev cards. */
-  setDevCardClickHandler(handler: (() => void) | null): void {
+  public setDevCardClickHandler(handler: (() => void) | null): void {
     this.devCardClickHandler = handler;
   }
 
-  setPerformanceStatsHandler(handler: PerformanceStatsHandler | null): void {
-    this.perfHandler = handler;
+  public setPerformanceStatsHandler(handler: PerformanceStatsHandler | null): void {
+    this.perfAggregator.setHandler(handler);
   }
 
   public setShadowQuality(quality: ShadowQuality): void {
@@ -465,85 +349,57 @@ export class GameEngine {
   }
 
   public setSpectatorCameraMode(active: boolean): void {
-    if (active === this.spectatorCameraActive) {
+    if (active === this.orbitAid.isSpectatorActive()) {
       return;
     }
     if (active) {
-      this.clearFocusedCard();
-      if (this.orbitLimitsBackup === null) {
-        this.orbitLimitsBackup = {
-          minDistance: this.controls.minDistance,
-          maxDistance: this.controls.maxDistance,
-          minPolarAngle: this.controls.minPolarAngle,
-          maxPolarAngle: this.controls.maxPolarAngle,
-        };
-      }
-      this.controls.minDistance = SPECTATOR_ORBIT_MIN_DISTANCE;
-      this.controls.maxDistance = SPECTATOR_ORBIT_MAX_DISTANCE;
-      this.controls.minPolarAngle = SPECTATOR_ORBIT_MIN_POLAR;
-      this.controls.maxPolarAngle = SPECTATOR_ORBIT_MAX_POLAR;
-      this.spectatorCameraActive = true;
-      this.hover.setExploreReadOnly(true);
-      this.hover.setHoverables(this.collectHoverables());
-    } else {
-      if (this.orbitLimitsBackup !== null) {
-        this.controls.minDistance = this.orbitLimitsBackup.minDistance;
-        this.controls.maxDistance = this.orbitLimitsBackup.maxDistance;
-        this.controls.minPolarAngle = this.orbitLimitsBackup.minPolarAngle;
-        this.controls.maxPolarAngle = this.orbitLimitsBackup.maxPolarAngle;
-        this.orbitLimitsBackup = null;
-      }
-      this.spectatorCameraActive = false;
-      this.hover.setExploreReadOnly(false);
-      this.hover.setHoverables(this.collectHoverables());
+      this.focusFan.clearRest(this.focusChangeHandler);
     }
+    this.orbitAid.setSpectatorCameraMode(active, this.controls);
+    this.hover.setExploreReadOnly(active);
+    this.hover.setHoverables(this.collectHoverables());
   }
 
-  /**
-   * Enter / leave build mode. Passing a {@link BuildKind} renders translucent
-   * ghost figures at every spot the local player may legally build; `null`
-   * clears them. `freeRoad` switches road ghosts to the cost-free
-   * road-building dev-card list.
-   */
-  showBuildSpots(kind: BuildKind | null, freeRoad = false): void {
+  public showBuildSpots(kind: BuildKind | null, freeRoad = false): void {
     this.buildMode = kind;
     this.buildModeFreeRoad = freeRoad;
     if (kind === null) {
       this.buildPreview.clear();
     } else {
-      this.buildPreview.show(kind, this.legalIdsForKind(kind), this.selfColor());
+      this.buildPreview.show(kind, this.resolveLegalIds(kind), this.selfColor());
     }
     this.updateActivatedArsenalFigure();
     this.hover.setHoverables(this.collectHoverables());
   }
 
-  /**
-   * Lift the picked arsenal figure into the air while ordinary build mode is
-   * active (the road-building dev card has no stash figure, so it never lifts).
-   */
   private updateActivatedArsenalFigure(): void {
-    if (this.selfSeat === null) return;
+    if (this.selfSeat === null) {
+      return;
+    }
     const selfArea = this.players[this.selfSeat];
-    if (!selfArea) return;
+    if (!selfArea) {
+      return;
+    }
     const figure =
       this.buildMode !== null && !this.buildModeFreeRoad ? this.pendingArsenalFigure : null;
     selfArea.setActivatedArsenalFigure(figure);
   }
 
-  /**
-   * A freshly placed piece should be flown in from the arsenal only when it is
-   * the local player's and they have an activated stash figure of that kind.
-   */
   private canFlyInArsenalFigure(kind: BuildKind, seat: PlayerSeat): boolean {
-    if (this.selfSeat === null || seat !== this.selfSeat) return false;
+    if (this.selfSeat === null || seat !== this.selfSeat) {
+      return false;
+    }
     return this.players[this.selfSeat]?.hasActivatedArsenalFigure(kind) ?? false;
   }
 
-  /** Fly the activated arsenal figure into a board piece spawned hidden by the diff. */
   private startArsenalFlyIn(piece: SpawnedBuildPiece): void {
-    if (this.selfSeat === null) return;
+    if (this.selfSeat === null) {
+      return;
+    }
     const selfArea = this.players[this.selfSeat];
-    if (!selfArea) return;
+    if (!selfArea) {
+      return;
+    }
     piece.figure.updateWorldMatrix(true, false);
     piece.figure.getWorldPosition(this.flyInScratchPos);
     piece.figure.getWorldQuaternion(this.flyInScratchQuat);
@@ -556,43 +412,45 @@ export class GameEngine {
     );
   }
 
-  /** Toggle robber placement: when active, clicking a tile reports its coord. */
-  setRobberMode(active: boolean): void {
+  public setRobberMode(active: boolean): void {
     if (active) {
       this.hover.setTileClickHandler((chip, screenX, screenY) => {
         const tile = chip.userData[SceneUserDataKey.Tile] as Tile | undefined;
-        if (tile) this.robberTilePickHandler?.(tile.coord.q, tile.coord.r, screenX, screenY);
+        if (tile) {
+          this.robberTilePickHandler?.(tile.coord.q, tile.coord.r, screenX, screenY);
+        }
       });
     } else {
       this.hover.setTileClickHandler(null);
     }
   }
 
-  private legalIdsForKind(kind: BuildKind): readonly string[] {
-    if (kind === BuildKind.Settlement) return this.legalSettlementVertexIds;
-    if (kind === BuildKind.Road) {
-      return this.buildModeFreeRoad ? this.legalRoadBuildingEdgeIds : this.legalRoadEdgeIds;
-    }
-    return this.legalCityVertexIds;
+  private resolveLegalIds(kind: BuildKind): readonly string[] {
+    return legalIdsForKind(
+      kind,
+      this.legalSettlementVertexIds,
+      this.legalRoadEdgeIds,
+      this.legalCityVertexIds,
+      this.legalRoadBuildingEdgeIds,
+      this.buildModeFreeRoad,
+    );
   }
 
   private selfColor(): number {
     const seat = this.selfSeat;
-    if (seat === null) return PLAYER_SEAT_ORDER[0];
+    if (seat === null) {
+      return PLAYER_SEAT_ORDER[0];
+    }
     return PLAYER_SEAT_ORDER[seat] ?? PLAYER_SEAT_ORDER[0];
   }
 
-  /** Release the focused group back to its resting place (e.g., backdrop click). */
-  clearFocusedCard(): void {
-    if (this.focusedGroup.length === 0) return;
-    for (const c of this.focusedGroup) c.setMode('rest');
-    this.focusedGroup = [];
-    this.focusChangeHandler?.(false);
+  public clearFocusedCard(): void {
+    this.focusFan.clearRest(this.focusChangeHandler);
   }
 
-  dispose(): void {
+  public dispose(): void {
     this.stop();
-    this.setSpectatorCameraMode(false);
+    this.orbitAid.resetSpectator(this.controls);
     this.resizeObserver.disconnect();
     this.controls.dispose();
     this.hover.dispose();
@@ -605,7 +463,9 @@ export class GameEngine {
     this.robberFigure.dispose();
     this.buildings.dispose();
     this.buildPreview.dispose();
-    for (const p of this.players) p.dispose();
+    for (const p of this.players) {
+      p.dispose();
+    }
     this.scene.clear();
     this.renderer.dispose();
     if (this.renderer.domElement.parentElement === this.container) {
@@ -613,14 +473,7 @@ export class GameEngine {
     }
   }
 
-  /**
-   * Push server-authoritative lobby state into the scene. Rebuilds the board
-   * if the seed changed (so hex layout matches the server), syncs the
-   * settlement/road overlay — which animates any newly built piece — and
-   * refreshes every player's hand so dice production and dev-card purchases
-   * deal cards in with a drop animation.
-   */
-  applyLobbyState(state: LobbyFullStatePayload): void {
+  public applyLobbyState(state: LobbyFullStatePayload): void {
     for (let s = 0; s < this.playerAreaActiveAtTable.length; s += 1) {
       this.playerAreaActiveAtTable[s] = false;
     }
@@ -661,13 +514,14 @@ export class GameEngine {
       this.startArsenalFlyIn(flyIns[i]);
     }
     this.robberFigure.syncCoord(state.robberCoord.q, state.robberCoord.r, boardJustRebuilt);
-    for (const playerState of state.players) {
+    for (let i = 0; i < state.players.length; i += 1) {
+      const playerState = state.players[i];
       const area = this.players[playerState.seat];
-      if (!area || !this.playerAreaActiveAtTable[playerState.seat]) continue;
-      const handSignature = this.computeHandSignature(
-        playerState.resources,
-        playerState.devCardsInHand,
-      );
+      if (!area || !this.playerAreaActiveAtTable[playerState.seat]) {
+        continue;
+      }
+      area.setDisplayName(playerState.displayName);
+      const handSignature = computeHandSignature(playerState.resources, playerState.devCardsInHand);
       if (this.handSignatureBySeat[playerState.seat] !== handSignature) {
         area.setHand(
           expandResourceHand(playerState.resources),
@@ -676,11 +530,10 @@ export class GameEngine {
         this.handSignatureBySeat[playerState.seat] = handSignature;
       }
     }
-    // Re-render ghost figures against the freshly-arrived legal-move lists.
     if (this.buildMode !== null) {
       this.buildPreview.show(
         this.buildMode,
-        this.legalIdsForKind(this.buildMode),
+        this.resolveLegalIds(this.buildMode),
         this.selfColor(),
       );
     }
@@ -690,36 +543,9 @@ export class GameEngine {
       state.phase !== GamePhase.LobbyWaiting &&
       state.phase !== GamePhase.Finished
     ) {
-      this.applyMatchStartCameraFraming();
+      this.orbitAid.applyMatchStartCameraFraming(this.camera, this.controls);
       this.hasFramedBoardForActiveMatch = true;
     }
-  }
-
-  private applyMatchStartCameraFraming(): void {
-    this.controls.target.set(0, 0, 0);
-    this.camera.position.set(0, 38, 46);
-    this.controls.update();
-  }
-
-  /**
-   * Right-click panning is allowed, but the orbit target must stay near the
-   * board: zoom distance is measured from the target, so a target panned far
-   * away makes the board permanently unreachable. Clamp the target to a small
-   * box around the origin each frame and shift the camera by the same
-   * correction so the view stops smoothly at the boundary instead of jumping.
-   */
-  private clampOrbitTarget(): void {
-    const ORBIT_TARGET_XZ = 9;
-    const ORBIT_TARGET_Y_MIN = -2;
-    const ORBIT_TARGET_Y_MAX = 8;
-    const target = this.controls.target;
-    const x = Math.min(ORBIT_TARGET_XZ, Math.max(-ORBIT_TARGET_XZ, target.x));
-    const y = Math.min(ORBIT_TARGET_Y_MAX, Math.max(ORBIT_TARGET_Y_MIN, target.y));
-    const z = Math.min(ORBIT_TARGET_XZ, Math.max(-ORBIT_TARGET_XZ, target.z));
-    if (x === target.x && y === target.y && z === target.z) return;
-    this.orbitClampDelta.set(x - target.x, y - target.y, z - target.z);
-    target.set(x, y, z);
-    this.camera.position.add(this.orbitClampDelta);
   }
 
   private rebuildBoard(seed: number): void {
@@ -733,43 +559,60 @@ export class GameEngine {
     const hoverables: Object3D[] = [];
     for (const tile of this.board.tiles) {
       const sprite = tile.getChipSprite();
-      if (sprite) hoverables.push(sprite);
+      if (sprite) {
+        hoverables.push(sprite);
+      }
     }
-    for (const harbor of this.harbors.harbors) hoverables.push(harbor.pickMesh);
-    for (const player of this.players) {
+    for (let i = 0; i < this.harbors.harbors.length; i += 1) {
+      hoverables.push(this.harbors.harbors[i].pickMesh);
+    }
+    const spectator = this.orbitAid.isSpectatorActive();
+    for (let i = 0; i < this.players.length; i += 1) {
+      const player = this.players[i];
       if (!this.playerAreaActiveAtTable[player.info.seat]) {
         continue;
       }
-      if (this.spectatorCameraActive) {
+      if (spectator) {
         if (this.selfSeat === null || player.info.seat !== this.selfSeat) {
           continue;
         }
-        for (const card of player.cards) hoverables.push(card.mesh);
+        for (let j = 0; j < player.cards.length; j += 1) {
+          hoverables.push(player.cards[j].mesh);
+        }
         continue;
       }
       if (this.selfSeat !== null && player.info.seat === this.selfSeat) {
-        for (const card of player.cards) hoverables.push(card.mesh);
+        for (let j = 0; j < player.cards.length; j += 1) {
+          hoverables.push(player.cards[j].mesh);
+        }
       } else {
         hoverables.push(player.getCostCard().mesh);
       }
     }
-    if (!this.spectatorCameraActive) {
-      for (const die of this.diceTray.dice) hoverables.push(die.mesh);
+    if (!spectator) {
+      for (let i = 0; i < this.diceTray.dice.length; i += 1) {
+        hoverables.push(this.diceTray.dice[i].mesh);
+      }
     }
-    if (!this.spectatorCameraActive) {
-      for (const figure of this.buildPreview.hoverables()) hoverables.push(figure);
+    if (!spectator) {
+      const previewHover = this.buildPreview.hoverables();
+      for (let i = 0; i < previewHover.length; i += 1) {
+        hoverables.push(previewHover[i]);
+      }
     }
     if (this.selfSeat !== null && this.playerAreaActiveAtTable[this.selfSeat]) {
       const selfArea = this.players[this.selfSeat];
       if (selfArea) {
-        for (const figure of selfArea.arsenal) hoverables.push(figure);
+        for (let i = 0; i < selfArea.arsenal.length; i += 1) {
+          hoverables.push(selfArea.arsenal[i]);
+        }
       }
     }
     return hoverables;
   }
 
   private cardIsInspectable(card: Card): boolean {
-    if (this.spectatorCameraActive) {
+    if (this.orbitAid.isSpectatorActive()) {
       if (this.selfSeat === null) {
         return false;
       }
@@ -803,7 +646,7 @@ export class GameEngine {
       [DevKind.Knight, DevKind.RoadBuilding],
     ];
     const players: PlayerArea[] = [];
-    for (let seat = 0; seat < 4; seat++) {
+    for (let seat = 0; seat < 4; seat += 1) {
       const color: PlayerColor = PLAYER_SEAT_ORDER[seat];
       players.push(
         new PlayerArea({
@@ -824,8 +667,6 @@ export class GameEngine {
     if (!this.cardIsInspectable(card)) {
       return;
     }
-    // Clicking one of the local player's own dev cards opens the play modal
-    // instead of the focus-fan used for resource cards.
     const info = card.getHoverInfo();
     if (
       info?.group === CardHoverGroup.Development &&
@@ -836,151 +677,54 @@ export class GameEngine {
       return;
     }
 
+    const fg = this.focusFan.getFocusedGroup();
     const sameGroupAlreadyFocused =
-      this.focusedGroup.length > 0 &&
-      this.focusedGroup[0].getGroupKey() === card.getGroupKey() &&
-      // null group keys never match each other — fall back to identity instead.
-      (card.getGroupKey() !== null || this.focusedGroup.includes(card));
+      fg.length > 0 &&
+      fg[0].getGroupKey() === card.getGroupKey() &&
+      (card.getGroupKey() !== null || fg.includes(card));
 
     if (sameGroupAlreadyFocused) {
       this.clearFocusedCard();
       return;
     }
 
-    for (const c of this.focusedGroup) c.setMode('rest');
     const members = this.collectGroupMembers(card);
-    for (let i = 0; i < members.length; i++) {
-      members[i].setMode('focused');
-      // Right-most card draws on top — natural reading order for a fanned hand.
-      members[i].mesh.renderOrder = 999 + i;
-    }
-    this.focusedGroup = members;
-    this.focusChangeHandler?.(true);
+    this.focusFan.commitFocusedMembers(members, this.focusChangeHandler);
   }
 
   private collectGroupMembers(card: Card): Card[] {
     const key = card.getGroupKey();
-    if (key === null) return [card];
+    if (key === null) {
+      return [card];
+    }
     const out: Card[] = [];
-    for (const player of this.players) {
+    for (let i = 0; i < this.players.length; i += 1) {
+      const player = this.players[i];
       if (!this.playerAreaActiveAtTable[player.info.seat]) {
         continue;
       }
-      for (const c of player.cards) {
-        if (c.getGroupKey() === key) out.push(c);
+      for (let j = 0; j < player.cards.length; j += 1) {
+        const c = player.cards[j];
+        if (c.getGroupKey() === key) {
+          out.push(c);
+        }
       }
     }
     return out.length > 0 ? out : [card];
   }
 
-  /**
-   * Per-frame: position every focused card along a horizontal fan in front of
-   * the camera. Distance is picked so the largest member's vertical extent and
-   * the whole fan's horizontal span both fit `FOCUS_FILL_RATIO` of the view.
-   */
-  private updateFocusedCards(): void {
-    if (this.focusedGroup.length === 0) return;
-
-    this.camera.getWorldDirection(this.camForward);
-    // Build an orthonormal camera basis from world-up. Using the OrbitControls
-    // setup the camera never rolls, so this stays stable.
-    this.camRight.crossVectors(this.camForward, this.worldUp).normalize();
-    this.camUp.crossVectors(this.camRight, this.camForward).normalize();
-
-    let maxX = 0;
-    let maxZ = 0;
-    for (const c of this.focusedGroup) {
-      const s = c.getLocalSize();
-      if (s.x > maxX) maxX = s.x;
-      if (s.z > maxZ) maxZ = s.z;
-    }
-    const spacing = maxX * FOCUS_GROUP_SPACING_FACTOR;
-    const singleCardFocused = this.focusedGroup.length === 1;
-    const fillRatio = singleCardFocused ? FOCUS_FILL_RATIO_SINGLE : FOCUS_FILL_RATIO_HAND;
-    const centerNdcY = singleCardFocused ? FOCUS_CENTER_NDC_SINGLE : FOCUS_CENTER_NDC_HAND;
-    const fanRadius = singleCardFocused
-      ? 0
-      : Math.max((this.focusedGroup.length - 1) * spacing * FOCUS_FAN_RADIUS_FACTOR, maxX * 0.85);
-    const halfFanAngle = singleCardFocused ? 0 : FOCUS_FAN_TOTAL_ANGLE_RAD * 0.5;
-
-    let minX = 0;
-    let maxXOffset = 0;
-    for (let i = 0; i < this.focusedGroup.length; i++) {
-      const half = (this.focusedGroup.length - 1) / 2;
-      const normalized = half === 0 ? 0 : (i - half) / half;
-      const angle = normalized * halfFanAngle;
-      const xOffset = Math.sin(angle) * fanRadius;
-      if (i === 0 || xOffset < minX) minX = xOffset;
-      if (i === 0 || xOffset > maxXOffset) maxXOffset = xOffset;
-    }
-    const span = maxX + (maxXOffset - minX);
-
-    const halfTan = Math.tan((this.camera.fov * Math.PI) / 360);
-    const aspect = this.camera.aspect;
-    const usableHalfNdcX = (1 - FOCUS_NDC_MARGIN) * fillRatio;
-    const usableHalfNdcY = (1 - FOCUS_NDC_MARGIN - Math.abs(centerNdcY)) * fillRatio;
-    const safeHalfNdcX = Math.max(usableHalfNdcX, 0.05);
-    const safeHalfNdcY = Math.max(usableHalfNdcY, 0.05);
-    const effectiveHeight = maxZ + FOCUS_HOVER_POP_UP * 2;
-    const distanceForHeight = effectiveHeight / (2 * halfTan * safeHalfNdcY);
-    const distanceForWidth = span / (2 * halfTan * aspect * safeHalfNdcX);
-    const distance = Math.max(distanceForHeight, distanceForWidth, FOCUS_MIN_DISTANCE);
-    const verticalBias = centerNdcY * halfTan * distance;
-
-    this.worldTargetQuat.copy(this.camera.quaternion).multiply(CARD_FACE_TO_CAMERA);
-
-    const half = (this.focusedGroup.length - 1) / 2;
-    for (let i = 0; i < this.focusedGroup.length; i++) {
-      const card = this.focusedGroup[i];
-      const parent = card.mesh.parent;
-      if (!parent) continue;
-
-      const normalized = half === 0 ? 0 : (i - half) / half;
-      const angle = normalized * halfFanAngle;
-      this.fan2D.set(Math.sin(angle) * fanRadius, 0);
-      this.worldTargetPos
-        .copy(this.camForward)
-        .multiplyScalar(distance)
-        .add(this.camera.position)
-        .addScaledVector(this.camRight, this.fan2D.x)
-        .addScaledVector(this.camUp, verticalBias + this.fan2D.y);
-
-      const hoverableInHand = card.getHoverInfo() !== null;
-      if (card.isHovered() && hoverableInHand && !singleCardFocused) {
-        const sideFactor = Math.abs(normalized);
-        const sideSign = normalized < 0 ? -1 : 1;
-        const upFactor = 1 - sideFactor;
-        this.worldTargetPos
-          .addScaledVector(this.camRight, sideSign * FOCUS_HOVER_POP_SIDEWAYS * sideFactor)
-          .addScaledVector(this.camUp, FOCUS_HOVER_POP_UP * (0.45 + upFactor));
-      }
-
-      parent.updateWorldMatrix(true, false);
-      this.parentInvMatrix.copy(parent.matrixWorld).invert();
-      this.localTargetPos.copy(this.worldTargetPos).applyMatrix4(this.parentInvMatrix);
-
-      parent.getWorldQuaternion(this.parentInvQuat).invert();
-      this.fanRollQuat.setFromAxisAngle(
-        this.camForward,
-        -normalized * halfFanAngle * FOCUS_FAN_ROLL_FACTOR,
-      );
-      this.worldCardQuat.copy(this.worldTargetQuat).multiply(this.fanRollQuat);
-      this.localTargetQuat.copy(this.parentInvQuat).multiply(this.worldCardQuat);
-
-      card.setLiveTarget(this.localTargetPos, this.localTargetQuat);
-    }
-  }
-
   private readonly loop = (time: number): void => {
-    if (!this.running || this.timer === null) return;
+    if (!this.running || this.timer === null) {
+      return;
+    }
     this.timer.update(time);
     const dt = this.timer.getDelta();
     const t = this.timer.getElapsed();
-    this.updateViewFrustum();
+    this.frustumCull.update(this.camera);
     let visibleTiles = 0;
     for (let i = 0; i < this.board.tiles.length; i += 1) {
       const tile = this.board.tiles[i];
-      const visible = this.isVisibleInFrustum(tile.group, TILE_UPDATE_BOUNDS_RADIUS);
+      const visible = this.frustumCull.intersectsObject(tile.group, TILE_UPDATE_BOUNDS_RADIUS);
       tile.group.visible = visible;
       if (visible) {
         visibleTiles += 1;
@@ -990,7 +734,7 @@ export class GameEngine {
     this.world.update(dt, t);
     this.sunShafts.update(dt, t);
     this.clouds.update(dt, t);
-    const boardOverlayVisible = this.isVisibleAtOrigin(BOARD_OVERLAY_UPDATE_BOUNDS_RADIUS);
+    const boardOverlayVisible = this.frustumCull.intersectsOrigin(BOARD_OVERLAY_UPDATE_BOUNDS_RADIUS);
     this.buildings.group.visible = boardOverlayVisible;
     this.robberFigure.group.visible = boardOverlayVisible;
     this.buildPreview.group.visible = boardOverlayVisible;
@@ -999,7 +743,7 @@ export class GameEngine {
       this.robberFigure.update(dt);
       this.buildPreview.update(dt);
     }
-    const diceVisible = this.isVisibleInFrustum(this.diceTray.group, DICE_UPDATE_BOUNDS_RADIUS);
+    const diceVisible = this.frustumCull.intersectsObject(this.diceTray.group, DICE_UPDATE_BOUNDS_RADIUS);
     this.diceTray.group.visible = diceVisible;
     if (diceVisible) {
       this.diceTray.update(dt);
@@ -1007,15 +751,15 @@ export class GameEngine {
     let visibleHarbors = 0;
     for (let i = 0; i < this.harbors.harbors.length; i += 1) {
       const harbor = this.harbors.harbors[i];
-      const visible = this.isVisibleInFrustum(harbor.group, TILE_UPDATE_BOUNDS_RADIUS);
+      const visible = this.frustumCull.intersectsObject(harbor.group, TILE_UPDATE_BOUNDS_RADIUS);
       harbor.group.visible = visible;
       if (visible) {
         visibleHarbors += 1;
       }
     }
     const cameraChanged = this.controls.update();
-    this.clampOrbitTarget();
-    this.updateFocusedCards();
+    this.orbitAid.clampOrbitTarget(this.camera, this.controls);
+    this.focusFan.update(this.camera);
     let visiblePlayers = 0;
     let activePlayersTotal = 0;
     for (let i = 0; i < this.players.length; i += 1) {
@@ -1025,7 +769,7 @@ export class GameEngine {
       }
       const visible =
         this.playerAreaActiveAtTable[i] &&
-        this.isVisibleInFrustum(player.group, PLAYER_UPDATE_BOUNDS_RADIUS);
+        this.frustumCull.intersectsObject(player.group, PLAYER_UPDATE_BOUNDS_RADIUS);
       player.group.visible = visible;
       if (visible) {
         visiblePlayers += 1;
@@ -1034,91 +778,25 @@ export class GameEngine {
     }
     this.hover.update(cameraChanged);
     this.renderer.render(this.scene, this.camera);
-    this.perfLastVisibleTiles = visibleTiles;
-    this.perfLastVisibleHarbors = visibleHarbors;
-    this.perfLastVisiblePlayers = visiblePlayers;
-    this.perfLastActivePlayersTotal = activePlayersTotal;
-    this.perfLastBoardOverlayVisible = boardOverlayVisible;
-    this.perfLastDiceVisible = diceVisible;
-    this.collectPerformanceStats(dt);
+    this.perfAggregator.recordVisibility({
+      visibleTiles,
+      visibleHarbors,
+      visiblePlayers,
+      activePlayersTotal,
+      boardOverlayVisible,
+      diceVisible,
+    });
+    this.perfAggregator.tick(dt, this.renderer, this.board.tiles.length, this.harbors.harbors.length);
     this.rafId = requestAnimationFrame(this.loop);
   };
 
-  private collectPerformanceStats(dt: number): void {
-    if (this.perfHandler === null) {
-      this.perfAccumFrames = 0;
-      this.perfAccumSeconds = 0;
-      this.perfAccumFrameMs = 0;
-      return;
-    }
-    this.perfAccumFrames += 1;
-    this.perfAccumSeconds += dt;
-    this.perfAccumFrameMs += dt * 1000;
-    if (this.perfAccumSeconds < 0.5) {
-      return;
-    }
-    const fps = this.perfAccumSeconds > 0 ? this.perfAccumFrames / this.perfAccumSeconds : 0;
-    const frameMs = this.perfAccumFrames > 0 ? this.perfAccumFrameMs / this.perfAccumFrames : 0;
-    const renderInfo = this.renderer.info.render;
-    const memoryInfo = this.renderer.info.memory;
-    this.perfHandler({
-      fps,
-      frameMs,
-      drawCalls: renderInfo.calls,
-      triangles: renderInfo.triangles,
-      geometries: memoryInfo.geometries,
-      textures: memoryInfo.textures,
-      visibleTiles: this.perfLastVisibleTiles,
-      totalTiles: this.board.tiles.length,
-      visibleHarbors: this.perfLastVisibleHarbors,
-      totalHarbors: this.harbors.harbors.length,
-      visiblePlayers: this.perfLastVisiblePlayers,
-      totalPlayers: this.perfLastActivePlayersTotal,
-      boardOverlayVisible: this.perfLastBoardOverlayVisible,
-      diceVisible: this.perfLastDiceVisible,
-    });
-    this.perfAccumFrames = 0;
-    this.perfAccumSeconds = 0;
-    this.perfAccumFrameMs = 0;
-  }
-
-  private updateViewFrustum(): void {
-    this.camera.updateMatrixWorld();
-    this.viewProjectionMatrix.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
-    this.viewFrustum.setFromProjectionMatrix(this.viewProjectionMatrix);
-  }
-
-  private isVisibleInFrustum(object: Object3D, radius: number): boolean {
-    object.getWorldPosition(this.cullCenter);
-    this.cullSphere.center.copy(this.cullCenter);
-    this.cullSphere.radius = radius;
-    return this.viewFrustum.intersectsSphere(this.cullSphere);
-  }
-
-  private isVisibleAtOrigin(radius: number): boolean {
-    this.cullSphere.center.set(0, 0, 0);
-    this.cullSphere.radius = radius;
-    return this.viewFrustum.intersectsSphere(this.cullSphere);
-  }
-
   private handleResize(): void {
     const { clientWidth, clientHeight } = this.container;
-    if (clientWidth === 0 || clientHeight === 0) return;
+    if (clientWidth === 0 || clientHeight === 0) {
+      return;
+    }
     this.camera.aspect = clientWidth / clientHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(clientWidth, clientHeight, false);
-  }
-
-  private computeHandSignature(
-    resources: Readonly<Record<ResourceType, number>>,
-    devCardsInHand: number,
-  ): string {
-    const keys = Object.keys(RESOURCE_TYPE_TO_KIND) as ResourceType[];
-    let signature = `${devCardsInHand}`;
-    for (let i = 0; i < keys.length; i += 1) {
-      const key = keys[i];
-      signature += `|${resources[key] ?? 0}`;
-    }
-    return signature;
   }
 }

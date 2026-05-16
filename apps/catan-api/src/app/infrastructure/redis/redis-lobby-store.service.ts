@@ -1,7 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import {
-  KnownLobbyId,
   LobbyMemberRedisRecord,
   ProcessEnvKey,
   RedisKeyPrefix,
@@ -10,14 +9,24 @@ import {
 } from '@catan/api-interfaces';
 import Redis from 'ioredis';
 
-const LOBBY_TTL_SECONDS = 86_400;
+const DEFAULT_LOBBY_IDLE_TTL_SECONDS = 300;
+const MIN_LOBBY_IDLE_TTL_SECONDS = 60;
+const MAX_LOBBY_IDLE_TTL_SECONDS = 86_400;
 
 @Injectable()
 export class RedisLobbyStoreService implements OnModuleDestroy {
   private readonly logger = new Logger(RedisLobbyStoreService.name);
   private readonly client: Redis;
+  private readonly idleLobbyTtlSeconds: number;
 
   public constructor() {
+    const parsed = Number(process.env[ProcessEnvKey.LobbyIdleTtlSeconds]);
+    this.idleLobbyTtlSeconds =
+      Number.isFinite(parsed) &&
+      parsed >= MIN_LOBBY_IDLE_TTL_SECONDS &&
+      parsed <= MAX_LOBBY_IDLE_TTL_SECONDS
+        ? Math.floor(parsed)
+        : DEFAULT_LOBBY_IDLE_TTL_SECONDS;
     const url = process.env[ProcessEnvKey.RedisUrl] ?? 'redis://127.0.0.1:6379';
     this.client = new Redis(url, { maxRetriesPerRequest: 2, lazyConnect: true });
     this.client.connect().catch((error: unknown) => {
@@ -29,46 +38,68 @@ export class RedisLobbyStoreService implements OnModuleDestroy {
     await this.client.quit();
   }
 
-  public async resolveOrCreateCanonicalLobbyId(lobbyCode: string): Promise<string> {
+  public async resolveCanonicalLobbyIdByCode(lobbyCode: string): Promise<string | null> {
     const normalizedCode = normalizeLobbyCode(lobbyCode);
-    if (normalizedCode === KnownLobbyId.DemoClient) {
-      await this.registerLobby(normalizedCode, normalizedCode);
-      return normalizedCode;
-    }
     const aliasKey = this.aliasKey(normalizedCode);
-    const existing = await this.client.get(aliasKey);
-    if (existing !== null) {
-      return existing;
-    }
+    return this.client.get(aliasKey);
+  }
+
+  public async createCanonicalLobbyId(lobbyCode: string): Promise<string | null> {
+    const normalizedCode = normalizeLobbyCode(lobbyCode);
+    const aliasKey = this.aliasKey(normalizedCode);
     const canonicalId = randomUUID();
-    const created = await this.client.set(aliasKey, canonicalId, 'EX', LOBBY_TTL_SECONDS, 'NX');
+    const created = await this.client.set(
+      aliasKey,
+      canonicalId,
+      'EX',
+      this.idleLobbyTtlSeconds,
+      'NX',
+    );
     if (created === null) {
-      const raced = await this.client.get(aliasKey);
-      if (raced !== null) {
-        return raced;
-      }
+      return null;
     }
     await this.registerLobby(canonicalId, normalizedCode);
     return canonicalId;
   }
 
   public async registerLobby(canonicalLobbyId: string, lobbyCode: string): Promise<void> {
+    const ttlSeconds = this.idleLobbyTtlSeconds;
     const metaKey = this.metaKey(canonicalLobbyId);
     await this.client
       .multi()
       .hset(metaKey, RedisKeySegment.Meta, '1', RedisKeySegment.LobbyCode, lobbyCode)
-      .expire(metaKey, LOBBY_TTL_SECONDS)
-      .expire(this.membersKey(canonicalLobbyId), LOBBY_TTL_SECONDS)
+      .expire(metaKey, ttlSeconds)
+      .expire(this.membersKey(canonicalLobbyId), ttlSeconds)
       .exec();
   }
 
-  public async addMember(lobbyId: string, member: LobbyMemberRedisRecord): Promise<void> {
+  public async refreshLobbyActivity(canonicalLobbyId: string, lobbyCode: string): Promise<void> {
+    const nk = normalizeLobbyCode(lobbyCode);
+    const ttlSeconds = this.idleLobbyTtlSeconds;
+    const rawMembers = await this.client.hgetall(this.membersKey(canonicalLobbyId));
+    const pipeline = this.client.multi();
+    pipeline.expire(this.aliasKey(nk), ttlSeconds);
+    pipeline.expire(this.metaKey(canonicalLobbyId), ttlSeconds);
+    pipeline.expire(this.membersKey(canonicalLobbyId), ttlSeconds);
+    const memberTokens = Object.keys(rawMembers);
+    for (let i = 0; i < memberTokens.length; i += 1) {
+      pipeline.expire(this.sessionLobbyKey(memberTokens[i]), ttlSeconds);
+    }
+    await pipeline.exec();
+  }
+
+  public async addMember(
+    lobbyId: string,
+    lobbyCode: string,
+    member: LobbyMemberRedisRecord,
+  ): Promise<void> {
+    const ttlSeconds = this.idleLobbyTtlSeconds;
     const membersKey = this.membersKey(lobbyId);
     await this.client
       .multi()
       .hset(membersKey, member.sessionToken, JSON.stringify(member))
-      .set(this.sessionLobbyKey(member.sessionToken), lobbyId, 'EX', LOBBY_TTL_SECONDS)
-      .expire(membersKey, LOBBY_TTL_SECONDS)
+      .set(this.sessionLobbyKey(member.sessionToken), lobbyId, 'EX', ttlSeconds)
+      .expire(membersKey, ttlSeconds)
       .exec();
   }
 

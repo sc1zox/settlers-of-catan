@@ -24,6 +24,16 @@ export const CLOCKWISE_SEATS: readonly PlayerSeat[] = [
   PlayerSeat.West,
 ];
 
+export function pickFallbackHumanAdminSessionToken(lobby: LobbyRuntime): string | null {
+  for (let i = 0; i < lobby.players.length; i += 1) {
+    const candidate = lobby.players[i];
+    if (!candidate.isBot) {
+      return candidate.sessionToken;
+    }
+  }
+  return null;
+}
+
 export interface LobbyPlayerSlot {
   sessionToken: string;
   displayName: string;
@@ -201,6 +211,12 @@ export class LobbyRuntime {
     if (player.disconnectTimer) {
       clearTimeout(player.disconnectTimer);
       player.disconnectTimer = null;
+    }
+  }
+
+  public clearAllDisconnectTimers(): void {
+    for (let i = 0; i < this.players.length; i += 1) {
+      this.clearDisconnectTimer(this.players[i]);
     }
   }
 

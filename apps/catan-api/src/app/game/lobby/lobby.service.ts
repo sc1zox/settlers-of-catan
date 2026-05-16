@@ -1,21 +1,16 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   ActionRejectCode,
   GameSocketServerEvent,
   isCanonicalLobbyId,
-  isLobbyCodeValid,
-  KnownLobbyId,
   normalizeLobbyCode,
   PlayerSeat,
   type LobbyFullStatePayload,
-  type LobbyJoinedPayload,
 } from '@catan/api-interfaces';
 import { Server } from 'socket.io';
-import { LiveKitRoomService } from '../../infrastructure/livekit/livekit-room.service';
 import { RedisLobbyStoreService } from '../../infrastructure/redis/redis-lobby-store.service';
-import { DemoBotService } from '../demo-bot/demo-bot.service';
 import { GameActionValidationService } from '../validation/game-action-validation.service';
-import { LobbyPlayerSlot, LobbyRuntime } from './lobby-runtime';
+import { LobbyPlayerSlot, LobbyRuntime, pickFallbackHumanAdminSessionToken } from './lobby-runtime';
 import { resolveHarborRates } from '../utils/harbor-rate.util';
 import { getTotalVictoryPoints } from '../utils/scoring.util';
 
@@ -27,9 +22,7 @@ export class LobbyService {
 
   public constructor(
     private readonly validation: GameActionValidationService,
-    private readonly demoBots: DemoBotService,
     private readonly redisLobby: RedisLobbyStoreService,
-    private readonly liveKit: LiveKitRoomService,
   ) {}
 
   public getOrCreateLobby(canonicalLobbyId: string, lobbyCode: string): LobbyRuntime {
@@ -64,140 +57,42 @@ export class LobbyService {
     }
   }
 
-  public async joinLobby(
-    lobbyCodeInput: string,
-    sessionToken: string,
-    displayName: string,
-    socketId: string,
-  ): Promise<{ lobby: LobbyRuntime; joined: LobbyJoinedPayload }> {
-    const lobbyCode = lobbyCodeInput.trim();
-    if (!isLobbyCodeValid(lobbyCode)) {
-      throw new BadRequestException(ActionRejectCode.InvalidPayload);
-    }
-    const canonicalLobbyId = await this.redisLobby.resolveOrCreateCanonicalLobbyId(lobbyCode);
-    const normalizedCode = normalizeLobbyCode(lobbyCode);
-    this.canonicalIdByLobbyCode.set(normalizedCode, canonicalLobbyId);
-    const lobby = this.getOrCreateLobby(canonicalLobbyId, normalizedCode);
-    await this.liveKit.ensureRoom(canonicalLobbyId);
-    this.demoBots.pruneDemoLobbyStaleHumans(lobby, sessionToken);
-    const player = lobby.findPlayerByToken(sessionToken);
-    if (!player) {
-      let seat: PlayerSeat;
-      try {
-        seat = lobby.addPlayer(sessionToken, displayName, socketId, false);
-        if (lobby.adminSessionToken === null) {
-          lobby.adminSessionToken = sessionToken;
-        }
-        this.demoBots.fillDemoLobbyWithBots(lobby);
-      } catch {
-        throw new BadRequestException(ActionRejectCode.LobbyFull);
-      }
-      await this.redisLobby.addMember(canonicalLobbyId, {
-        sessionToken,
-        seat,
-        displayName,
-        isBot: false,
-      });
-      const liveKitGrant = await this.liveKit.issueJoinToken({
-        roomName: canonicalLobbyId,
-        identity: sessionToken,
-        displayName,
-        seat,
-        canPublish: true,
-      });
-      return {
-        lobby,
-        joined: {
-          lobbyId: canonicalLobbyId,
-          lobbyCode: normalizedCode,
-          seat,
-          liveKit: {
-            serverUrl: liveKitGrant.serverUrl,
-            token: liveKitGrant.token,
-            roomName: liveKitGrant.roomName,
-          },
-        },
-      };
-    }
-    lobby.clearDisconnectTimer(player);
-    player.socketId = socketId;
-    this.demoBots.fillDemoLobbyWithBots(lobby);
-    await this.redisLobby.addMember(canonicalLobbyId, {
-      sessionToken,
-      seat: player.seat,
-      displayName: player.displayName,
-      isBot: false,
-    });
-    const liveKitGrant = await this.liveKit.issueJoinToken({
-      roomName: canonicalLobbyId,
-      identity: sessionToken,
-      displayName: player.displayName,
-      seat: player.seat,
-      canPublish: true,
-    });
-    return {
-      lobby,
-      joined: {
-        lobbyId: canonicalLobbyId,
-        lobbyCode: normalizedCode,
-        seat: player.seat,
-        liveKit: {
-          serverUrl: liveKitGrant.serverUrl,
-          token: liveKitGrant.token,
-          roomName: liveKitGrant.roomName,
-        },
-      },
-    };
+  public getCanonicalIdByLobbyCode(normalizedCode: string): string | undefined {
+    return this.canonicalIdByLobbyCode.get(normalizedCode);
   }
 
-  public onDisconnect(sessionToken: string, server: Server): void {
+  public registerCanonicalIdByLobbyCode(normalizedCode: string, canonicalLobbyId: string): void {
+    this.canonicalIdByLobbyCode.set(normalizedCode, canonicalLobbyId);
+  }
+
+  public evictLobby(canonicalLobbyId: string): void {
+    const lobby = this.lobbies.get(canonicalLobbyId);
+    if (lobby === undefined) {
+      return;
+    }
+    lobby.clearAllDisconnectTimers();
+    this.lobbies.delete(canonicalLobbyId);
+  }
+
+  public removeLobby(canonicalLobbyId: string, lobbyCode: string): void {
+    this.lobbies.delete(canonicalLobbyId);
+    this.canonicalIdByLobbyCode.delete(lobbyCode);
+  }
+
+  public findLobbyByPlayerToken(
+    sessionToken: string,
+  ): { lobby: LobbyRuntime; player: LobbyPlayerSlot } | undefined {
     for (const lobby of this.lobbies.values()) {
       const player = lobby.findPlayerByToken(sessionToken);
-      if (!player) {
-        continue;
-      }
-      player.socketId = null;
-      lobby.startDisconnectHold(player, 60_000, () => {
-        void this.handleDisconnectGraceEnded(lobby, player, server);
-      });
-      this.broadcastFullState(server, lobby);
-      return;
-    }
-  }
-
-  private async handleDisconnectGraceEnded(
-    lobby: LobbyRuntime,
-    player: LobbyPlayerSlot,
-    server: Server,
-  ): Promise<void> {
-    this.logger.warn(`grace period ended for ${player.sessionToken} in ${lobby.lobbyCode}`);
-    await this.redisLobby.removeMember(lobby.lobbyId, player.sessionToken);
-    lobby.removePlayer(player.sessionToken);
-    this.broadcastFullState(server, lobby);
-    await this.maybeCloseVideoLobby(lobby);
-  }
-
-  private async maybeCloseVideoLobby(lobby: LobbyRuntime): Promise<void> {
-    let humans = 0;
-    for (let i = 0; i < lobby.players.length; i += 1) {
-      if (!lobby.players[i].isBot) {
-        humans += 1;
+      if (player !== undefined) {
+        return { lobby, player };
       }
     }
-    if (humans > 0) {
-      return;
-    }
-    this.lobbies.delete(lobby.lobbyId);
-    this.canonicalIdByLobbyCode.delete(lobby.lobbyCode);
-    const redisHumans = await this.redisLobby.listHumanMembers(lobby.lobbyId);
-    if (redisHumans.length > 0) {
-      return;
-    }
-    await this.liveKit.deleteRoom(lobby.lobbyId);
-    await this.redisLobby.deleteLobby(lobby.lobbyId, lobby.lobbyCode);
+    return undefined;
   }
 
   public toFullState(lobby: LobbyRuntime, viewerSessionToken: string): LobbyFullStatePayload {
+    this.ensureLobbyAdminConsistent(lobby);
     const players = lobby.players.map((p) => ({
       seat: p.seat,
       displayName: p.displayName,
@@ -256,6 +151,30 @@ export class LobbyService {
           .emit(GameSocketServerEvent.FullState, this.toFullState(lobby, p.sessionToken));
       }
     }
+    if (!this.nonBotLobbyMembersHaveSockets(lobby)) {
+      return;
+    }
+    void this.redisLobby.refreshLobbyActivity(lobby.lobbyId, lobby.lobbyCode).catch((error: unknown) => {
+      this.logger.warn(`refreshLobbyActivity failed (${lobby.lobbyCode}): ${String(error)}`);
+    });
+  }
+
+  public ensureLobbyAdminConsistent(lobby: LobbyRuntime): void {
+    const token = lobby.adminSessionToken;
+    if (token !== null && lobby.findPlayerByToken(token) !== undefined) {
+      return;
+    }
+    lobby.adminSessionToken = pickFallbackHumanAdminSessionToken(lobby);
+  }
+
+  private nonBotLobbyMembersHaveSockets(lobby: LobbyRuntime): boolean {
+    for (let i = 0; i < lobby.players.length; i += 1) {
+      const p = lobby.players[i];
+      if (!p.isBot && p.socketId !== null && p.socketId.length > 0) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private resolveCanonicalLobbyIdFromMemory(lobbyKey: string): string | null {

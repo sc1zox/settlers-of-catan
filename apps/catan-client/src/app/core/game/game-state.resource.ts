@@ -7,7 +7,6 @@ import {
   type DiceRolledPayload,
   type LobbyFullStatePayload,
   type LobbyJoinedPayload,
-  type TradeUpdatedPayload,
 } from '@catan/api-interfaces';
 import { EMPTY, firstValueFrom } from 'rxjs';
 import { filter, take, takeUntil, timeout } from 'rxjs/operators';
@@ -45,23 +44,6 @@ export class GameStateResource {
     defaultValue: undefined,
   });
 
-  public readonly tradeUpdated = rxResource<
-    TradeUpdatedPayload | undefined,
-    LobbyConnectionParams | undefined
-  >({
-    params: () => this.lobbyParams(),
-    stream: ({ params, abortSignal }) => {
-      if (params === undefined) {
-        return EMPTY;
-      }
-      return this.sockets.tradeUpdated$.pipe(
-        filter((payload) => params.lobbyId.length > 0 && payload.lobbyId === params.lobbyId),
-        takeUntil(observeAbort(abortSignal)),
-      );
-    },
-    defaultValue: undefined,
-  });
-
   public readonly diceRolled = rxResource<
     DiceRolledPayload | undefined,
     LobbyConnectionParams | undefined
@@ -79,15 +61,34 @@ export class GameStateResource {
     defaultValue: undefined,
   });
 
-  public async connectToLobby(
+  public async joinLobby(
     lobbyCodeInput: string,
     displayName: string,
+  ): Promise<LobbyJoinedPayload> {
+    return this.connectToLobby(lobbyCodeInput, displayName, 'join');
+  }
+
+  public async createLobby(
+    lobbyCodeInput: string,
+    displayName: string,
+  ): Promise<LobbyJoinedPayload> {
+    return this.connectToLobby(lobbyCodeInput, displayName, 'create');
+  }
+
+  private async connectToLobby(
+    lobbyCodeInput: string,
+    displayName: string,
+    mode: 'create' | 'join',
   ): Promise<LobbyJoinedPayload> {
     const lobbyCode = normalizeLobbyCode(lobbyCodeInput);
     try {
       await this.sockets.connect();
       this.lobbyParams.set({ lobbyId: '', lobbyCode, displayName });
-      this.sockets.joinLobby(lobbyCodeInput.trim(), displayName);
+      if (mode === 'create') {
+        this.sockets.createLobby(lobbyCodeInput.trim(), displayName);
+      } else {
+        this.sockets.joinLobby(lobbyCodeInput.trim(), displayName);
+      }
       const joined = await firstValueFrom(
         this.sockets.lobbyJoined$.pipe(
           filter((payload) => payload.lobbyCode === lobbyCode),
@@ -115,20 +116,20 @@ export class GameStateResource {
     this.sockets.startLobby(params.lobbyId);
   }
 
+  public fillLobbyWithBots(): void {
+    const params = this.lobbyParams();
+    if (params === undefined) {
+      return;
+    }
+    this.sockets.fillLobbyWithBots(params.lobbyId);
+  }
+
   public rollDice(): void {
     const params = this.lobbyParams();
     if (params === undefined) {
       return;
     }
     this.sockets.rollDice(params.lobbyId);
-  }
-
-  public finishTrading(): void {
-    const params = this.lobbyParams();
-    if (params === undefined) {
-      return;
-    }
-    this.sockets.finishTrading(params.lobbyId);
   }
 
   public endTurn(): void {
@@ -221,44 +222,12 @@ export class GameStateResource {
     this.sockets.playRoadBuilding(params.lobbyId, firstEdgeId, secondEdgeId);
   }
 
-  public bankTrade(
-    giveResource: ResourceType,
-    giveAmount: number,
-    receiveResource: ResourceType,
-  ): void {
+  public leaveLobby(): void {
     const params = this.lobbyParams();
-    if (params === undefined) {
+    if (params === undefined || params.lobbyId.length === 0) {
       return;
     }
-    this.sockets.bankTrade(params.lobbyId, giveResource, giveAmount, receiveResource);
-  }
-
-  public proposeTrade(
-    toSeat: PlayerSeat,
-    offer: Readonly<Partial<Record<ResourceType, number>>>,
-    request: Readonly<Partial<Record<ResourceType, number>>>,
-  ): void {
-    const params = this.lobbyParams();
-    if (params === undefined) {
-      return;
-    }
-    this.sockets.proposeTrade(params.lobbyId, toSeat, offer, request);
-  }
-
-  public acceptTrade(tradeId: string): void {
-    const params = this.lobbyParams();
-    if (params === undefined) {
-      return;
-    }
-    this.sockets.acceptTrade(params.lobbyId, tradeId);
-  }
-
-  public rejectTrade(tradeId: string): void {
-    const params = this.lobbyParams();
-    if (params === undefined) {
-      return;
-    }
-    this.sockets.rejectTrade(params.lobbyId, tradeId);
+    this.sockets.leaveLobby(params.lobbyId);
   }
 
   public disconnectLobby(): void {

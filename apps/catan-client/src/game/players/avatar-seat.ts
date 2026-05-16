@@ -1,9 +1,12 @@
 import { WEBCAM_MEDIA_SCOPE, WebcamMediaScopeKey } from '@catan/api-interfaces';
 import {
+  AdditiveBlending,
   BoxGeometry,
+  CanvasTexture,
   ClampToEdgeWrapping,
   Color,
   CylinderGeometry,
+  DoubleSide,
   Group,
   Mesh,
   MeshBasicMaterial,
@@ -31,6 +34,19 @@ const HEAD_SCREEN_ASPECT =
   WEBCAM_MEDIA_SCOPE[WebcamMediaScopeKey.MediumWidth] /
   WEBCAM_MEDIA_SCOPE[WebcamMediaScopeKey.MediumHeight];
 const DEFAULT_VIDEO_DISPLAY_GAMMA = 1.55;
+const NAME_PLATE_WIDTH = 1.42;
+const NAME_PLATE_HEIGHT = 0.34;
+const NAME_PLATE_Y = 2.02;
+const NAME_PLATE_Z = -0.12;
+const NAME_PLATE_BASE_OPACITY = 0.88;
+const NAME_PLATE_BOB_AMPLITUDE = 0.03;
+const NAME_PLATE_BOB_SPEED = 1.9;
+const NAME_PLATE_PULSE_SPEED = 2.4;
+const NAME_PLATE_PULSE_AMPLITUDE = 0.12;
+
+export interface AvatarSeatVideoOptions {
+  readonly placeholderWhenEmpty: boolean;
+}
 
 export class AvatarSeat {
   public readonly group: Group = new Group();
@@ -39,8 +55,15 @@ export class AvatarSeat {
   private readonly screenMaterial: MeshBasicMaterial;
   private headMesh: Mesh | null = null;
   private videoTexture: VideoTexture | null = null;
+  private smileyTexture: CanvasTexture | null = null;
   private attachedVideo: HTMLVideoElement | null = null;
+  private emptyDisplayUsesPlaceholder = false;
   private videoDisplayGamma = DEFAULT_VIDEO_DISPLAY_GAMMA;
+  private readonly namePlateMaterial: MeshBasicMaterial;
+  private readonly namePlateMesh: Mesh;
+  private namePlateTexture: CanvasTexture | null = null;
+  private namePlateLabel = '';
+  private namePlateTime = 0;
   private readonly onVideoFrameGeometryReady = (): void => {
     this.ensureVideoTextureFromAttached();
   };
@@ -60,6 +83,21 @@ export class AvatarSeat {
       color: new Color(DEFAULT_VIDEO_DISPLAY_GAMMA, DEFAULT_VIDEO_DISPLAY_GAMMA, DEFAULT_VIDEO_DISPLAY_GAMMA),
       toneMapped: false,
     });
+    this.namePlateMaterial = new MeshBasicMaterial({
+      transparent: true,
+      opacity: NAME_PLATE_BASE_OPACITY,
+      toneMapped: false,
+      blending: AdditiveBlending,
+      side: DoubleSide,
+      depthWrite: false,
+      depthTest: true,
+    });
+    this.namePlateMesh = new Mesh(
+      new PlaneGeometry(NAME_PLATE_WIDTH, NAME_PLATE_HEIGHT),
+      this.namePlateMaterial,
+    );
+    this.namePlateMesh.position.set(0, NAME_PLATE_Y, NAME_PLATE_Z);
+    this.avatarRoot.add(this.namePlateMesh);
     this.buildMinimalBody(bodyMat, limbMat);
     this.buildSquareHead();
   }
@@ -69,17 +107,31 @@ export class AvatarSeat {
     this.applyVideoDisplayGamma();
   }
 
-  public setVideoElement(video: HTMLVideoElement | null): void {
-    if (this.attachedVideo === video) {
+  public setVideoElement(video: HTMLVideoElement | null, options?: AvatarSeatVideoOptions): void {
+    const placeholderWhenEmpty = options?.placeholderWhenEmpty === true;
+    if (this.attachedVideo === video && video !== null) {
+      return;
+    }
+    if (
+      this.attachedVideo === video &&
+      video === null &&
+      this.emptyDisplayUsesPlaceholder === placeholderWhenEmpty
+    ) {
       return;
     }
     this.teardownVideoListeners();
     this.disposeVideoTextureOnly();
+    this.disposeSmileyTextureOnly();
     this.attachedVideo = video;
+    this.emptyDisplayUsesPlaceholder = video === null ? placeholderWhenEmpty : false;
     if (video === null || this.headMesh === null) {
-      this.screenMaterial.map = null;
-      this.screenMaterial.color.setHex(0x2a3344);
-      this.screenMaterial.needsUpdate = true;
+      if (video === null && placeholderWhenEmpty) {
+        this.applySmileyPlaceholder();
+      } else {
+        this.screenMaterial.map = null;
+        this.screenMaterial.color.setHex(0x2a3344);
+        this.screenMaterial.needsUpdate = true;
+      }
       return;
     }
     video.addEventListener('loadedmetadata', this.onVideoFrameGeometryReady);
@@ -91,7 +143,7 @@ export class AvatarSeat {
     this.ensureVideoTextureFromAttached();
   }
 
-  public update(): void {
+  public update(dt: number): void {
     if (
       this.videoTexture !== null &&
       this.attachedVideo !== null &&
@@ -100,12 +152,41 @@ export class AvatarSeat {
     ) {
       this.videoTexture.needsUpdate = true;
     }
+    this.namePlateTime += dt;
+    const wobble = Math.sin(this.namePlateTime * NAME_PLATE_BOB_SPEED) * NAME_PLATE_BOB_AMPLITUDE;
+    this.namePlateMesh.position.y = NAME_PLATE_Y + wobble;
+    const pulse =
+      NAME_PLATE_BASE_OPACITY +
+      Math.sin(this.namePlateTime * NAME_PLATE_PULSE_SPEED) * NAME_PLATE_PULSE_AMPLITUDE;
+    this.namePlateMaterial.opacity = pulse;
+  }
+
+  public setDisplayName(name: string): void {
+    const normalized = name.trim().length > 0 ? name.trim() : 'Spieler';
+    if (normalized === this.namePlateLabel) {
+      return;
+    }
+    this.namePlateLabel = normalized;
+    if (this.namePlateTexture !== null) {
+      this.namePlateTexture.dispose();
+      this.namePlateTexture = null;
+    }
+    this.namePlateTexture = AvatarSeat.buildNamePlateTexture(normalized);
+    this.namePlateMaterial.map = this.namePlateTexture;
+    this.namePlateMaterial.needsUpdate = true;
   }
 
   public dispose(): void {
     this.teardownVideoListeners();
     this.disposeVideoTextureOnly();
+    this.disposeSmileyTextureOnly();
     this.attachedVideo = null;
+    if (this.namePlateTexture !== null) {
+      this.namePlateTexture.dispose();
+      this.namePlateTexture = null;
+    }
+    this.namePlateMaterial.dispose();
+    this.namePlateMesh.geometry.dispose();
     this.screenMaterial.dispose();
     if (this.headMesh !== null) {
       this.headMesh.geometry.dispose();
@@ -137,6 +218,104 @@ export class AvatarSeat {
       this.videoTexture = null;
     }
     this.screenMaterial.map = null;
+  }
+
+  private disposeSmileyTextureOnly(): void {
+    if (this.smileyTexture === null) {
+      return;
+    }
+    if (this.screenMaterial.map === this.smileyTexture) {
+      this.screenMaterial.map = null;
+    }
+    this.smileyTexture.dispose();
+    this.smileyTexture = null;
+  }
+
+  private applySmileyPlaceholder(): void {
+    if (this.smileyTexture === null) {
+      this.smileyTexture = AvatarSeat.buildSmileyCanvasTexture();
+    }
+    this.screenMaterial.map = this.smileyTexture;
+    this.applyVideoDisplayGamma();
+    this.screenMaterial.needsUpdate = true;
+  }
+
+  private static buildSmileyCanvasTexture(): CanvasTexture {
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (ctx === null) {
+      const fallback = new CanvasTexture(canvas);
+      fallback.colorSpace = SRGBColorSpace;
+      return fallback;
+    }
+    ctx.fillStyle = '#ffcc33';
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size * 0.42, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#d4a017';
+    ctx.lineWidth = size * 0.02;
+    ctx.stroke();
+    ctx.fillStyle = '#1a2230';
+    ctx.beginPath();
+    ctx.arc(size * 0.36, size * 0.42, size * 0.055, 0, Math.PI * 2);
+    ctx.arc(size * 0.64, size * 0.42, size * 0.055, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#1a2230';
+    ctx.lineWidth = size * 0.035;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(size / 2, size * 0.52, size * 0.14, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.stroke();
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = SRGBColorSpace;
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  private static buildNamePlateTexture(name: string): CanvasTexture {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    if (ctx === null) {
+      const fallback = new CanvasTexture(canvas);
+      fallback.colorSpace = SRGBColorSpace;
+      return fallback;
+    }
+
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+    gradient.addColorStop(0, 'rgba(0, 214, 255, 0.24)');
+    gradient.addColorStop(0.5, 'rgba(193, 71, 255, 0.42)');
+    gradient.addColorStop(1, 'rgba(0, 214, 255, 0.24)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 42, canvas.width, canvas.height - 84);
+
+    ctx.strokeStyle = 'rgba(130, 230, 255, 0.78)';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(24, 52, canvas.width - 48, canvas.height - 104);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.font = 'bold 108px "Comic Sans MS", "Trebuchet MS", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0, 242, 255, 0.95)';
+    ctx.shadowBlur = 26;
+    ctx.fillText(name, canvas.width / 2, canvas.height / 2);
+
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.44)';
+    ctx.lineWidth = 3;
+    ctx.strokeText(name, canvas.width / 2, canvas.height / 2);
+
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = SRGBColorSpace;
+    texture.wrapS = ClampToEdgeWrapping;
+    texture.wrapT = ClampToEdgeWrapping;
+    texture.needsUpdate = true;
+    return texture;
   }
 
   private ensureVideoTextureFromAttached(): void {

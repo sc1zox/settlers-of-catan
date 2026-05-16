@@ -21,6 +21,7 @@ export enum ProcessEnvKey {
   PlayerSessionAccessTtl = 'PLAYER_SESSION_ACCESS_TTL',
   PlayerSessionRefreshTtl = 'PLAYER_SESSION_REFRESH_TTL',
   RedisUrl = 'REDIS_URL',
+  LobbyIdleTtlSeconds = 'LOBBY_IDLE_TTL_SECONDS',
   LiveKitApiKey = 'LIVEKIT_API_KEY',
   LiveKitApiSecret = 'LIVEKIT_API_SECRET',
   LiveKitPublicUrl = 'LIVEKIT_PUBLIC_URL',

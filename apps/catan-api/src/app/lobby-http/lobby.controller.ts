@@ -1,6 +1,7 @@
-import { Body, Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import {
+  ActionRejectCode,
   CreateLobbyResponseDto,
   HttpApiRelativePath,
   SwaggerApiTag,
@@ -23,11 +24,16 @@ export class LobbyController {
   @HttpCode(200)
   @UseGuards(BearerSessionGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Optional: pre-register a lobby code (join also auto-creates)' })
+  @ApiOperation({ summary: 'Optional: pre-register a lobby code' })
   @ApiOkResponse({ description: 'Lobby code and canonical id' })
   public async createLobby(@Body() body: CreateLobbyRequestDto): Promise<CreateLobbyResponseDto> {
     const lobbyCode = normalizeLobbyCode(body.lobbyCode ?? randomUUID().slice(0, 8));
-    const lobbyId = await this.redisLobby.resolveOrCreateCanonicalLobbyId(lobbyCode);
+    const createdLobbyId = await this.redisLobby.createCanonicalLobbyId(lobbyCode);
+    const lobbyId =
+      createdLobbyId ?? (await this.redisLobby.resolveCanonicalLobbyIdByCode(lobbyCode));
+    if (lobbyId === null) {
+      throw new BadRequestException(ActionRejectCode.UnknownLobby);
+    }
     return { lobbyId, lobbyCode };
   }
 }

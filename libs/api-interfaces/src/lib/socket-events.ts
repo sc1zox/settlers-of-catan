@@ -25,11 +25,17 @@ export interface JoinLobbyPayload {
   readonly displayName: string;
 }
 
+export interface CreateLobbyPayload {
+  readonly lobbyCode: string;
+  readonly displayName: string;
+}
+
 export interface LobbyJoinedPayload {
   readonly lobbyId: string;
   readonly lobbyCode: string;
   readonly seat: PlayerSeat;
   readonly liveKit?: LiveKitCredentialsPayload;
+  readonly lobbyIdleRecycled?: boolean;
 }
 
 export interface BuildSettlementPayload {
@@ -86,8 +92,19 @@ export interface StartLobbyPayload {
   readonly lobbyId: string;
 }
 
+export interface LeaveLobbyPayload {
+  readonly lobbyId: string;
+}
+
+export interface FillLobbyWithBotsPayload {
+  readonly lobbyId: string;
+}
+
 export enum GameSocketClientEvent {
+  CreateLobby = 'game:createLobby',
   JoinLobby = 'game:joinLobby',
+  LeaveLobby = 'game:leaveLobby',
+  FillLobbyWithBots = 'game:fillLobbyWithBots',
   StartLobby = 'game:startLobby',
   RollDice = 'game:rollDice',
   RobberDiscard = 'game:robberDiscard',

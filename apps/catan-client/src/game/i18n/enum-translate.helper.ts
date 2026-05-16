@@ -136,6 +136,10 @@ export class EnumTranslate {
         return 'reject.lobbyFull';
       case ActionRejectCode.UnknownLobby:
         return 'reject.unknownLobby';
+      case ActionRejectCode.LobbyAlreadyExists:
+        return 'reject.lobbyAlreadyExists';
+      case ActionRejectCode.LobbyHostOnly:
+        return 'reject.lobbyHostOnly';
       case ActionRejectCode.PlayerNotInLobby:
         return 'reject.playerNotInLobby';
       case ActionRejectCode.UnknownTrade:

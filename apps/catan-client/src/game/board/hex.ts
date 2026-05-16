@@ -1,14 +1,8 @@
 import { Vector3 } from 'three';
-import {
-  type AxialCoord,
-  axialToWorldXZ,
-  HEX_SIZE,
-  hexDisc,
-  hexRing,
-} from '@catan/shared-game-field';
+import { type AxialCoord, axialToWorldXZ, HEX_SIZE, hexRing } from '@catan/shared-game-field';
 
 export type { AxialCoord };
-export { HEX_SIZE, hexDisc, hexRing };
+export { HEX_SIZE, hexRing };
 
 export function axialToWorld(coord: AxialCoord, size: number = HEX_SIZE): Vector3 {
   const { x, z } = axialToWorldXZ(coord, size);

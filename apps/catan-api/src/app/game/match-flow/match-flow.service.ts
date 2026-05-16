@@ -32,7 +32,7 @@ export class MatchFlowService {
       throw new Error(ActionRejectCode.PlayerNotInLobby);
     }
     if (lobby.adminSessionToken !== sessionToken) {
-      throw new Error(ActionRejectCode.NotYourTurn);
+      throw new Error(ActionRejectCode.LobbyHostOnly);
     }
     const activeSeats = this.turnFlow.getActiveTurnSeats(lobby);
     const minimumPlayerCount = this.demoBots.getMinimumStartPlayerCount(lobby);

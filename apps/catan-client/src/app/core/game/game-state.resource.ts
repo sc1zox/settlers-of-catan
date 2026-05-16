@@ -4,6 +4,7 @@ import {
   PlayerSeat,
   ResourceType,
   normalizeLobbyCode,
+  type BonusAwardedPayload,
   type DiceRolledPayload,
   type LobbyFullStatePayload,
   type LobbyJoinedPayload,
@@ -52,6 +53,23 @@ export class GameStateResource {
         return EMPTY;
       }
       return this.sockets.diceRolled$.pipe(
+        filter((payload) => params.lobbyId.length > 0 && payload.lobbyId === params.lobbyId),
+        takeUntil(observeAbort(abortSignal)),
+      );
+    },
+    defaultValue: undefined,
+  });
+
+  public readonly bonusAwarded = rxResource<
+    BonusAwardedPayload | undefined,
+    LobbyConnectionParams | undefined
+  >({
+    params: () => this.lobbyParams(),
+    stream: ({ params, abortSignal }) => {
+      if (params === undefined) {
+        return EMPTY;
+      }
+      return this.sockets.bonusAwarded$.pipe(
         filter((payload) => params.lobbyId.length > 0 && payload.lobbyId === params.lobbyId),
         takeUntil(observeAbort(abortSignal)),
       );

@@ -109,6 +109,16 @@ export class Card {
     return this.localSize;
   }
 
+  /** Parent-local resting position (set via {@link setBasePose}). */
+  getBasePosition(): Vector3 {
+    return this.basePos;
+  }
+
+  /** Parent-local resting orientation (set via {@link setBasePose}). */
+  getBaseQuaternion(): Quaternion {
+    return this.baseQuat;
+  }
+
   toggle(): void {
     this.setMode(this.mode === 'rest' ? 'focused' : 'rest');
   }

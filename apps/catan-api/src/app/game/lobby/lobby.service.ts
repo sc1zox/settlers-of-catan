@@ -1,10 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   ActionRejectCode,
+  BonusAwardKind,
+  formatSocketIoLobbyRoomId,
   GameSocketServerEvent,
   isCanonicalLobbyId,
   normalizeLobbyCode,
   PlayerSeat,
+  type BonusAwardedPayload,
   type LobbyFullStatePayload,
 } from '@catan/api-interfaces';
 import { Server } from 'socket.io';
@@ -143,6 +146,7 @@ export class LobbyService {
   }
 
   public broadcastFullState(server: Server, lobby: LobbyRuntime): void {
+    this.announceBonusAwardTransitions(server, lobby);
     for (let i = 0; i < lobby.players.length; i += 1) {
       const p = lobby.players[i];
       if (p.socketId) {
@@ -167,6 +171,40 @@ export class LobbyService {
       return;
     }
     lobby.adminSessionToken = pickFallbackHumanAdminSessionToken(lobby);
+  }
+
+  /**
+   * Emit a `BonusAwarded` to the lobby room exactly once per transition to a
+   * new recipient. Losing a bonus (seat going to `null`) is silent — the next
+   * FullState already shrinks the holder list, so no fanfare animation is
+   * needed for that case.
+   */
+  private announceBonusAwardTransitions(server: Server, lobby: LobbyRuntime): void {
+    const room = formatSocketIoLobbyRoomId(lobby.lobbyId);
+    if (
+      lobby.longestRoadSeat !== null &&
+      lobby.longestRoadSeat !== lobby.lastAnnouncedLongestRoadSeat
+    ) {
+      const payload: BonusAwardedPayload = {
+        lobbyId: lobby.lobbyId,
+        kind: BonusAwardKind.LongestRoad,
+        recipientSeat: lobby.longestRoadSeat,
+      };
+      server.to(room).emit(GameSocketServerEvent.BonusAwarded, payload);
+    }
+    lobby.lastAnnouncedLongestRoadSeat = lobby.longestRoadSeat;
+    if (
+      lobby.largestArmySeat !== null &&
+      lobby.largestArmySeat !== lobby.lastAnnouncedLargestArmySeat
+    ) {
+      const payload: BonusAwardedPayload = {
+        lobbyId: lobby.lobbyId,
+        kind: BonusAwardKind.LargestArmy,
+        recipientSeat: lobby.largestArmySeat,
+      };
+      server.to(room).emit(GameSocketServerEvent.BonusAwarded, payload);
+    }
+    lobby.lastAnnouncedLargestArmySeat = lobby.largestArmySeat;
   }
 
   private nonBotLobbyMembersHaveSockets(lobby: LobbyRuntime): boolean {

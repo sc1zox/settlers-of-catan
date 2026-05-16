@@ -1,4 +1,4 @@
-import { Group } from 'three';
+import { Group, Vector3 } from 'three';
 import { PlayerColor } from './colors';
 import { AvatarSeat } from './avatar-seat';
 
@@ -39,6 +39,10 @@ export class PlayerAreaAvatar {
 
   public update(dt: number): void {
     this.avatarSeat.update(dt);
+  }
+
+  public getHeadWorldPosition(out: Vector3): Vector3 {
+    return this.avatarSeat.getHeadWorldPosition(out);
   }
 
   public dispose(): void {

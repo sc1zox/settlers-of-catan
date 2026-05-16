@@ -186,6 +186,13 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
     }
   });
 
+  private readonly bonusAwardSync = effect(() => {
+    const award = this.gameState.bonusAwarded.value();
+    if (award && this.engine) {
+      this.engine.playBonusAward(award.kind, award.recipientSeat);
+    }
+  });
+
   public ngAfterViewInit(): void {
     setGameTranslateFn((key, params) => this.translate.instant(marker(key), params));
     this.engine = new GameEngine(this.hostRef.nativeElement);

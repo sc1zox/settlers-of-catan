@@ -4,6 +4,7 @@ import { io, Socket } from 'socket.io-client';
 import {
   ActionRejectedPayload,
   BankTradePayload,
+  BonusAwardedPayload,
   BuildCityPayload,
   BuildRoadPayload,
   BuildSettlementPayload,
@@ -51,6 +52,7 @@ export class GameSocketService implements OnDestroy {
   private readonly diceRolledSubject = new Subject<DiceRolledPayload>();
   private readonly tradeUpdatedSubject = new Subject<TradeUpdatedPayload>();
   private readonly actionRejectedSubject = new Subject<ActionRejectedPayload>();
+  private readonly bonusAwardedSubject = new Subject<BonusAwardedPayload>();
   private readonly lobbyJoinedSubject = new Subject<LobbyJoinedPayload>();
 
   public readonly fullState$ = this.fullStateSubject.asObservable();
@@ -59,6 +61,7 @@ export class GameSocketService implements OnDestroy {
   public readonly diceRolled$ = this.diceRolledSubject.asObservable();
   public readonly tradeUpdated$ = this.tradeUpdatedSubject.asObservable();
   public readonly actionRejected$ = this.actionRejectedSubject.asObservable();
+  public readonly bonusAwarded$ = this.bonusAwardedSubject.asObservable();
 
   private socket: Socket | null = null;
   private connectErrorRetries = 0;
@@ -236,6 +239,7 @@ export class GameSocketService implements OnDestroy {
     s.off(GameSocketServerEvent.DiceRolled);
     s.off(GameSocketServerEvent.TradeUpdated);
     s.off(GameSocketServerEvent.ActionRejected);
+    s.off(GameSocketServerEvent.BonusAwarded);
     s.off(GameSocketServerEvent.LobbyJoined);
     s.on(GameSocketServerEvent.LobbyJoined, (payload: LobbyJoinedPayload) => {
       this.lobbyJoinedSubject.next(payload);
@@ -254,6 +258,9 @@ export class GameSocketService implements OnDestroy {
     });
     s.on(GameSocketServerEvent.ActionRejected, (payload: ActionRejectedPayload) => {
       this.actionRejectedSubject.next(payload);
+    });
+    s.on(GameSocketServerEvent.BonusAwarded, (payload: BonusAwardedPayload) => {
+      this.bonusAwardedSubject.next(payload);
     });
   }
 

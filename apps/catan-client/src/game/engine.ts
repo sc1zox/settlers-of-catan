@@ -14,8 +14,17 @@ import {
 import { shadowQualityPreset } from './scene/shadow-quality-preset';
 import { ShadowQuality } from './scene/shadow-quality.enum';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { BuildKind, GamePhase, PlayerSeat, SceneUserDataKey } from '@catan/api-interfaces';
-import type { LobbySceneState } from '../app/shared/helper/game-scene/lobby-scene-state';
+import {
+  BonusAwardKind,
+  BuildKind,
+  GamePhase,
+  PlayerSeat,
+  SceneUserDataKey,
+} from '@catan/api-interfaces';
+import type {
+  LobbyScenePlayerState,
+  LobbySceneState,
+} from '../app/shared/helper/game-scene/lobby-scene-state';
 import { Board } from './board/board';
 import { BoardBuildings, type SpawnedBuildPiece } from './board/buildings';
 import { RobberFigure } from './board/robber-figure';
@@ -47,6 +56,7 @@ import {
   TABLE_TOP_Y,
   TILE_UPDATE_BOUNDS_RADIUS,
 } from './engine-runtime/constants';
+import { BonusAwardFlight } from './engine-runtime/bonus-award-flight';
 import { FocusCardFan } from './engine-runtime/focus-cards';
 import { FrustumCull } from './engine-runtime/frustum-cull';
 import { OrbitCameraAid } from './engine-runtime/orbit-camera';
@@ -101,6 +111,7 @@ export class GameEngine {
   private readonly orbitAid = new OrbitCameraAid();
   private readonly perfAggregator = new PerfStatsAggregator();
   private readonly focusFan = new FocusCardFan();
+  private readonly bonusFlight = new BonusAwardFlight();
 
   private currentSeed: number | null = null;
 
@@ -439,8 +450,28 @@ export class GameEngine {
     this.focusFan.clearRest(this.focusChangeHandler);
   }
 
+  /**
+   * Trigger the "Längste Handelsstraße / Größte Rittermacht" presentation.
+   * The card hovers in front of the recipient (for them it fills the screen;
+   * for everyone else it floats by their avatar) for ~2 seconds, then settles
+   * onto the table next to their hand. Idempotent re-emits restart the flight.
+   */
+  public playBonusAward(kind: BonusAwardKind, recipientSeat: PlayerSeat): void {
+    const area = this.players[recipientSeat];
+    if (!area || !this.playerAreaActiveAtTable[recipientSeat]) {
+      return;
+    }
+    const card = area.setBonusCard(kind, true);
+    if (!card) {
+      return;
+    }
+    this.bonusFlight.start(card, kind, recipientSeat, recipientSeat === this.selfSeat);
+    this.hover.setHoverables(this.collectHoverables());
+  }
+
   public dispose(): void {
     this.stop();
+    this.bonusFlight.clearAll();
     this.orbitAid.resetSpectator(this.controls);
     this.resizeObserver.disconnect();
     this.controls.dispose();
@@ -490,7 +521,7 @@ export class GameEngine {
       this.currentSeed = state.seed;
       this.hasFramedBoardForActiveMatch = false;
     }
-    const self = state.players.find((p) => p.isSelf);
+    const self = state.players.find((p: LobbyScenePlayerState) => p.isSelf);
     this.selfSeat = self ? self.seat : null;
     this.legalSettlementVertexIds = state.legalSettlementVertexIds;
     this.legalRoadEdgeIds = state.legalRoadEdgeIds;
@@ -516,6 +547,8 @@ export class GameEngine {
         this.handSignatureBySeat[playerState.seat] = handSignature;
       }
     }
+    this.syncBonusCardOwnership(state.longestRoadSeat, BonusAwardKind.LongestRoad);
+    this.syncBonusCardOwnership(state.largestArmySeat, BonusAwardKind.LargestArmy);
     if (this.buildMode !== null) {
       this.buildPreview.show(
         this.buildMode,
@@ -531,6 +564,25 @@ export class GameEngine {
     ) {
       this.orbitAid.applyMatchStartCameraFraming(this.camera, this.controls);
       this.hasFramedBoardForActiveMatch = true;
+    }
+  }
+
+  /**
+   * Mirror the server-authoritative bonus-card holder into the player areas.
+   * Each player area owns at most one card per kind; this drops it from
+   * anyone who no longer holds it and creates a resting card on the new
+   * holder so reconnecting clients see the right table state without needing
+   * a `BonusAwarded` event.
+   */
+  private syncBonusCardOwnership(holderSeat: PlayerSeat | null, kind: BonusAwardKind): void {
+    for (let i = 0; i < this.players.length; i += 1) {
+      const owned = holderSeat !== null && holderSeat === i && this.playerAreaActiveAtTable[i];
+      if (!owned) {
+        // Cancel any in-flight animation before the card mesh is disposed —
+        // otherwise the flight keeps poking a freed `Card` until it times out.
+        this.bonusFlight.cancel(kind, i as PlayerSeat);
+      }
+      this.players[i].setBonusCard(kind, owned);
     }
   }
 
@@ -751,6 +803,7 @@ export class GameEngine {
     const cameraChanged = this.controls.update();
     this.orbitAid.clampOrbitTarget(this.camera, this.controls);
     this.focusFan.update(this.camera);
+    this.bonusFlight.update(dt, this.camera, this.players);
     let visiblePlayers = 0;
     let activePlayersTotal = 0;
     for (let i = 0; i < this.players.length; i += 1) {

@@ -100,6 +100,10 @@ export class LobbyRuntime {
   public readonly devDeck: DevCardType[];
   public longestRoadSeat: PlayerSeat | null = null;
   public largestArmySeat: PlayerSeat | null = null;
+  /** Last seat we emitted a Longest-Road `BonusAwarded` for — used to detect transitions. */
+  public lastAnnouncedLongestRoadSeat: PlayerSeat | null = null;
+  /** Last seat we emitted a Largest-Army `BonusAwarded` for — used to detect transitions. */
+  public lastAnnouncedLargestArmySeat: PlayerSeat | null = null;
   public winnerSeat: PlayerSeat | null = null;
 
   public constructor(lobbyId: string, lobbyCode: string) {

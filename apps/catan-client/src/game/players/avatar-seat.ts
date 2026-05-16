@@ -12,6 +12,7 @@ import {
   MeshStandardMaterial,
   PlaneGeometry,
   SRGBColorSpace,
+  Vector3,
   VideoTexture,
 } from 'three';
 
@@ -177,6 +178,21 @@ export class AvatarSeat {
     this.namePlateTexture = AvatarSeat.buildNamePlateTexture(normalized);
     this.namePlateMaterial.map = this.namePlateTexture;
     this.namePlateMaterial.needsUpdate = true;
+  }
+
+  /**
+   * World-space anchor where a fly-in bonus card should appear "in front of"
+   * this avatar — the head if it exists, otherwise the seat root. The avatar
+   * group sits behind the table looking inward, so this point is naturally on
+   * the same side as the player.
+   */
+  public getHeadWorldPosition(out: Vector3): Vector3 {
+    if (this.headMesh !== null) {
+      this.headMesh.getWorldPosition(out);
+      return out;
+    }
+    this.group.getWorldPosition(out);
+    return out;
   }
 
   public dispose(): void {

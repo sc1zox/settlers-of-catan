@@ -1,7 +1,11 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslateService } from '@ngx-translate/core';
-import { PlayerSeat } from '@catan/api-interfaces';
+import {
+  LobbyPlayerPublicDto,
+  LobbySettlementDto,
+  PlayerSeat,
+} from '@catan/api-interfaces';
 import { collectRobberVictimSeats } from '@catan/shared-game-field';
 import { GameStateResource } from '../../core/game/game-state.resource';
 import { RobberTilePick } from '../../game-canvas/game-canvas';
@@ -53,8 +57,11 @@ export class SessionRobberFlowService {
     if (payload !== undefined && selfSeat !== null) {
       const victimSeats = collectRobberVictimSeats(
         payload.tiles,
-        payload.settlements.map((s) => ({ seat: s.seat, vertexId: s.vertexId })),
-        payload.players.map((p) => ({
+        payload.settlements.map((s: LobbySettlementDto) => ({
+          seat: s.seat,
+          vertexId: s.vertexId,
+        })),
+        payload.players.map((p: LobbyPlayerPublicDto) => ({
           seat: p.seat,
           totalResourceCards: totalResourceCards(p.resources),
         })),
@@ -64,8 +71,8 @@ export class SessionRobberFlowService {
       );
       const allowed = new Set(victimSeats);
       candidates = payload.players
-        .filter((p) => allowed.has(p.seat))
-        .map((p) => ({ seat: p.seat, name: p.displayName }));
+        .filter((p: LobbyPlayerPublicDto) => allowed.has(p.seat))
+        .map((p: LobbyPlayerPublicDto) => ({ seat: p.seat, name: p.displayName }));
     }
     this.robberVictim.set({ x: pick.x, y: pick.y, candidates });
   }

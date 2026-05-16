@@ -1,4 +1,5 @@
 import { ActionRejectCode } from './action-reject-code.enum';
+import { BonusAwardKind } from './bonus-award.enum';
 import type { LiveKitCredentialsPayload } from './livekit.dto';
 import { PlayerSeat } from './player-seat.enum';
 import { ResourceType } from './resource-type.enum';
@@ -14,6 +15,12 @@ import {
 export interface ActionRejectedPayload {
   readonly code: ActionRejectCode;
   readonly message: string;
+}
+
+export interface BonusAwardedPayload {
+  readonly lobbyId: string;
+  readonly kind: BonusAwardKind;
+  readonly recipientSeat: PlayerSeat;
 }
 
 export interface SessionBoundPayload {
@@ -132,6 +139,7 @@ export enum GameSocketServerEvent {
   GameDelta = 'game:gameDelta',
   DiceRolled = 'game:diceRolled',
   TradeUpdated = 'game:tradeUpdated',
+  BonusAwarded = 'game:bonusAwarded',
   ActionRejected = 'game:actionRejected',
 }
 

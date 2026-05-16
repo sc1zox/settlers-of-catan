@@ -1,7 +1,8 @@
 import { Group, MeshStandardMaterial, Object3D, Quaternion, Vector3 } from 'three';
-import { BuildKind } from '@catan/api-interfaces';
+import { BonusAwardKind, BuildKind } from '@catan/api-interfaces';
 import { DevKind, ResourceKind } from '../cards/textures';
 import { Card } from '../cards/card';
+import { createBonusCard } from '../cards/bonus-card';
 import { createCostCard } from '../cards/cost-card';
 import { PlayerColor, playerColorLabel } from './colors';
 import { PlayerAreaArsenal } from './player-area-arsenal';
@@ -36,6 +37,9 @@ export class PlayerArea {
   private readonly avatar: PlayerAreaAvatar;
 
   private readonly ownedMaterials: MeshStandardMaterial[] = [];
+  /** Materials backing currently-displayed bonus cards — disposed on remove. */
+  private readonly bonusMaterials = new Map<BonusAwardKind, MeshStandardMaterial[]>();
+  private readonly bonusCards = new Map<BonusAwardKind, Card>();
   private _cards: Card[];
 
   public constructor(options: PlayerAreaOptions) {
@@ -136,11 +140,97 @@ export class PlayerArea {
 
   public setHand(resources: readonly ResourceKind[], devCount: number): void {
     this.hand.setHand(resources, devCount);
-    this._cards = [this.costCard, ...this.hand.cards];
+    this.refreshCardList();
+  }
+
+  /**
+   * Add or remove an award card (Längste Handelsstraße / Größte Rittermacht)
+   * from this seat's outer card row. The mesh persists across re-syncs so the
+   * fly-in animation can drive it directly via {@link getBonusCard}.
+   */
+  public setBonusCard(kind: BonusAwardKind, owned: boolean): Card | null {
+    if (owned) {
+      const existing = this.bonusCards.get(kind);
+      if (existing) {
+        return existing;
+      }
+      const bonusThickness = 0.04;
+      const bonus = createBonusCard({
+        kind,
+        width: 1.0,
+        depth: 0.7,
+        thickness: bonusThickness,
+      });
+      bonus.card.setGroupKey(`bonus-${this.info.seat}-${kind}`);
+      const restPos = this.bonusRestPosition(kind, bonusThickness);
+      const restQuat = this.bonusRestQuaternion(kind);
+      bonus.card.setBasePose(restPos, restQuat);
+      this.group.add(bonus.card.mesh);
+      this.bonusCards.set(kind, bonus.card);
+      this.bonusMaterials.set(kind, [...bonus.materials]);
+      this.refreshCardList();
+      return bonus.card;
+    }
+    const existing = this.bonusCards.get(kind);
+    if (!existing) {
+      return null;
+    }
+    existing.setMode('rest');
+    this.group.remove(existing.mesh);
+    existing.dispose();
+    this.bonusCards.delete(kind);
+    const mats = this.bonusMaterials.get(kind);
+    if (mats) {
+      for (let i = 0; i < mats.length; i += 1) {
+        mats[i].map?.dispose();
+        mats[i].dispose();
+      }
+      this.bonusMaterials.delete(kind);
+    }
+    this.refreshCardList();
+    return null;
+  }
+
+  public getBonusCard(kind: BonusAwardKind): Card | undefined {
+    return this.bonusCards.get(kind);
+  }
+
+  /**
+   * World-space position of this seat's avatar head — the anchor point the
+   * fly-in animation uses for the "in front of the recipient's screen" pose.
+   */
+  public getAvatarHeadWorldPosition(out: Vector3): Vector3 {
+    return this.avatar.getHeadWorldPosition(out);
+  }
+
+  /**
+   * Layout slots between the cost card (X ≈ -5.2) and the hand (X ≈ -2.7) so
+   * both award cards fit without overlapping either neighbour, and rotate with
+   * the seat group.
+   */
+  private bonusRestPosition(kind: BonusAwardKind, thickness: number): Vector3 {
+    const slotX = kind === BonusAwardKind.LongestRoad ? -4.6 : -3.45;
+    return new Vector3(slotX, this.tableY + thickness / 2 + 0.005, this.cardRowZ);
+  }
+
+  private bonusRestQuaternion(kind: BonusAwardKind): Quaternion {
+    // Flip the card face-up (face material is on the -Y face) and add a tiny
+    // seat-specific yaw jitter so the two awards don't look machine-stamped.
+    const yaw = kind === BonusAwardKind.LongestRoad ? 0.05 : -0.06;
+    return new Quaternion()
+      .setFromAxisAngle(new Vector3(1, 0, 0), Math.PI)
+      .multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), yaw));
+  }
+
+  private refreshCardList(): void {
+    this._cards = [this.costCard, ...this.bonusCards.values(), ...this.hand.cards];
   }
 
   public update(dt: number): void {
     this.costCard.update(dt);
+    for (const bonus of this.bonusCards.values()) {
+      bonus.update(dt);
+    }
     this.hand.update(dt);
     this.avatar.update(dt);
     this.arsenalKit.update(dt);
@@ -152,6 +242,17 @@ export class PlayerArea {
       m.map?.dispose();
       m.dispose();
     }
+    for (const card of this.bonusCards.values()) {
+      card.dispose();
+    }
+    for (const mats of this.bonusMaterials.values()) {
+      for (let i = 0; i < mats.length; i += 1) {
+        mats[i].map?.dispose();
+        mats[i].dispose();
+      }
+    }
+    this.bonusCards.clear();
+    this.bonusMaterials.clear();
     this.hand.dispose();
     this.costCard.dispose();
     this.avatar.dispose();

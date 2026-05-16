@@ -1,0 +1,52 @@
+@media (max-width: 640px) {
+  .ui-layer {
+    padding: 0.75rem;
+    place-items: end center;
+  }
+
+  .panel {
+    width: 100%;
+    border-radius: 14px;
+    padding: 1rem;
+    max-height: min(100dvh - 1.5rem, 700px);
+  }
+
+  .hud {
+    top: 0.75rem;
+    left: 0.75rem;
+    right: 0.75rem;
+    width: auto;
+  }
+
+  .lobby-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .button-row {
+    grid-template-columns: 1fr;
+  }
+
+  .avatar-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 460px) {
+  .panel__header h1 {
+    font-size: 1.2rem;
+  }
+
+  input,
+  button {
+    font-size: 0.92rem;
+  }
+
+  .seat-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .seat-badges {
+    width: 100%;
+  }
+}

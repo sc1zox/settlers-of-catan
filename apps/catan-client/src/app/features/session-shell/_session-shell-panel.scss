@@ -1,0 +1,56 @@
+.panel {
+  box-sizing: border-box;
+  width: min(560px, 100%);
+  max-width: 100%;
+  max-height: calc(100dvh - 2.5rem);
+  overflow: auto;
+  background: rgba(14, 22, 38, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(16px);
+  border-radius: 18px;
+  padding: 1.25rem;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.48);
+  pointer-events: auto;
+}
+
+.panel__header {
+  margin-bottom: 1rem;
+
+  h1 {
+    margin: 0;
+    font-size: 1.4rem;
+    letter-spacing: -0.02em;
+  }
+
+  p {
+    margin: 0.4rem 0 0;
+    color: rgba(233, 239, 255, 0.76);
+    font-size: 0.92rem;
+  }
+}
+
+.feedback {
+  margin: 0 0 0.9rem;
+  font-size: 0.88rem;
+  border-radius: 10px;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid transparent;
+}
+
+.feedback--info {
+  color: #c9defb;
+  background: rgba(66, 165, 245, 0.18);
+  border-color: rgba(66, 165, 245, 0.35);
+}
+
+.feedback--success {
+  color: #d9fbe9;
+  background: rgba(56, 216, 169, 0.18);
+  border-color: rgba(56, 216, 169, 0.35);
+}
+
+.feedback--error {
+  color: #ffdfe5;
+  background: rgba(255, 107, 107, 0.2);
+  border-color: rgba(255, 107, 107, 0.38);
+}

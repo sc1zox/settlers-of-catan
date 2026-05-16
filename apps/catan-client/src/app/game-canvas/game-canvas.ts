@@ -102,11 +102,16 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
 
   private readonly lobbyStateSync = effect(() => {
     const state = this.gameState.lobby.value();
-    if (state && this.engine) {
-      const scene = mapLobbyFullStateToSceneState(state);
-      this.engine.applySceneState(scene);
-      this.headVideoSync.syncToEngine(this.engine, scene);
+    if (!this.engine) {
+      return;
     }
+    if (!state) {
+      this.engine.clearSelfSeatHighlights();
+      return;
+    }
+    const scene = mapLobbyFullStateToSceneState(state);
+    this.engine.applySceneState(scene);
+    this.headVideoSync.syncToEngine(this.engine, scene);
   });
 
   private readonly headVideoSyncEffect = effect(() => {

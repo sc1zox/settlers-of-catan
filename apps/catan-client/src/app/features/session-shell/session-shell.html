@@ -27,6 +27,29 @@
       >
         <span class="shell-back-btn__icon" aria-hidden="true">&#8592;</span>
       </button>
+      @if (ui.lobbyDepartedFeed.entries().length > 0) {
+        <aside
+          class="shell-activity-feed"
+          role="log"
+          aria-relevant="additions"
+          aria-live="polite"
+          [attr.aria-label]="'shell.activityFeedAria' | translate"
+        >
+          <div class="shell-activity-feed__chrome">
+            <span class="shell-activity-feed__title">{{
+              'shell.activityFeedHeading' | translate
+            }}</span>
+          </div>
+          <div class="shell-activity-feed__stream">
+            @for (
+              row of ui.lobbyDepartedFeed.entries().slice(-8);
+              track row.id
+            ) {
+              <p class="shell-activity-feed__bubble">{{ row.text }}</p>
+            }
+          </div>
+        </aside>
+      }
       @if (ui.lobbyFlow.leaveLobbyPromptOpen()) {
         <div class="shell-leave-overlay" role="presentation">
           <button
@@ -65,27 +88,14 @@
         {{ ui.lobbyGameUi.gameFinishedBannerText() }}
       </div>
     }
-    @if (ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.InGame) {
+    @if (
+      ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.InGame &&
+      ui.lobbyGameUi.announcerEntry().text.length > 0
+    ) {
       <aside class="hud-bottom-dock" role="status" aria-live="polite">
         @for (entry of [ui.lobbyGameUi.announcerEntry()]; track entry.id) {
-          @if (entry.text.length > 0) {
-            <p class="hud-bottom-dock__announcer">{{ entry.text }}</p>
-          }
+          <p class="hud-bottom-dock__announcer">{{ entry.text }}</p>
         }
-        <div class="hud-bottom-dock__bonus-row">
-          <div class="hud-bottom-dock__bonus">
-            <span>{{ 'shell.hudLargestArmy' | translate }}</span>
-            <strong>{{ ui.lobbyGameUi.largestArmyLabel() }}</strong>
-          </div>
-          <div class="hud-bottom-dock__bonus">
-            <span>{{ 'shell.hudLongestRoad' | translate }}</span>
-            <strong>{{ ui.lobbyGameUi.longestRoadLabel() }}</strong>
-          </div>
-        </div>
-        <div class="hud-bottom-dock__phase">
-          <span>{{ 'shell.hudPhase' | translate }}</span>
-          <strong>{{ ui.lobbyGameUi.phaseLabel() }}</strong>
-        </div>
       </aside>
     }
 
@@ -273,6 +283,23 @@
           [class.hud--spectator-paused]="ui.lobbyGameUi.hudChromeSpectatorPaused()"
         >
           <div class="hud__chrome">
+            <div class="hud__stats">
+              <div class="hud__stats-row">
+                <div class="hud__stat">
+                  <span>{{ 'shell.hudLargestArmy' | translate }}</span>
+                  <strong>{{ ui.lobbyGameUi.largestArmyLabel() }}</strong>
+                </div>
+                <div class="hud__stat">
+                  <span>{{ 'shell.hudLongestRoad' | translate }}</span>
+                  <strong>{{ ui.lobbyGameUi.longestRoadLabel() }}</strong>
+                </div>
+              </div>
+              <div class="hud__stat hud__stat--phase">
+                <span>{{ 'shell.hudPhase' | translate }}</span>
+                <strong>{{ ui.lobbyGameUi.phaseLabel() }}</strong>
+              </div>
+            </div>
+
             @if (ui.shellFeedback.feedback() !== null) {
               <p
                 class="hud__feedback feedback"

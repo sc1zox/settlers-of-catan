@@ -12,6 +12,7 @@ export class ShellFeedbackService {
   private readonly translate = inject(TranslateService);
   private readonly destroyRef = inject(DestroyRef);
   private errorDismissHandle: ReturnType<typeof setTimeout> | null = null;
+  private infoSuccessDismissHandle: ReturnType<typeof setTimeout> | null = null;
 
   public readonly feedback = signal<UiFeedbackState | null>(null);
 
@@ -20,6 +21,10 @@ export class ShellFeedbackService {
       if (this.errorDismissHandle !== null) {
         clearTimeout(this.errorDismissHandle);
         this.errorDismissHandle = null;
+      }
+      if (this.infoSuccessDismissHandle !== null) {
+        clearTimeout(this.infoSuccessDismissHandle);
+        this.infoSuccessDismissHandle = null;
       }
     });
     this.sockets.actionRejected$
@@ -34,9 +39,14 @@ export class ShellFeedbackService {
       clearTimeout(this.errorDismissHandle);
       this.errorDismissHandle = null;
     }
+    if (this.infoSuccessDismissHandle !== null) {
+      clearTimeout(this.infoSuccessDismissHandle);
+      this.infoSuccessDismissHandle = null;
+    }
     this.feedback.set({ tone, message });
+    const snapshotMessage = message;
+    const snapshotTone = tone;
     if (tone === UiFeedbackTone.Error) {
-      const snapshotMessage = message;
       this.errorDismissHandle = setTimeout(() => {
         this.errorDismissHandle = null;
         const current = this.feedback();
@@ -49,12 +59,29 @@ export class ShellFeedbackService {
         }
       }, 2000);
     }
+    if (tone === UiFeedbackTone.Info || tone === UiFeedbackTone.Success) {
+      this.infoSuccessDismissHandle = setTimeout(() => {
+        this.infoSuccessDismissHandle = null;
+        const current = this.feedback();
+        if (
+          current !== null &&
+          current.message === snapshotMessage &&
+          current.tone === snapshotTone
+        ) {
+          this.feedback.set(null);
+        }
+      }, 10000);
+    }
   }
 
   public clearFeedback(): void {
     if (this.errorDismissHandle !== null) {
       clearTimeout(this.errorDismissHandle);
       this.errorDismissHandle = null;
+    }
+    if (this.infoSuccessDismissHandle !== null) {
+      clearTimeout(this.infoSuccessDismissHandle);
+      this.infoSuccessDismissHandle = null;
     }
     this.feedback.set(null);
   }

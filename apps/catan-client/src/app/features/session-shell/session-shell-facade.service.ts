@@ -8,6 +8,7 @@ import { GameSettingsService } from '../game-settings/game-settings.service';
 import { DevCardsService } from '../dev-cards/dev-cards.service';
 import { LobbyUiStep, UiFeedbackTone } from '../../shared/types/lobby-ui-state';
 import { LobbyShellGameUiService } from '../lobby-game-ui/lobby-shell-game-ui.service';
+import { LobbyDepartedFeedService } from '../shell-feedback/lobby-departed-feed.service';
 import { ShellFeedbackService } from '../shell-feedback/shell-feedback.service';
 import { SpectatorCameraService } from '../spectator-camera/spectator-camera.service';
 import { SessionLobbyFlowService } from './session-lobby-flow.service';
@@ -30,6 +31,7 @@ export class SessionShellFacadeService {
   public readonly lobbyGameUi = inject(LobbyShellGameUiService);
   public readonly devCards = inject(DevCardsService);
   public readonly shellFeedback = inject(ShellFeedbackService);
+  public readonly lobbyDepartedFeed = inject(LobbyDepartedFeedService);
   public readonly gameSettings = inject(GameSettingsService);
   public readonly spectatorCamService = inject(SpectatorCameraService);
 

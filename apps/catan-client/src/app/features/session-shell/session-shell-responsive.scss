@@ -15,8 +15,8 @@
     left: calc(0.65rem + env(safe-area-inset-left));
     right: auto;
     top: auto;
-    width: min(260px, calc(100vw - 1.35rem));
-    bottom: calc(6.45rem + env(safe-area-inset-bottom));
+    width: min(284px, calc(100vw - 1.35rem));
+    bottom: calc(1.05rem + env(safe-area-inset-bottom));
   }
 
   .hud-bottom-dock {

@@ -8,6 +8,7 @@ import { PlayerColor, playerColorLabel } from './colors';
 import { PlayerAreaArsenal } from './player-area-arsenal';
 import { PlayerAreaAvatar } from './player-area-avatar';
 import { PlayerAreaHand } from './player-area-hand';
+import { PlayerAreaSelfPad } from './player-area-self-pad';
 
 export interface PlayerAreaInfo {
   readonly seat: number;
@@ -35,6 +36,7 @@ export class PlayerArea {
   private readonly arsenalKit: PlayerAreaArsenal;
   private readonly hand: PlayerAreaHand;
   private readonly avatar: PlayerAreaAvatar;
+  private readonly selfPad: PlayerAreaSelfPad;
 
   private readonly ownedMaterials: MeshStandardMaterial[] = [];
   /** Materials backing currently-displayed bonus cards — disposed on remove. */
@@ -50,6 +52,9 @@ export class PlayerArea {
     };
 
     this.group.rotation.y = options.seat * (Math.PI / 2);
+
+    this.selfPad = new PlayerAreaSelfPad(options.color, options.tableTopY, options.innerEdgeZ);
+    this.group.add(this.selfPad.group);
 
     this.tableY = options.tableTopY;
     const innerZ = options.innerEdgeZ;
@@ -91,6 +96,10 @@ export class PlayerArea {
 
   public get cards(): readonly Card[] {
     return this._cards;
+  }
+
+  public setSelfSeatHighlight(active: boolean): void {
+    this.selfPad.setActive(active);
   }
 
   public getCostCard(): Card {
@@ -234,9 +243,11 @@ export class PlayerArea {
     this.hand.update(dt);
     this.avatar.update(dt);
     this.arsenalKit.update(dt);
+    this.selfPad.update(dt);
   }
 
   public dispose(): void {
+    this.selfPad.dispose();
     this.arsenalKit.dispose();
     for (const m of this.ownedMaterials) {
       m.map?.dispose();

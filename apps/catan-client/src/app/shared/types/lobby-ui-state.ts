@@ -19,6 +19,11 @@ export interface UiFeedbackState {
   readonly tone: UiFeedbackTone;
 }
 
+export interface LobbyActivityFeedEntry {
+  readonly id: string;
+  readonly text: string;
+}
+
 export interface SessionUiState {
   readonly displayName: string;
   readonly sessionId: string;

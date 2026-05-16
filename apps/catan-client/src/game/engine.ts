@@ -495,6 +495,12 @@ export class GameEngine {
     }
   }
 
+  public clearSelfSeatHighlights(): void {
+    for (let s = 0; s < this.players.length; s += 1) {
+      this.players[s].setSelfSeatHighlight(false);
+    }
+  }
+
   public applySceneState(state: LobbySceneState): void {
     for (let s = 0; s < this.playerAreaActiveAtTable.length; s += 1) {
       this.playerAreaActiveAtTable[s] = false;
@@ -521,8 +527,21 @@ export class GameEngine {
       this.currentSeed = state.seed;
       this.hasFramedBoardForActiveMatch = false;
     }
+    let selfMarkerCount = 0;
+    for (let i = 0; i < state.players.length; i += 1) {
+      if (state.players[i].isSelf) {
+        selfMarkerCount += 1;
+      }
+    }
     const self = state.players.find((p: LobbyScenePlayerState) => p.isSelf);
     this.selfSeat = self ? self.seat : null;
+    const showSelfPadOnly =
+      selfMarkerCount === 1 &&
+      this.selfSeat !== null &&
+      this.playerAreaActiveAtTable[this.selfSeat];
+    for (let s = 0; s < this.players.length; s += 1) {
+      this.players[s].setSelfSeatHighlight(showSelfPadOnly && s === this.selfSeat);
+    }
     this.legalSettlementVertexIds = state.legalSettlementVertexIds;
     this.legalRoadEdgeIds = state.legalRoadEdgeIds;
     this.legalCityVertexIds = state.legalCityVertexIds;

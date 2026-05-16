@@ -96,7 +96,11 @@
     "buttonEndTurn": "Zug beenden",
     "hintBuildSpot": "Bauplatz auf dem Brett anklicken — Klick ins Leere bricht ab.",
     "hintRobber": "Raeuber: ein Feld anklicken.",
-    "hintBuildFromArsenal": "Bauen: Figur im eigenen Lager anklicken."
+    "hintBuildFromArsenal": "Bauen: Figur im eigenen Lager anklicken.",
+    "activityFeedHeading": "Mitteilungen",
+    "activityFeedAria": "Mitteilungen, nur zum Lesen",
+    "playerLeftLobby": "{{playerName}} hat die Lobby verlassen.",
+    "playerLeftGame": "{{playerName}} hat das Spiel verlassen."
   },
   "seat": {
     "north": "Nord",

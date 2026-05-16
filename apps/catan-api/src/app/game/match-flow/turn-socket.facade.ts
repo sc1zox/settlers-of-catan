@@ -6,14 +6,6 @@ import { GameService } from '../core/game.service';
 export class TurnSocketFacade {
   public constructor(private readonly gameService: GameService) {}
 
-  public startLobby(lobbyId: string, sessionToken: string, server: Server): void {
-    this.gameService.startLobby(lobbyId, sessionToken, server);
-  }
-
-  public fillLobbyWithBots(lobbyId: string, sessionToken: string, server: Server): void {
-    this.gameService.fillLobbyWithBots(lobbyId, sessionToken, server);
-  }
-
   public rollDice(lobbyId: string, sessionToken: string, server: Server): void {
     this.gameService.rollDice(lobbyId, sessionToken, server);
   }

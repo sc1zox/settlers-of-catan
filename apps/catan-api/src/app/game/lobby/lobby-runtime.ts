@@ -24,6 +24,19 @@ export const CLOCKWISE_SEATS: readonly PlayerSeat[] = [
   PlayerSeat.West,
 ];
 
+export function getOccupiedSeatsClockwise(lobby: LobbyRuntime): PlayerSeat[] {
+  const occupied: PlayerSeat[] = [];
+  for (let i = 0; i < CLOCKWISE_SEATS.length; i += 1) {
+    const seat = CLOCKWISE_SEATS[i];
+    const player = lobby.findPlayerBySeat(seat);
+    if (!player) {
+      continue;
+    }
+    occupied.push(seat);
+  }
+  return occupied;
+}
+
 export function pickFallbackHumanAdminSessionToken(lobby: LobbyRuntime): string | null {
   for (let i = 0; i < lobby.players.length; i += 1) {
     const candidate = lobby.players[i];

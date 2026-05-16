@@ -11,6 +11,7 @@ import { Server } from 'socket.io';
 import { GameActionValidationService } from '../validation/game-action-validation.service';
 import {
   CLOCKWISE_SEATS,
+  getOccupiedSeatsClockwise,
   type LobbyPlayerSlot,
   LobbyRuntime,
 } from '../lobby/lobby-runtime';
@@ -28,7 +29,7 @@ export interface DemoSetupBotCallbacks {
 export interface DemoMainGameCallbacks {
   getLobby(lobbyId: string): LobbyRuntime | undefined;
   rollDice(lobbyId: string, sessionToken: string, server: Server): void;
-  finishTrading(lobbyId: string, sessionToken: string, server: Server): void;
+  completeTradingPhaseAndExpireOffers(lobbyId: string, sessionToken: string, server: Server): void;
   endTurn(lobbyId: string, sessionToken: string, server: Server): void;
   submitRobberDiscard(
     lobbyId: string,
@@ -93,21 +94,7 @@ export class DemoBotService {
   }
 
   public getActiveTurnSeats(lobby: LobbyRuntime): PlayerSeat[] {
-    const activeSeats: PlayerSeat[] = [];
-    for (let i = 0; i < CLOCKWISE_SEATS.length; i += 1) {
-      const seat = CLOCKWISE_SEATS[i];
-      const player = lobby.findPlayerBySeat(seat);
-      if (!player) {
-        continue;
-      }
-      activeSeats.push(seat);
-    }
-    return activeSeats;
-  }
-
-  public getMinimumStartPlayerCount(lobby: LobbyRuntime): number {
-    void lobby;
-    return 3;
+    return getOccupiedSeatsClockwise(lobby);
   }
 
   public resolveDemoBotTradeAcceptorSessionToken(
@@ -236,7 +223,7 @@ export class DemoBotService {
       return true;
     }
     if (phase === GamePhase.Trading) {
-      callbacks.finishTrading(lobbyId, current.sessionToken, server);
+      callbacks.completeTradingPhaseAndExpireOffers(lobbyId, current.sessionToken, server);
       return true;
     }
     if (phase === GamePhase.Building) {

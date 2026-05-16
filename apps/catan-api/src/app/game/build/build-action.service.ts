@@ -6,6 +6,7 @@ import {
   type GameDeltaPayload,
 } from '@catan/api-interfaces';
 import { EconomyService } from '../economy/economy.service';
+import { ResourceCostService } from '../economy/resource-cost.service';
 import { GameActionValidationService } from '../validation/game-action-validation.service';
 import { LobbyRuntime } from '../lobby/lobby-runtime';
 import { applyPostActionScoring } from '../utils/scoring.util';
@@ -17,6 +18,7 @@ export class BuildActionService {
     private readonly validation: GameActionValidationService,
     private readonly turnFlow: TurnFlowService,
     private readonly economy: EconomyService,
+    private readonly resourceCost: ResourceCostService,
   ) {}
 
   public buildSettlement(
@@ -38,7 +40,7 @@ export class BuildActionService {
     this.validation.assertLegalSettlementVertex(lobby, player, vertexId, !isSetupPhase);
     if (phase === GamePhase.Building) {
       this.validation.assertSettlementCost(player);
-      this.validation.deductSettlementCost(player);
+      this.resourceCost.deductSettlementCost(player);
     }
     lobby.settlements.push({ seat: player.seat, vertexId, isCity: false });
     player.visibleVictoryPoints += 1;
@@ -85,7 +87,7 @@ export class BuildActionService {
     } else {
       this.validation.assertRoadCost(player);
       this.validation.assertLegalRoadEdge(lobby, player, edgeId);
-      this.validation.deductRoadCost(player);
+      this.resourceCost.deductRoadCost(player);
     }
     lobby.roads.push({ seat: player.seat, edgeId });
     if (isSetupPhase) {
@@ -129,7 +131,7 @@ export class BuildActionService {
     if (!settlement || settlement.isCity) {
       throw new Error(ActionRejectCode.IllegalPlacement);
     }
-    this.validation.deductCityCost(player);
+    this.resourceCost.deductCityCost(player);
     settlement.isCity = true;
     player.visibleVictoryPoints += 1;
     applyPostActionScoring(lobby);

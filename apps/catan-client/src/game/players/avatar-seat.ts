@@ -1,4 +1,3 @@
-import { WEBCAM_MEDIA_SCOPE, WebcamMediaScopeKey } from '@catan/api-interfaces';
 import {
   AdditiveBlending,
   BoxGeometry,
@@ -30,9 +29,9 @@ const HEAD_Y = 1.28;
 const HEAD_Z = -0.16;
 const HEAD_FRAME_PAD = 0.05;
 const HEAD_SCREEN_INSET = 0.035;
-const HEAD_SCREEN_ASPECT =
-  WEBCAM_MEDIA_SCOPE[WebcamMediaScopeKey.MediumWidth] /
-  WEBCAM_MEDIA_SCOPE[WebcamMediaScopeKey.MediumHeight];
+const HEAD_VIDEO_CAPTURE_WIDTH = 480;
+const HEAD_VIDEO_CAPTURE_HEIGHT = 360;
+const HEAD_SCREEN_ASPECT = HEAD_VIDEO_CAPTURE_WIDTH / HEAD_VIDEO_CAPTURE_HEIGHT;
 const DEFAULT_VIDEO_DISPLAY_GAMMA = 1.55;
 const NAME_PLATE_WIDTH = 1.42;
 const NAME_PLATE_HEIGHT = 0.34;

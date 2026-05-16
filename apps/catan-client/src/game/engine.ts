@@ -19,8 +19,8 @@ import {
   GamePhase,
   PlayerSeat,
   SceneUserDataKey,
-  type LobbyFullStatePayload,
 } from '@catan/api-interfaces';
+import type { LobbySceneState } from '../app/shared/helper/game-scene/lobby-scene-state';
 import { Board } from './board/board';
 import { BoardBuildings, type SpawnedBuildPiece } from './board/buildings';
 import { RobberFigure } from './board/robber-figure';
@@ -473,7 +473,7 @@ export class GameEngine {
     }
   }
 
-  public applyLobbyState(state: LobbyFullStatePayload): void {
+  public applySceneState(state: LobbySceneState): void {
     for (let s = 0; s < this.playerAreaActiveAtTable.length; s += 1) {
       this.playerAreaActiveAtTable[s] = false;
     }

@@ -12,7 +12,7 @@ import {
   StartLobbyPayload,
 } from '@catan/api-interfaces';
 import { GameService } from '../core/game.service';
-import { TurnSocketFacade } from '../match-flow/turn-socket.facade';
+import { LobbySocketFacade } from '../match-flow/lobby-socket.facade';
 import { GatewaySocketSessionService } from './gateway-common.services';
 
 @Injectable()
@@ -20,7 +20,7 @@ export class GatewayLobbyHandlers {
   public constructor(
     private readonly gameService: GameService,
     private readonly sessions: GatewaySocketSessionService,
-    private readonly turnSocket: TurnSocketFacade,
+    private readonly lobbySocket: LobbySocketFacade,
   ) {}
 
   public async joinLobby(
@@ -79,11 +79,11 @@ export class GatewayLobbyHandlers {
 
   public startLobby(server: Server, client: Socket, payload: StartLobbyPayload): void {
     const sessionToken = this.sessions.requireSessionToken(client);
-    this.turnSocket.startLobby(payload.lobbyId, sessionToken, server);
+    this.lobbySocket.startLobby(payload.lobbyId, sessionToken, server);
   }
 
   public fillLobbyWithBots(server: Server, client: Socket, payload: FillLobbyWithBotsPayload): void {
     const sessionToken = this.sessions.requireSessionToken(client);
-    this.turnSocket.fillLobbyWithBots(payload.lobbyId, sessionToken, server);
+    this.lobbySocket.fillLobbyWithBots(payload.lobbyId, sessionToken, server);
   }
 }

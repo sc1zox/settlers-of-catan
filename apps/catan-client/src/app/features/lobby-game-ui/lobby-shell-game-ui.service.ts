@@ -1,329 +1,55 @@
-import { computed, DestroyRef, effect, inject, Injectable, signal, Signal } from '@angular/core';
-import {
-  GamePhase,
-  LobbyFullStatePayload,
-  LobbyPlayerPublicDto,
-  PlayerSeat,
-  TradeOfferDto,
-} from '@catan/api-interfaces';
-import { marker } from '@colsen1991/ngx-translate-extract-marker';
-import { TranslateService } from '@ngx-translate/core';
-import { TranslateInstantFn } from '../../../shared/i18n/translate-instant-fn';
-import { EnumTranslate } from '../../../game/i18n/enum-translate.helper';
-import { GameStateResource } from '../../core/game/game-state.resource';
-import { TradingStateService } from '../trading/trading-state.service';
-import { DiscardModalModel } from '../../game-canvas/discard-modal';
-import type { TradePartner } from '../../shared/types/trading-ui.types';
-import { LobbyUiState, LobbyUiStep } from '../../shared/types/lobby-ui-state';
-import {
-  computeHudChromeSpectatorPaused,
-  computeHudGameplayLocked,
-  computeHudRobberDiscardSelf,
-  computeHudShowPassiveWait,
-} from '../../shared/helper/lobby-game-ui/in-game-hud-state';
-import {
-  mapLobbyFullStateToUiState,
-  phaseLabel,
-  seatLabel,
-} from '../../shared/helper/lobby-game-ui/lobby-ui.mapper';
-import { totalResourceCards } from '../../shared/helper/lobby-game-ui/resource-card-totals';
-import { buildTurnAnnouncerText } from '../../shared/helper/lobby-game-ui/turn-announcer-text';
+import { inject, Injectable, Signal } from '@angular/core';
+import { LobbyUiStep } from '../../shared/types/lobby-ui-state';
+import { LobbyActionCapabilitiesUiService } from './lobby-action-capabilities-ui.service';
+import { LobbyDiscardUiService } from './lobby-discard-ui.service';
+import { LobbyGameUiStateService } from './lobby-game-ui-state.service';
+import { LobbyHudUiService } from './lobby-hud-ui.service';
+import { LobbyTradeUiService } from './lobby-trade-ui.service';
 
 @Injectable({ providedIn: 'root' })
 export class LobbyShellGameUiService {
-  private readonly gameState = inject(GameStateResource);
-  private readonly tradingState = inject(TradingStateService);
-  private readonly translate = inject(TranslateService);
-  private readonly destroyRef = inject(DestroyRef);
-  private readonly uiStepHolder = signal<Signal<LobbyUiStep> | null>(null);
-
-  private readonly instant: TranslateInstantFn = (key, params) =>
-    this.translate.instant(marker(key), params);
+  private readonly core = inject(LobbyGameUiStateService);
+  private readonly hud = inject(LobbyHudUiService);
+  private readonly capabilities = inject(LobbyActionCapabilitiesUiService);
+  private readonly tradeUi = inject(LobbyTradeUiService);
+  private readonly discardUi = inject(LobbyDiscardUiService);
 
   public attachUiStep(uiStep: Signal<LobbyUiStep>): void {
-    this.uiStepHolder.set(uiStep);
+    this.core.attachUiStep(uiStep);
   }
 
-  private readonly uiStep = computed<LobbyUiStep>(() => {
-    const holder = this.uiStepHolder();
-    return holder === null ? LobbyUiStep.SignIn : holder();
-  });
+  public readonly lobbyUiState = this.core.lobbyUiState;
+  public readonly rawLobbyState = this.core.rawLobbyState;
+  public readonly isLobbyLoading = this.core.isLobbyLoading;
+  public readonly activeSeatLabel = this.core.activeSeatLabel;
+  public readonly phaseLabel = this.core.phaseLabel;
+  public readonly longestRoadLabel = this.core.longestRoadLabel;
+  public readonly largestArmyLabel = this.core.largestArmyLabel;
+  public readonly winnerLabel = this.core.winnerLabel;
+  public readonly selfSeat = this.core.selfSeat;
+  public readonly selfPlayer = this.core.selfPlayer;
+  public readonly isSelfTurn = this.core.isSelfTurn;
+  public readonly activeTurnPlayerName = this.core.activeTurnPlayerName;
+  public readonly isLobbyAdmin = this.core.isLobbyAdmin;
 
-  public readonly lobbyUiState = computed<LobbyUiState | null>(() => {
-    const lobbyState = this.gameState.lobby.value();
-    if (lobbyState === undefined) {
-      return null;
-    }
-    return mapLobbyFullStateToUiState(lobbyState, this.instant);
-  });
+  public readonly announcerEntry = this.hud.announcerEntry;
+  public readonly hudGameplayLocked = this.hud.hudGameplayLocked;
+  public readonly hudRobberDiscardSelf = this.hud.hudRobberDiscardSelf;
+  public readonly hudShowPassiveWait = this.hud.hudShowPassiveWait;
+  public readonly hudChromeSpectatorPaused = this.hud.hudChromeSpectatorPaused;
 
-  public readonly rawLobbyState = computed<LobbyFullStatePayload | undefined>(() =>
-    this.gameState.lobby.value(),
-  );
+  public readonly canStartLobby = this.capabilities.canStartLobby;
+  public readonly canFillLobbyWithBots = this.capabilities.canFillLobbyWithBots;
+  public readonly canRollDice = this.capabilities.canRollDice;
+  public readonly canFinishTrading = this.capabilities.canFinishTrading;
+  public readonly canEndTurn = this.capabilities.canEndTurn;
+  public readonly canOpenTrade = this.capabilities.canOpenTrade;
+  public readonly canMoveRobber = this.capabilities.canMoveRobber;
+  public readonly canBuildSettlement = this.capabilities.canBuildSettlement;
+  public readonly canBuildRoad = this.capabilities.canBuildRoad;
+  public readonly canBuildCity = this.capabilities.canBuildCity;
 
-  public readonly isLobbyLoading = computed<boolean>(() => this.gameState.lobby.isLoading());
-
-  public readonly activeSeatLabel = computed<string>(() => {
-    const state = this.lobbyUiState();
-    return state === null ? '-' : seatLabel(state.activeSeat, this.instant);
-  });
-
-  public readonly phaseLabel = computed<string>(() => {
-    const state = this.lobbyUiState();
-    return state === null ? '-' : phaseLabel(state.phase, this.instant);
-  });
-
-  public readonly longestRoadLabel = computed<string>(() => {
-    const state = this.lobbyUiState();
-    if (state === null || state.longestRoadSeat === null) {
-      return '-';
-    }
-    return seatLabel(state.longestRoadSeat, this.instant);
-  });
-
-  public readonly largestArmyLabel = computed<string>(() => {
-    const state = this.lobbyUiState();
-    if (state === null || state.largestArmySeat === null) {
-      return '-';
-    }
-    return seatLabel(state.largestArmySeat, this.instant);
-  });
-
-  public readonly winnerLabel = computed<string>(() => {
-    const state = this.lobbyUiState();
-    if (state === null || state.winnerSeat === null) {
-      return '-';
-    }
-    return seatLabel(state.winnerSeat, this.instant);
-  });
-
-  public readonly selfSeat = computed<PlayerSeat | null>(() => {
-    const state = this.lobbyUiState();
-    if (state === null) {
-      return null;
-    }
-    for (let i = 0; i < state.seats.length; i += 1) {
-      if (state.seats[i].isSelf) {
-        return state.seats[i].seat;
-      }
-    }
-    return null;
-  });
-
-  public readonly selfPlayer = computed<LobbyPlayerPublicDto | undefined>(() => {
-    const payload = this.rawLobbyState();
-    if (payload === undefined) {
-      return undefined;
-    }
-    return payload.players.find((player) => player.isSelf);
-  });
-
-  public readonly isSelfTurn = computed<boolean>(() => {
-    const state = this.lobbyUiState();
-    const seat = this.selfSeat();
-    if (state === null || seat === null) {
-      return false;
-    }
-    return state.activeSeat === seat;
-  });
-
-  public readonly activeTurnPlayerName = computed<string>(() => {
-    const raw = this.rawLobbyState();
-    const ui = this.lobbyUiState();
-    if (raw === undefined || ui === null) {
-      return '';
-    }
-    const player = raw.players.find((p) => p.seat === ui.activeSeat);
-    return player?.displayName ?? EnumTranslate.translateGenericPlayer(this.instant);
-  });
-
-  public readonly announcerText = computed<string>(() =>
-    buildTurnAnnouncerText(
-      {
-        uiStep: this.uiStep(),
-        raw: this.rawLobbyState(),
-        ui: this.lobbyUiState(),
-        activeTurnPlayerName: this.activeTurnPlayerName(),
-        isSelfActiveTurn: this.isSelfTurn(),
-      },
-      this.instant,
-    ),
-  );
-
-  public readonly announcerEntry = signal<{ id: number; text: string }>({ id: 0, text: '' });
-  private announcerHideHandle: ReturnType<typeof setTimeout> | null = null;
-
-  public readonly hudGameplayLocked = computed<boolean>(() =>
-    computeHudGameplayLocked(this.lobbyUiState(), this.isSelfTurn()),
-  );
-
-  public readonly hudRobberDiscardSelf = computed<boolean>(() =>
-    computeHudRobberDiscardSelf(this.lobbyUiState(), this.selfSeat()),
-  );
-
-  public readonly hudShowPassiveWait = computed<boolean>(() =>
-    computeHudShowPassiveWait(
-      this.hudGameplayLocked(),
-      this.hudRobberDiscardSelf(),
-      this.lobbyUiState()?.phase,
-    ),
-  );
-
-  public readonly hudChromeSpectatorPaused = computed<boolean>(() =>
-    computeHudChromeSpectatorPaused(this.hudGameplayLocked(), this.hudRobberDiscardSelf()),
-  );
-
-  public readonly isLobbyAdmin = computed<boolean>(() => {
-    const state = this.lobbyUiState();
-    if (state === null) {
-      return false;
-    }
-    for (let i = 0; i < state.seats.length; i += 1) {
-      if (state.seats[i].isSelf) {
-        return state.seats[i].seat === state.adminSeat;
-      }
-    }
-    return false;
-  });
-
-  public readonly canStartLobby = computed<boolean>(
-    () => this.isLobbyAdmin() && this.lobbyUiState()?.phase === GamePhase.LobbyWaiting,
-  );
-
-  public readonly canFillLobbyWithBots = computed<boolean>(() => {
-    const state = this.lobbyUiState();
-    const raw = this.rawLobbyState();
-    if (!this.isLobbyAdmin() || state === null || raw === undefined) {
-      return false;
-    }
-    return state.phase === GamePhase.LobbyWaiting && raw.players.length < 4;
-  });
-
-  public readonly canRollDice = computed<boolean>(
-    () => this.isSelfTurn() && this.lobbyUiState()?.phase === GamePhase.Rolling,
-  );
-
-  public readonly canFinishTrading = computed<boolean>(
-    () => this.isSelfTurn() && this.lobbyUiState()?.phase === GamePhase.Trading,
-  );
-
-  public readonly canEndTurn = computed<boolean>(
-    () => this.isSelfTurn() && this.lobbyUiState()?.phase === GamePhase.Building,
-  );
-
-  public readonly canOpenTrade = computed<boolean>(
-    () => this.isSelfTurn() && this.lobbyUiState()?.phase === GamePhase.Trading,
-  );
-
-  public readonly canMoveRobber = computed<boolean>(
-    () => this.isSelfTurn() && this.lobbyUiState()?.phase === GamePhase.RobberMove,
-  );
-
-  private readonly setupPendingRoadVertexId = computed<string | null>(() => {
-    const state = this.lobbyUiState();
-    const seat = this.selfSeat();
-    if (state === null || seat === null || state.pendingSetupRoadSeat !== seat) {
-      return null;
-    }
-    return state.pendingSetupRoadFromVertexId;
-  });
-
-  public readonly canBuildSettlement = computed<boolean>(() => {
-    const state = this.lobbyUiState();
-    const seat = this.selfSeat();
-    if (state === null) {
-      return false;
-    }
-    const setupPendingForSelf =
-      seat !== null &&
-      state.pendingSetupRoadSeat === seat &&
-      state.pendingSetupRoadFromVertexId !== null;
-    return (
-      this.isSelfTurn() &&
-      (state.phase === GamePhase.Building ||
-        ((state.phase === GamePhase.SetupForward || state.phase === GamePhase.SetupBackward) &&
-          !setupPendingForSelf))
-    );
-  });
-
-  public readonly canBuildRoad = computed<boolean>(() => {
-    const state = this.lobbyUiState();
-    if (state === null || !this.isSelfTurn()) {
-      return false;
-    }
-    if (state.phase === GamePhase.Building) {
-      return true;
-    }
-    if (state.phase === GamePhase.SetupForward || state.phase === GamePhase.SetupBackward) {
-      return this.setupPendingRoadVertexId() !== null;
-    }
-    return false;
-  });
-
-  public readonly canBuildCity = computed<boolean>(() => this.canEndTurn());
-
-  public readonly discardModel = computed<DiscardModalModel | null>(() => {
-    const state = this.lobbyUiState();
-    const seat = this.selfSeat();
-    const self = this.selfPlayer();
-    if (state === null || seat === null || self === undefined) {
-      return null;
-    }
-    if (state.phase !== GamePhase.RobberDiscard) {
-      return null;
-    }
-    if (!state.pendingRobberDiscardSeats.includes(seat)) {
-      return null;
-    }
-    const total = totalResourceCards(self.resources);
-    return { required: Math.floor(total / 2), handCounts: self.resources };
-  });
-
-  public readonly tradePartners = computed<readonly TradePartner[]>(() => {
-    const payload = this.rawLobbyState();
-    if (payload === undefined) {
-      return [];
-    }
-    return payload.players
-      .filter((player) => !player.isSelf)
-      .map((player) => ({ seat: player.seat, name: player.displayName }));
-  });
-
-  public readonly pendingTrade = computed<TradeOfferDto | null>(() => {
-    const trade = this.tradingState.tradeUpdated.value();
-    return trade === undefined ? null : trade.trade;
-  });
-
-  public constructor() {
-    this.destroyRef.onDestroy(() => {
-      if (this.announcerHideHandle !== null) {
-        clearTimeout(this.announcerHideHandle);
-        this.announcerHideHandle = null;
-      }
-    });
-    effect(() => {
-      const text = this.announcerText();
-      if (text.length === 0) {
-        if (this.announcerHideHandle !== null) {
-          clearTimeout(this.announcerHideHandle);
-          this.announcerHideHandle = null;
-        }
-        this.announcerEntry.set({ id: 0, text: '' });
-        return;
-      }
-      const prev = this.announcerEntry();
-      if (prev.text === text) {
-        return;
-      }
-      if (this.announcerHideHandle !== null) {
-        clearTimeout(this.announcerHideHandle);
-        this.announcerHideHandle = null;
-      }
-      this.announcerEntry.set({ id: prev.id + 1, text });
-      this.announcerHideHandle = setTimeout(() => {
-        this.announcerHideHandle = null;
-        this.announcerEntry.set({ id: 0, text: '' });
-      }, 6000);
-    });
-  }
+  public readonly discardModel = this.discardUi.discardModel;
+  public readonly tradePartners = this.tradeUi.tradePartners;
+  public readonly pendingTrade = this.tradeUi.pendingTrade;
 }

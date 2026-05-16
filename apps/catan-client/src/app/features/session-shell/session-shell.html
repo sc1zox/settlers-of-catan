@@ -1,44 +1,44 @@
 <main class="shell">
   <app-game-canvas
     class="canvas-layer"
-    [buildMode]="buildFlow.buildMode()"
-    [freeRoadMode]="buildFlow.freeRoadMode()"
-    [robberMode]="robberMode()"
-    [diceRollClickEnabled]="lobbyGameUi.canRollDice() && !spectatorCamService.mode()"
-    [uiChromeHidden]="spectatorCamService.mode()"
-    (arsenalBuild)="buildFlow.onArsenalBuild($event)"
-    (buildSpotPicked)="buildFlow.onBuildSpotPicked($event)"
-    (robberTilePicked)="robberFlow.onRobberTilePicked($event)"
-    (buildModeCancelled)="buildFlow.onBuildModeCancelled()"
-    (devCardClicked)="devOverlay.onDevCardClicked()"
-    (rollDiceRequested)="rollDice()"
+    [buildMode]="ui.buildFlow.buildMode()"
+    [freeRoadMode]="ui.buildFlow.freeRoadMode()"
+    [robberMode]="ui.robberMode()"
+    [diceRollClickEnabled]="ui.lobbyGameUi.canRollDice() && !ui.spectatorCamService.mode()"
+    [uiChromeHidden]="ui.spectatorCamService.mode()"
+    (arsenalBuild)="ui.buildFlow.onArsenalBuild($event)"
+    (buildSpotPicked)="ui.buildFlow.onBuildSpotPicked($event)"
+    (robberTilePicked)="ui.robberFlow.onRobberTilePicked($event)"
+    (buildModeCancelled)="ui.buildFlow.onBuildModeCancelled()"
+    (devCardClicked)="ui.devOverlay.onDevCardClicked()"
+    (rollDiceRequested)="ui.rollDice()"
   />
   <section class="ui-layer">
-    @if (!spectatorCamService.mode()) {
-      @if (lobbyFlow.uiStep() !== lobbyUiStep.InGame) {
+    @if (!ui.spectatorCamService.mode()) {
+      @if (ui.lobbyFlow.uiStep() !== ui.lobbyUiStepEnum.InGame) {
         <article class="panel">
         <header class="panel__header">
           <h1>{{ 'shell.appTitle' | translate }}</h1>
           <p>{{ 'shell.appSubtitle' | translate }}</p>
         </header>
 
-        @if (shellFeedback.feedback() !== null) {
+        @if (ui.shellFeedback.feedback() !== null) {
           <p
             class="feedback"
-            [class.feedback--info]="shellFeedback.feedback()?.tone === uiFeedbackTone.Info"
-            [class.feedback--success]="shellFeedback.feedback()?.tone === uiFeedbackTone.Success"
-            [class.feedback--error]="shellFeedback.feedback()?.tone === uiFeedbackTone.Error"
+            [class.feedback--info]="ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Info"
+            [class.feedback--success]="ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Success"
+            [class.feedback--error]="ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Error"
             aria-live="polite"
           >
-            {{ shellFeedback.feedback()?.message }}
+            {{ ui.shellFeedback.feedback()?.message }}
           </p>
         }
 
-        @if (lobbyFlow.uiStep() === lobbyUiStep.SignIn) {
-          <form class="form-block" [formGroup]="sessionForm" (ngSubmit)="startSession()">
+        @if (ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.SignIn) {
+          <form class="form-block" [formGroup]="ui.sessionForm" (ngSubmit)="ui.startSession()">
             <label for="displayName">{{ 'shell.labelDisplayName' | translate }}</label>
             <input id="displayName" type="text" autocomplete="nickname" formControlName="displayName" />
-            @if (sessionForm.controls.displayName.invalid && sessionForm.controls.displayName.touched) {
+            @if (ui.sessionForm.controls.displayName.invalid && ui.sessionForm.controls.displayName.touched) {
               <p class="status">{{ 'shell.validationDisplayName' | translate }}</p>
             }
             <div class="webcam-option">
@@ -53,8 +53,8 @@
                 <input
                   type="checkbox"
                   class="webcam-option__input"
-                  [checked]="gameSettings.webcamEnabled()"
-                  (change)="onWebcamEnabledChange($event)"
+                  [checked]="ui.gameSettings.webcamEnabled()"
+                  (change)="ui.onWebcamEnabledChange($event)"
                 />
                 <span class="webcam-option__track" aria-hidden="true">
                   <span class="webcam-option__thumb"></span>
@@ -68,35 +68,35 @@
           </form>
         }
 
-        @if (lobbyFlow.uiStep() === lobbyUiStep.JoinLobby) {
-          <form class="form-block" [formGroup]="lobbyForm" (ngSubmit)="joinLobby()">
+        @if (ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.JoinLobby) {
+          <form class="form-block" [formGroup]="ui.lobbyForm" (ngSubmit)="ui.joinLobby()">
             <p class="session-pill">
-              {{ 'shell.sessionPill' | translate: { displayName: lobbyFlow.sessionState()?.displayName ?? '' } }}
+              {{ 'shell.sessionPill' | translate: { displayName: ui.lobbyFlow.sessionState()?.displayName ?? '' } }}
             </p>
             <label for="lobbyCode">{{ 'shell.labelLobbyCode' | translate }}</label>
             <input id="lobbyCode" type="text" autocomplete="off" formControlName="lobbyCode" />
-            @if (lobbyForm.controls.lobbyCode.invalid && lobbyForm.controls.lobbyCode.touched) {
+            @if (ui.lobbyForm.controls.lobbyCode.invalid && ui.lobbyForm.controls.lobbyCode.touched) {
               <p class="status">{{ 'shell.validationLobbyCode' | translate }}</p>
             }
             <div class="button-row">
               <button
                 type="button"
                 class="button--ghost"
-                [disabled]="lobbyFlow.isJoinInProgress()"
-                (click)="lobbyFlow.backToSignIn()"
+                [disabled]="ui.lobbyFlow.isJoinInProgress()"
+                (click)="ui.lobbyFlow.backToSignIn()"
               >
                 {{ 'shell.buttonChangeName' | translate }}
               </button>
-              <button type="submit" [disabled]="lobbyFlow.isJoinInProgress()">
-                @if (lobbyFlow.isJoinInProgress()) {
+              <button type="submit" [disabled]="ui.lobbyFlow.isJoinInProgress()">
+                @if (ui.lobbyFlow.isJoinInProgress()) {
                   <span class="button-spinner" aria-hidden="true"></span>
                   <span>{{ 'shell.buttonJoining' | translate }}</span>
                 } @else {
                   <span>{{ 'shell.buttonJoinGame' | translate }}</span>
                 }
               </button>
-              <button type="button" [disabled]="lobbyFlow.isJoinInProgress()" (click)="createLobby()">
-                @if (lobbyFlow.isJoinInProgress()) {
+              <button type="button" [disabled]="ui.lobbyFlow.isJoinInProgress()" (click)="ui.createLobby()">
+                @if (ui.lobbyFlow.isJoinInProgress()) {
                   <span class="button-spinner" aria-hidden="true"></span>
                   <span>{{ 'shell.buttonCreating' | translate }}</span>
                 } @else {
@@ -107,29 +107,29 @@
           </form>
         }
 
-        @if (lobbyFlow.uiStep() === lobbyUiStep.Lobby) {
+        @if (ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.Lobby) {
           <div class="lobby-block">
             <div class="lobby-meta">
               <p>
                 <span>{{ 'shell.metaLobby' | translate }}</span
-                ><strong>{{ activeLobbyCode() }}</strong>
+                ><strong>{{ ui.activeLobbyCode() }}</strong>
               </p>
               <p>
                 <span>{{ 'shell.metaActiveSeat' | translate }}</span
-                ><strong>{{ lobbyGameUi.activeSeatLabel() }}</strong>
+                ><strong>{{ ui.lobbyGameUi.activeSeatLabel() }}</strong>
               </p>
               <p>
                 <span>{{ 'shell.metaPhase' | translate }}</span
-                ><strong>{{ lobbyGameUi.phaseLabel() }}</strong>
+                ><strong>{{ ui.lobbyGameUi.phaseLabel() }}</strong>
               </p>
             </div>
 
-            @if (lobbyFlow.isJoinInProgress()) {
+            @if (ui.lobbyFlow.isJoinInProgress()) {
               <p class="status">
                 <span class="status-spinner" aria-hidden="true"></span>
                 <span>{{ 'shell.statusJoinInProgress' | translate }}</span>
               </p>
-            } @else if (lobbyGameUi.isLobbyLoading()) {
+            } @else if (ui.lobbyGameUi.isLobbyLoading()) {
               <p class="status">
                 <span class="status-spinner" aria-hidden="true"></span>
                 <span>{{ 'shell.statusLoadingLobbyState' | translate }}</span>
@@ -137,7 +137,7 @@
             }
 
             <ul class="seat-list">
-              @for (seat of lobbyGameUi.lobbyUiState()?.seats ?? []; track seat.seat) {
+              @for (seat of ui.lobbyGameUi.lobbyUiState()?.seats ?? []; track seat.seat) {
                 <li class="seat-item">
                   <div>
                     <p class="seat-title">{{ seat.seatLabel }}</p>
@@ -158,20 +158,20 @@
             </ul>
 
             <div class="button-row">
-              @if (lobbyGameUi.canStartLobby()) {
+              @if (ui.lobbyGameUi.canStartLobby()) {
                 <button
                   type="button"
-                  [disabled]="lobbyFlow.isJoinInProgress() || lobbyGameUi.isLobbyLoading()"
-                  (click)="startLobby()"
+                  [disabled]="ui.lobbyFlow.isJoinInProgress() || ui.lobbyGameUi.isLobbyLoading()"
+                  (click)="ui.startLobby()"
                 >
                   {{ 'shell.buttonStartGame' | translate }}
                 </button>
               }
-              @if (lobbyGameUi.canFillLobbyWithBots()) {
+              @if (ui.lobbyGameUi.canFillLobbyWithBots()) {
                 <button
                   type="button"
-                  [disabled]="lobbyFlow.isJoinInProgress() || lobbyGameUi.isLobbyLoading()"
-                  (click)="fillLobbyWithBots()"
+                  [disabled]="ui.lobbyFlow.isJoinInProgress() || ui.lobbyGameUi.isLobbyLoading()"
+                  (click)="ui.fillLobbyWithBots()"
                 >
                   {{ 'shell.buttonFillBots' | translate }}
                 </button>
@@ -179,16 +179,16 @@
               <button
                 type="button"
                 class="button--ghost"
-                [disabled]="lobbyFlow.isJoinInProgress() || lobbyGameUi.isLobbyLoading()"
-                (click)="lobbyFlow.backToJoinLobby()"
+                [disabled]="ui.lobbyFlow.isJoinInProgress() || ui.lobbyGameUi.isLobbyLoading()"
+                (click)="ui.lobbyFlow.backToJoinLobby()"
               >
                 {{ 'shell.buttonOtherLobby' | translate }}
               </button>
               <button
                 type="button"
                 class="button--danger"
-                [disabled]="lobbyFlow.isJoinInProgress() || lobbyGameUi.isLobbyLoading()"
-                (click)="lobbyFlow.resetSession()"
+                [disabled]="ui.lobbyFlow.isJoinInProgress() || ui.lobbyGameUi.isLobbyLoading()"
+                (click)="ui.lobbyFlow.resetSession()"
               >
                 {{ 'shell.buttonEndSession' | translate }}
               </button>
@@ -197,99 +197,99 @@
         }
       </article>
       } @else {
-        @if (lobbyGameUi.announcerEntry().text.length > 0) {
+        @if (ui.lobbyGameUi.announcerEntry().text.length > 0) {
           <aside class="hud-announcer" role="status" aria-live="polite">
-            @for (entry of [lobbyGameUi.announcerEntry()]; track entry.id) {
+            @for (entry of [ui.lobbyGameUi.announcerEntry()]; track entry.id) {
               <p class="hud-announcer__text">{{ entry.text }}</p>
             }
           </aside>
         }
-        <aside class="hud" [class.hud--spectator-paused]="lobbyGameUi.hudChromeSpectatorPaused()">
+        <aside class="hud" [class.hud--spectator-paused]="ui.lobbyGameUi.hudChromeSpectatorPaused()">
           <div class="hud__chrome">
-            @if (shellFeedback.feedback() !== null) {
+            @if (ui.shellFeedback.feedback() !== null) {
               <p
                 class="hud__feedback feedback"
-                [class.feedback--info]="shellFeedback.feedback()?.tone === uiFeedbackTone.Info"
-                [class.feedback--success]="shellFeedback.feedback()?.tone === uiFeedbackTone.Success"
-                [class.feedback--error]="shellFeedback.feedback()?.tone === uiFeedbackTone.Error"
+                [class.feedback--info]="ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Info"
+                [class.feedback--success]="ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Success"
+                [class.feedback--error]="ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Error"
                 aria-live="polite"
               >
-                {{ shellFeedback.feedback()?.message }}
+                {{ ui.shellFeedback.feedback()?.message }}
               </p>
             }
             <div class="hud__meta">
               <p>
                 <span>{{ 'shell.hudLobby' | translate }}</span
-                ><strong>{{ activeLobbyCode() }}</strong>
+                ><strong>{{ ui.activeLobbyCode() }}</strong>
               </p>
               <p>
                 <span>{{ 'shell.hudActiveSeat' | translate }}</span
-                ><strong>{{ lobbyGameUi.activeSeatLabel() }}</strong>
+                ><strong>{{ ui.lobbyGameUi.activeSeatLabel() }}</strong>
               </p>
               <p>
                 <span>{{ 'shell.hudPhase' | translate }}</span
-                ><strong>{{ lobbyGameUi.phaseLabel() }}</strong>
+                ><strong>{{ ui.lobbyGameUi.phaseLabel() }}</strong>
               </p>
               <p>
                 <span>{{ 'shell.hudLongestRoad' | translate }}</span
-                ><strong>{{ lobbyGameUi.longestRoadLabel() }}</strong>
+                ><strong>{{ ui.lobbyGameUi.longestRoadLabel() }}</strong>
               </p>
               <p>
                 <span>{{ 'shell.hudLargestArmy' | translate }}</span
-                ><strong>{{ lobbyGameUi.largestArmyLabel() }}</strong>
+                ><strong>{{ ui.lobbyGameUi.largestArmyLabel() }}</strong>
               </p>
               <p>
                 <span>{{ 'shell.hudWinner' | translate }}</span
-                ><strong>{{ lobbyGameUi.winnerLabel() }}</strong>
+                ><strong>{{ ui.lobbyGameUi.winnerLabel() }}</strong>
               </p>
             </div>
 
             <div
               class="hud__play-surface"
-              [class.hud__play-surface--locked]="lobbyGameUi.hudGameplayLocked()"
-              [class.hud__play-surface--live]="!lobbyGameUi.hudGameplayLocked()"
+              [class.hud__play-surface--locked]="ui.lobbyGameUi.hudGameplayLocked()"
+              [class.hud__play-surface--live]="!ui.lobbyGameUi.hudGameplayLocked()"
             >
-              @if (lobbyGameUi.hudGameplayLocked()) {
-                @if (lobbyGameUi.hudRobberDiscardSelf()) {
+              @if (ui.lobbyGameUi.hudGameplayLocked()) {
+                @if (ui.lobbyGameUi.hudRobberDiscardSelf()) {
                   <p class="hud__play-wait hud__play-wait--accent">
                     {{ 'shell.hudDiscardPrompt' | translate }}
                   </p>
-                } @else if (lobbyGameUi.hudShowPassiveWait()) {
+                } @else if (ui.lobbyGameUi.hudShowPassiveWait()) {
                   <p class="hud__play-wait">
-                    {{ 'shell.hudSpectateWait' | translate: { name: lobbyGameUi.activeTurnPlayerName() } }}
+                    {{ 'shell.hudSpectateWait' | translate: { name: ui.lobbyGameUi.activeTurnPlayerName() } }}
                   </p>
                 }
               }
               <div class="hud__actions">
-                @if (lobbyGameUi.canRollDice()) {
-                  <button type="button" (click)="rollDice()">{{ 'shell.buttonRollDice' | translate }}</button>
+                @if (ui.lobbyGameUi.canRollDice()) {
+                  <button type="button" (click)="ui.rollDice()">{{ 'shell.buttonRollDice' | translate }}</button>
                 }
-                @if (lobbyGameUi.canOpenTrade()) {
-                  <button type="button" (click)="tradingPanel.openTrade()">{{ 'shell.buttonTrade' | translate }}</button>
+                @if (ui.lobbyGameUi.canOpenTrade()) {
+                  <button type="button" (click)="ui.tradingPanel.openTrade()">{{ 'shell.buttonTrade' | translate }}</button>
                 }
-                @if (lobbyGameUi.canFinishTrading()) {
-                  <button type="button" (click)="finishTrading()">
+                @if (ui.lobbyGameUi.canFinishTrading()) {
+                  <button type="button" (click)="ui.finishTrading()">
                     {{ 'shell.buttonFinishTrade' | translate }}
                   </button>
                 }
-                @if (devCards.canBuyDevCard()) {
-                  <button type="button" (click)="buyDevCard()">
-                    {{ 'shell.buttonBuyDevCard' | translate }} ({{ devCards.devDeckCount() }})
+                @if (ui.devCards.canBuyDevCard()) {
+                  <button type="button" (click)="ui.buyDevCard()">
+                    {{ 'shell.buttonBuyDevCard' | translate }} ({{ ui.devCards.devDeckCount() }})
                   </button>
                 }
-                @if (lobbyGameUi.canEndTurn()) {
-                  <button type="button" (click)="endTurn()">{{ 'shell.buttonEndTurn' | translate }}</button>
+                @if (ui.lobbyGameUi.canEndTurn()) {
+                  <button type="button" (click)="ui.endTurn()">{{ 'shell.buttonEndTurn' | translate }}</button>
                 }
               </div>
 
-              @if (buildFlow.buildMode() !== null) {
+              @if (ui.buildFlow.buildMode() !== null) {
                 <p class="hud__hint">{{ 'shell.hintBuildSpot' | translate }}</p>
               }
-              @if (robberMode()) {
+              @if (ui.robberMode()) {
                 <p class="hud__hint">{{ 'shell.hintRobber' | translate }}</p>
               }
               @if (
-                lobbyGameUi.canBuildSettlement() || lobbyGameUi.canBuildRoad() || lobbyGameUi.canBuildCity()
+                ui.lobbyGameUi.canBuildSettlement() || ui.lobbyGameUi.canBuildRoad() || ui.lobbyGameUi.canBuildCity()
               ) {
                 <p class="hud__hint hud__hint--soft">{{ 'shell.hintBuildFromArsenal' | translate }}</p>
               }
@@ -300,16 +300,16 @@
             <button
               type="button"
               class="button--ghost"
-              [disabled]="lobbyFlow.isJoinInProgress() || lobbyGameUi.isLobbyLoading()"
-              (click)="lobbyFlow.backToJoinLobby()"
+              [disabled]="ui.lobbyFlow.isJoinInProgress() || ui.lobbyGameUi.isLobbyLoading()"
+              (click)="ui.lobbyFlow.backToJoinLobby()"
             >
               {{ 'shell.buttonOtherLobbyHud' | translate }}
             </button>
             <button
               type="button"
               class="button--danger"
-              [disabled]="lobbyFlow.isJoinInProgress() || lobbyGameUi.isLobbyLoading()"
-              (click)="lobbyFlow.resetSession()"
+              [disabled]="ui.lobbyFlow.isJoinInProgress() || ui.lobbyGameUi.isLobbyLoading()"
+              (click)="ui.lobbyFlow.resetSession()"
             >
               {{ 'shell.buttonEndSessionHud' | translate }}
             </button>
@@ -320,34 +320,34 @@
   </section>
 
   <app-spectator-camera-toggle [visible]="true" />
-  <app-game-settings-toggle [visible]="lobbyFlow.uiStep() === lobbyUiStep.InGame" />
+  <app-game-settings-toggle [visible]="ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.InGame" />
 
-  @if (lobbyFlow.uiStep() === lobbyUiStep.InGame && !spectatorCamService.mode()) {
+  @if (ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.InGame && !ui.spectatorCamService.mode()) {
     <app-build-confirm-popover
-      [model]="buildFlow.buildConfirm()"
-      (confirm)="buildFlow.confirmBuild()"
-      (dismiss)="buildFlow.cancelBuild()"
+      [model]="ui.buildFlow.buildConfirm()"
+      (confirm)="ui.buildFlow.confirmBuild()"
+      (dismiss)="ui.buildFlow.cancelBuild()"
     />
-    <app-robber-victim-popover [model]="robberFlow.robberVictim()" (pick)="robberFlow.onRobberVictimPick($event)" />
-    <app-discard-modal [model]="lobbyGameUi.discardModel()" (confirmed)="onSubmitDiscard($event)" />
+    <app-robber-victim-popover [model]="ui.robberFlow.robberVictim()" (pick)="ui.robberFlow.onRobberVictimPick($event)" />
+    <app-discard-modal [model]="ui.lobbyGameUi.discardModel()" (confirmed)="ui.onSubmitDiscard($event)" />
     <app-trade-panel
-      [open]="tradingPanel.tradeOpen()"
-      [selfSeat]="lobbyGameUi.selfSeat()"
-      [partnerList]="lobbyGameUi.tradePartners()"
-      [pendingTrade]="lobbyGameUi.pendingTrade()"
-      (bankTrade)="tradingPanel.onBankTrade($event)"
-      (propose)="tradingPanel.onProposeTrade($event)"
-      (accept)="tradingPanel.onAcceptTrade($event)"
-      (reject)="tradingPanel.onRejectTrade($event)"
-      (closed)="tradingPanel.closeTrade()"
+      [open]="ui.tradingPanel.tradeOpen()"
+      [selfSeat]="ui.lobbyGameUi.selfSeat()"
+      [partnerList]="ui.lobbyGameUi.tradePartners()"
+      [pendingTrade]="ui.lobbyGameUi.pendingTrade()"
+      (bankTrade)="ui.tradingPanel.onBankTrade($event)"
+      (propose)="ui.tradingPanel.onProposeTrade($event)"
+      (accept)="ui.tradingPanel.onAcceptTrade($event)"
+      (reject)="ui.tradingPanel.onRejectTrade($event)"
+      (closed)="ui.tradingPanel.closeTrade()"
     />
     <app-dev-card-modal
-      [open]="devOverlay.devCardOpen()"
-      (playKnight)="devOverlay.onPlayKnight()"
-      (playMonopoly)="devOverlay.onPlayMonopoly($event)"
-      (playYearOfPlenty)="devOverlay.onPlayYearOfPlenty($event)"
-      (playRoadBuilding)="devOverlay.onPlayRoadBuilding()"
-      (closed)="devOverlay.closeDevCard()"
+      [open]="ui.devOverlay.devCardOpen()"
+      (playKnight)="ui.devOverlay.onPlayKnight()"
+      (playMonopoly)="ui.devOverlay.onPlayMonopoly($event)"
+      (playYearOfPlenty)="ui.devOverlay.onPlayYearOfPlenty($event)"
+      (playRoadBuilding)="ui.devOverlay.onPlayRoadBuilding()"
+      (closed)="ui.devOverlay.closeDevCard()"
     />
   }
 </main>

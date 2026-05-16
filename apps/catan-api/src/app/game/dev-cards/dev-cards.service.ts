@@ -8,6 +8,7 @@ import {
 } from '@catan/api-interfaces';
 import { LobbyRuntime } from '../lobby/lobby-runtime';
 import { applyRobberMove } from '../robber/robber.util';
+import { ResourceCostService } from '../economy/resource-cost.service';
 import { GameActionValidationService } from '../validation/game-action-validation.service';
 import { applyPostActionScoring } from '../utils/scoring.util';
 import {
@@ -20,7 +21,10 @@ const PLAYABLE_PHASES: readonly GamePhase[] = [GamePhase.Trading, GamePhase.Buil
 
 @Injectable()
 export class DevCardsService {
-  public constructor(private readonly validation: GameActionValidationService) {}
+  public constructor(
+    private readonly validation: GameActionValidationService,
+    private readonly resourceCost: ResourceCostService,
+  ) {}
 
   public buyDevCardAsCurrentTurn(lobby: LobbyRuntime, sessionToken: string): void {
     this.validation.assertPhase(lobby, [GamePhase.Building]);
@@ -29,7 +33,7 @@ export class DevCardsService {
       throw new Error(ActionRejectCode.NoDevCardAvailable);
     }
     this.validation.assertDevCardCost(player);
-    this.validation.deductDevCardCost(player);
+    this.resourceCost.deductDevCardCost(player);
     const topCard = lobby.devDeck.pop();
     if (!topCard) {
       throw new Error(ActionRejectCode.NoDevCardAvailable);

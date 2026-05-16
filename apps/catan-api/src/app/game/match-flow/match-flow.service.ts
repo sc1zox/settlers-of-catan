@@ -8,12 +8,12 @@ import {
   formatSocketIoLobbyRoomId,
 } from '@catan/api-interfaces';
 import { Server } from 'socket.io';
-import { DemoBotService } from '../demo-bot/demo-bot.service';
 import { EconomyService } from '../economy/economy.service';
 import { resetTurnDevCardState } from '../dev-cards/dev-cards.runtime';
 import { GameActionValidationService } from '../validation/game-action-validation.service';
 import { LobbyRuntime } from '../lobby/lobby-runtime';
 import { TradeService } from '../trade/trade.service';
+import { getMinimumPlayerCountToStartLobby } from './match-start-rules';
 import { TurnFlowService } from '../turn/turn-flow.service';
 
 @Injectable()
@@ -23,7 +23,6 @@ export class MatchFlowService {
     private readonly tradeService: TradeService,
     private readonly turnFlow: TurnFlowService,
     private readonly economy: EconomyService,
-    private readonly demoBots: DemoBotService,
   ) {}
 
   public startLobby(lobby: LobbyRuntime, sessionToken: string): void {
@@ -35,7 +34,7 @@ export class MatchFlowService {
       throw new Error(ActionRejectCode.LobbyHostOnly);
     }
     const activeSeats = this.turnFlow.getActiveTurnSeats(lobby);
-    const minimumPlayerCount = this.demoBots.getMinimumStartPlayerCount(lobby);
+    const minimumPlayerCount = getMinimumPlayerCountToStartLobby(lobby);
     if (activeSeats.length < minimumPlayerCount) {
       throw new Error(ActionRejectCode.LobbyNotEnoughPlayers);
     }
@@ -65,11 +64,24 @@ export class MatchFlowService {
     lobby.fsm.onTurnEnded();
   }
 
-  public finishTrading(lobby: LobbyRuntime, sessionToken: string, lobbyId: string, server: Server): void {
+  public completeTradingPhaseAndExpireOffers(
+    lobby: LobbyRuntime,
+    sessionToken: string,
+    lobbyId: string,
+    server: Server,
+  ): void {
+    this.assertMayCompleteTradingPhase(lobby, sessionToken);
+    this.transitionFromTradingToBuilding(lobby);
+    this.emitExpiredTradeOffers(lobbyId, server);
+  }
+
+  private assertMayCompleteTradingPhase(lobby: LobbyRuntime, sessionToken: string): void {
     this.validation.assertPhase(lobby, [GamePhase.Trading]);
     this.validation.assertCurrentPlayer(lobby, sessionToken);
+  }
+
+  private transitionFromTradingToBuilding(lobby: LobbyRuntime): void {
     lobby.fsm.onTradingFinished();
-    this.emitExpiredTradeOffers(lobbyId, server);
   }
 
   private emitExpiredTradeOffers(lobbyId: string, server: Server): void {

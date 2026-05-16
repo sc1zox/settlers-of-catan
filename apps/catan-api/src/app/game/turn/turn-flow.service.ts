@@ -1,14 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { ActionRejectCode, PlayerSeat } from '@catan/api-interfaces';
-import { DemoBotService } from '../demo-bot/demo-bot.service';
-import { CLOCKWISE_SEATS, LobbyRuntime } from '../lobby/lobby-runtime';
+import { CLOCKWISE_SEATS, getOccupiedSeatsClockwise, LobbyRuntime } from '../lobby/lobby-runtime';
 
 @Injectable()
 export class TurnFlowService {
-  public constructor(private readonly demoBots: DemoBotService) {}
-
   public getActiveTurnSeats(lobby: LobbyRuntime): PlayerSeat[] {
-    return this.demoBots.getActiveTurnSeats(lobby);
+    return getOccupiedSeatsClockwise(lobby);
   }
 
   public firstTurnSeat(lobby: LobbyRuntime): PlayerSeat {

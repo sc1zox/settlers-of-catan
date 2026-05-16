@@ -79,7 +79,7 @@ export class GameService {
       rollDice: (id, sessionToken, srv) => {
         this.rollDice(id, sessionToken, srv);
       },
-      finishTrading: (id, sessionToken, srv) => {
+      completeTradingPhaseAndExpireOffers: (id, sessionToken, srv) => {
         this.finishTrading(id, sessionToken, srv);
       },
       endTurn: (id, sessionToken, srv) => {
@@ -232,7 +232,7 @@ export class GameService {
   public finishTrading(lobbyId: string, sessionToken: string, server: Server): void {
     const lobby = this.lobby.requireLobby(lobbyId);
     this.lobby.assertLobbyOpen(lobby);
-    this.matchFlow.finishTrading(lobby, sessionToken, lobbyId, server);
+    this.matchFlow.completeTradingPhaseAndExpireOffers(lobby, sessionToken, lobbyId, server);
     this.broadcastFullState(server, lobby);
   }
 

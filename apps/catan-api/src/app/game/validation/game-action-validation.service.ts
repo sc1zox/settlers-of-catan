@@ -1,29 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { ActionRejectCode, GamePhase, PlayerSeat, ResourceType } from '@catan/api-interfaces';
 import type { LobbyPlayerSlot, LobbyRuntime } from '../lobby/lobby-runtime';
-
-const SETTLEMENT_COST: Readonly<Partial<Record<ResourceType, number>>> = {
-  [ResourceType.Wood]: 1,
-  [ResourceType.Brick]: 1,
-  [ResourceType.Wheat]: 1,
-  [ResourceType.Wool]: 1,
-};
-
-const ROAD_COST: Readonly<Partial<Record<ResourceType, number>>> = {
-  [ResourceType.Wood]: 1,
-  [ResourceType.Brick]: 1,
-};
-
-const CITY_COST: Readonly<Partial<Record<ResourceType, number>>> = {
-  [ResourceType.Wheat]: 2,
-  [ResourceType.Ore]: 3,
-};
-
-const DEV_CARD_COST: Readonly<Partial<Record<ResourceType, number>>> = {
-  [ResourceType.Wheat]: 1,
-  [ResourceType.Wool]: 1,
-  [ResourceType.Ore]: 1,
-};
+import {
+  CITY_COST,
+  DEV_CARD_COST,
+  ROAD_COST,
+  SETTLEMENT_COST,
+} from '../economy/build-resource-costs';
 
 @Injectable()
 export class GameActionValidationService {
@@ -113,15 +96,6 @@ export class GameActionValidationService {
     }
   }
 
-  public deductCityCost(player: LobbyPlayerSlot): void {
-    const keys = Object.keys(CITY_COST) as ResourceType[];
-    for (let i = 0; i < keys.length; i += 1) {
-      const resource = keys[i];
-      const need = CITY_COST[resource] ?? 0;
-      player.resources[resource] = (player.resources[resource] ?? 0) - need;
-    }
-  }
-
   public assertDevCardCost(player: LobbyPlayerSlot): void {
     const keys = Object.keys(DEV_CARD_COST) as ResourceType[];
     for (let i = 0; i < keys.length; i += 1) {
@@ -130,24 +104,6 @@ export class GameActionValidationService {
       if ((player.resources[resource] ?? 0) < need) {
         throw new Error(ActionRejectCode.InsufficientResources);
       }
-    }
-  }
-
-  public deductDevCardCost(player: LobbyPlayerSlot): void {
-    const keys = Object.keys(DEV_CARD_COST) as ResourceType[];
-    for (let i = 0; i < keys.length; i += 1) {
-      const resource = keys[i];
-      const need = DEV_CARD_COST[resource] ?? 0;
-      player.resources[resource] = (player.resources[resource] ?? 0) - need;
-    }
-  }
-
-  public deductRoadCost(player: LobbyPlayerSlot): void {
-    const keys = Object.keys(ROAD_COST) as ResourceType[];
-    for (let i = 0; i < keys.length; i += 1) {
-      const resource = keys[i];
-      const need = ROAD_COST[resource] ?? 0;
-      player.resources[resource] = (player.resources[resource] ?? 0) - need;
     }
   }
 
@@ -241,21 +197,6 @@ export class GameActionValidationService {
     return false;
   }
 
-  public deductSettlementCost(player: LobbyPlayerSlot): void {
-    const keys = Object.keys(SETTLEMENT_COST) as ResourceType[];
-    for (let i = 0; i < keys.length; i++) {
-      const r = keys[i];
-      const need = SETTLEMENT_COST[r] ?? 0;
-      player.resources[r] = (player.resources[r] ?? 0) - need;
-    }
-  }
-
-  /**
-   * Enumerate every placement the given seat may legally make *right now* by
-   * replaying the same assertions the action handlers use. Returns empty lists
-   * when it is not that seat's turn or the phase forbids building — the client
-   * uses these to highlight buildable spots.
-   */
   public computeLegalMoves(
     lobby: LobbyRuntime,
     seat: PlayerSeat,
@@ -326,8 +267,6 @@ export class GameActionValidationService {
       }
     }
 
-    // Road-building dev card places roads for free, so its legal edges ignore
-    // resource cost — available in both trading and building phases.
     if (phase === GamePhase.Trading || phase === GamePhase.Building) {
       for (const edgeId of lobby.edgesById.keys()) {
         if (this.isPlacementLegal(() => this.assertLegalRoadEdge(lobby, player, edgeId))) {

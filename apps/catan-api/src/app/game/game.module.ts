@@ -19,6 +19,7 @@ import { GameService } from './core/game.service';
 import { LobbyModule } from './lobby/lobby.module';
 import { LobbyOrchestratorModule } from './lobby-orchestrator/lobby-orchestrator.module';
 import { MatchFlowModule } from './match-flow/match-flow.module';
+import { LobbySocketFacade } from './match-flow/lobby-socket.facade';
 import { TurnSocketFacade } from './match-flow/turn-socket.facade';
 import { RobberModule } from './robber/robber.module';
 import { RobberSocketFacade } from './robber/robber-socket.facade';
@@ -54,6 +55,7 @@ import { TurnFlowModule } from './turn/turn-flow.module';
     GatewayTradeHandlers,
     BuildSocketFacade,
     RobberSocketFacade,
+    LobbySocketFacade,
     TurnSocketFacade,
     DevCardsSocketFacade,
   ],

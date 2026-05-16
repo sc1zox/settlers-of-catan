@@ -16,16 +16,14 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   BuildKind,
   SceneObjectKind,
-  WEBCAM_MEDIA_SCOPE,
-  WebcamMediaScopeKey,
-  type LobbyFullStatePayload,
 } from '@catan/api-interfaces';
 import { GameEngine } from '../../game/engine';
 import { setGameTranslateFn } from '../../game/i18n-bridge';
 import { GameStateResource } from '../core/game/game-state.resource';
 import { GameSettingsService } from '../features/game-settings/game-settings.service';
-import { LobbyLiveKitService } from '../features/webcam-head/lobby-livekit.service';
+import { HeadVideoSyncService } from '../features/webcam-head/head-video-sync.service';
 import { SpectatorCameraService } from '../features/spectator-camera/spectator-camera.service';
+import { mapLobbyFullStateToSceneState } from '../shared/helper/game-scene/map-lobby-full-state-to-scene';
 import { HoverState } from '../../game/interaction/hover';
 import { BuildConfirmModel } from './build-confirm-popover';
 import { CardTooltipComponent, CardTooltipModel } from './card-tooltip';
@@ -68,7 +66,7 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
   @ViewChild('host', { static: true }) private hostRef!: ElementRef<HTMLDivElement>;
   private readonly gameState = inject(GameStateResource);
   private readonly gameSettings = inject(GameSettingsService);
-  private readonly liveKit = inject(LobbyLiveKitService);
+  private readonly headVideoSync = inject(HeadVideoSyncService);
   private readonly spectatorCam = inject(SpectatorCameraService);
   private readonly translate = inject(TranslateService);
   private engine: GameEngine | null = null;
@@ -108,20 +106,20 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
   private readonly lobbyStateSync = effect(() => {
     const state = this.gameState.lobby.value();
     if (state && this.engine) {
-      this.engine.applyLobbyState(state);
-      this.syncHeadVideos(state);
+      const scene = mapLobbyFullStateToSceneState(state);
+      this.engine.applySceneState(scene);
+      this.headVideoSync.syncToEngine(this.engine, scene);
     }
   });
 
-  private readonly headVideoSync = effect(() => {
-    this.liveKit.localVideoElement();
-    this.liveKit.remoteVideoRevision();
-    this.gameSettings.webcamEnabled();
+  private readonly headVideoSyncEffect = effect(() => {
+    this.headVideoSync.readSyncTriggers();
     const state = this.gameState.lobby.value();
     if (!this.engine || state === undefined) {
       return;
     }
-    this.syncHeadVideos(state);
+    const scene = mapLobbyFullStateToSceneState(state);
+    this.headVideoSync.syncToEngine(this.engine, scene);
   });
 
   private readonly buildModeSync = effect(() => {
@@ -155,8 +153,10 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
   });
 
   private readonly headVideoGammaSync = effect(() => {
-    const gamma = WEBCAM_MEDIA_SCOPE[WebcamMediaScopeKey.HeadDisplayGamma];
-    this.engine?.setHeadVideoDisplayGamma(gamma);
+    if (!this.engine) {
+      return;
+    }
+    this.headVideoSync.applyDisplayGammaToEngine(this.engine);
   });
 
   private readonly performanceSamplingSync = effect(() => {
@@ -215,7 +215,7 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
     this.engine.setDiceRollRequestHandler(() => this.rollDiceRequested.emit());
     this.engine.setShadowQuality(this.gameSettings.shadowQuality());
     this.engine.setSceneBrightness(this.gameSettings.sceneBrightness());
-    this.engine.setHeadVideoDisplayGamma(WEBCAM_MEDIA_SCOPE[WebcamMediaScopeKey.HeadDisplayGamma]);
+    this.headVideoSync.applyDisplayGammaToEngine(this.engine);
     if (this.gameSettings.performanceSamplingEnabled()) {
       this.engine.setPerformanceStatsHandler((stats) => {
         this.gameSettings.handlePerformanceStats(stats);
@@ -224,8 +224,9 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
     this.engine.start();
     const current = this.gameState.lobby.value();
     if (current) {
-      this.engine.applyLobbyState(current);
-      this.syncHeadVideos(current);
+      const scene = mapLobbyFullStateToSceneState(current);
+      this.engine.applySceneState(scene);
+      this.headVideoSync.syncToEngine(this.engine, scene);
     }
     this.engine.showBuildSpots(this.buildMode(), this.freeRoadMode());
     this.engine.setRobberMode(this.robberMode());
@@ -245,28 +246,6 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
 
   public dismissFocusedCard(): void {
     this.engine?.clearFocusedCard();
-  }
-
-  private syncHeadVideos(state: LobbyFullStatePayload): void {
-    if (!this.engine) {
-      return;
-    }
-    for (let i = 0; i < state.players.length; i += 1) {
-      const player = state.players[i];
-      if (player.isBot) {
-        this.engine.setHeadVideoForSeat(player.seat, null, false);
-        continue;
-      }
-      if (player.isSelf) {
-        const localVideo = this.liveKit.localVideoElement();
-        const showPlaceholder = this.gameSettings.webcamEnabled() && localVideo === null;
-        this.engine.setHeadVideoForSeat(player.seat, localVideo, showPlaceholder);
-        continue;
-      }
-      const remoteVideo = this.liveKit.getRemoteVideoForSeat(player.seat);
-      const remotePlaceholder = remoteVideo === null;
-      this.engine.setHeadVideoForSeat(player.seat, remoteVideo, remotePlaceholder);
-    }
   }
 
   private handleHover(state: HoverState | null): void {

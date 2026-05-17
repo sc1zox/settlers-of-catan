@@ -24,6 +24,7 @@ export class PlayerAreaHand {
   private handMaterials: MeshStandardMaterial[] = [];
   private resourceCounts: Record<ResourceKind, number>;
   private devCount = 0;
+  private hiddenResourceCount = 0;
   private presenceDimmed = false;
 
   public constructor(
@@ -52,10 +53,13 @@ export class PlayerAreaHand {
     resources: readonly ResourceKind[],
     nextDevCount: number,
     devKinds: readonly DevKind[] | null = null,
+    hiddenResourceCount: number | null = null,
   ): void {
     const nextCounts = this.emptyResourceCounts();
-    for (let i = 0; i < resources.length; i += 1) {
-      nextCounts[resources[i]] += 1;
+    if (hiddenResourceCount === null) {
+      for (let i = 0; i < resources.length; i += 1) {
+        nextCounts[resources[i]] += 1;
+      }
     }
 
     this.clearHand();
@@ -65,21 +69,37 @@ export class PlayerAreaHand {
     const devGroupKey = `dev-${this.seat}`;
     const handStartX = -2.4;
     let slot = 0;
-    for (let k = 0; k < RESOURCE_DISPLAY_ORDER.length; k += 1) {
-      const kind = RESOURCE_DISPLAY_ORDER[k];
-      const have = nextCounts[kind];
-      const had = this.resourceCounts[kind];
-      for (let j = 0; j < have; j += 1) {
-        const card = this.buildResourceCard(kind);
+    if (hiddenResourceCount !== null) {
+      const hadHidden = this.hiddenResourceCount;
+      for (let j = 0; j < hiddenResourceCount; j += 1) {
+        const card = this.buildHiddenResourceCard();
         card.setGroupKey(resourceGroupKey);
         const x = handStartX + slot * (CARD_SHORT + HAND_GAP);
         this.placeCard(card, x, this.cardRowZ, this.tableY);
-        if (j >= had) {
+        if (j >= hadHidden) {
           this.applyDealInPose(card);
         }
         this.group.add(card.mesh);
         cards.push(card);
         slot += 1;
+      }
+    } else {
+      for (let k = 0; k < RESOURCE_DISPLAY_ORDER.length; k += 1) {
+        const kind = RESOURCE_DISPLAY_ORDER[k];
+        const have = nextCounts[kind];
+        const had = this.resourceCounts[kind];
+        for (let j = 0; j < have; j += 1) {
+          const card = this.buildResourceCard(kind);
+          card.setGroupKey(resourceGroupKey);
+          const x = handStartX + slot * (CARD_SHORT + HAND_GAP);
+          this.placeCard(card, x, this.cardRowZ, this.tableY);
+          if (j >= had) {
+            this.applyDealInPose(card);
+          }
+          this.group.add(card.mesh);
+          cards.push(card);
+          slot += 1;
+        }
       }
     }
 
@@ -101,7 +121,8 @@ export class PlayerAreaHand {
     }
 
     this.handCards = cards;
-    this.resourceCounts = nextCounts;
+    this.resourceCounts = hiddenResourceCount === null ? nextCounts : this.emptyResourceCounts();
+    this.hiddenResourceCount = hiddenResourceCount ?? 0;
     this.devCount = nextDevCount;
     this.applyPresenceDimToHand();
   }
@@ -165,6 +186,22 @@ export class PlayerAreaHand {
       [ResourceKind.Wool]: 0,
       [ResourceKind.Ore]: 0,
     };
+  }
+
+  private buildHiddenResourceCard(): Card {
+    const backTex = makeResourceBackTexture();
+    const faceMat = new MeshStandardMaterial({ map: backTex, flatShading: true, roughness: 0.85 });
+    const backMat = new MeshStandardMaterial({ map: backTex, flatShading: true, roughness: 0.85 });
+    const edgeMat = new MeshStandardMaterial({ color: 0x6b4a26, flatShading: true });
+    this.handMaterials.push(faceMat, backMat, edgeMat);
+    return new Card({
+      width: CARD_LONG,
+      height: CARD_SHORT,
+      thickness: CARD_THICKNESS,
+      backMaterial: backMat,
+      faceMaterial: faceMat,
+      edgeMaterial: edgeMat,
+    });
   }
 
   private buildResourceCard(kind: ResourceKind): Card {

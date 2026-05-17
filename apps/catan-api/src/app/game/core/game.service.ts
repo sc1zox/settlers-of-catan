@@ -11,7 +11,7 @@ import {
   type LobbyFullStatePayload,
   type LobbyJoinedPayload,
 } from '@catan/api-interfaces';
-import { Server } from 'socket.io';
+import { Server, Socket } from 'socket.io';
 import { BuildActionService } from '../build/build-action.service';
 import { DemoBotService } from '../demo-bot/demo-bot.service';
 import { DevCardsService } from '../dev-cards/dev-cards.service';
@@ -122,6 +122,14 @@ export class GameService {
     });
   }
 
+  public async resumeSessionSocket(
+    sessionToken: string,
+    client: Socket,
+    server: Server,
+  ): Promise<void> {
+    await this.lobbyOrchestrator.resumeSessionSocket(sessionToken, client, server);
+  }
+
   public onDisconnect(sessionToken: string, server: Server): void {
     this.lobbyOrchestrator.onDisconnect(sessionToken, server);
   }
@@ -225,7 +233,8 @@ export class GameService {
   }
 
   public fillLobbyWithBots(lobbyId: string, sessionToken: string, server: Server): void {
-    this.lobbyOrchestrator.fillLobbyWithBots(lobbyId, sessionToken, server);
+    const lobby = this.lobbyOrchestrator.fillLobbyWithBots(lobbyId, sessionToken);
+    this.broadcastFullState(server, lobby);
   }
 
   public rollDice(lobbyId: string, sessionToken: string, server: Server): DiceRolledPayload {

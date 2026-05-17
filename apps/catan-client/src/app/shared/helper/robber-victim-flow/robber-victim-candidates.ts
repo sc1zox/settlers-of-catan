@@ -2,7 +2,6 @@ import { LobbyFullStatePayload, PlayerSeat } from '@catan/api-interfaces';
 import { collectRobberVictimSeats } from '@catan/shared-game-field';
 import { RobberTilePick } from '../../../game-canvas/game-canvas';
 import { RobberVictimCandidate } from '../../../game-canvas/robber-victim-popover';
-import { totalResourceCards } from '../lobby-game-ui/resource-card-totals';
 
 export function buildRobberVictimCandidates(
   payload: LobbyFullStatePayload,
@@ -14,7 +13,7 @@ export function buildRobberVictimCandidates(
     payload.settlements.map((s) => ({ seat: s.seat, vertexId: s.vertexId })),
     payload.players.map((p) => ({
       seat: p.seat,
-      totalResourceCards: totalResourceCards(p.resources),
+      totalResourceCards: p.totalResourceCards,
     })),
     selfSeat,
     pick.q,

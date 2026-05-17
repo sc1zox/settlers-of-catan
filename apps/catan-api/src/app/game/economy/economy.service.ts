@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   ActionRejectCode,
+  assertResourceType,
   DiceRollDto,
   GamePhase,
   PlayerSeat,
@@ -84,6 +85,8 @@ export class EconomyService {
     giveAmount: number,
     receiveResource: ResourceType,
   ): void {
+    assertResourceType(giveResource);
+    assertResourceType(receiveResource);
     const giveN = Math.floor(Number(giveAmount));
     const rates = resolveHarborRates(lobby, player.seat);
     const expectedGive = rates.perResource[giveResource];

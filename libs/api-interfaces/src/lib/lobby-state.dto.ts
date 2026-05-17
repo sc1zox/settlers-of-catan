@@ -38,7 +38,10 @@ export interface LobbyPlayerPublicDto {
   readonly isBot: boolean;
   readonly isConnected: boolean;
   readonly isSelf: boolean;
+  /** Exact resource bag; only meaningful for `isSelf` (opponents receive an empty map). */
   readonly resources: Readonly<Record<ResourceType, number>>;
+  /** Total resource cards in hand (always set; used for opponents when `resources` is hidden). */
+  readonly totalResourceCards: number;
   readonly devCardsInHand: number;
   readonly devCardsBoughtThisTurn: number;
   readonly hasPlayedDevCardThisTurn: boolean;

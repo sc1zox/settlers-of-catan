@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   ActionRejectCode,
+  assertResourceType,
   DevCardType,
   GamePhase,
   PlayerSeat,
@@ -10,6 +11,7 @@ import { LobbyRuntime } from '../lobby/lobby-runtime';
 import { applyRobberMove } from '../robber/robber.util';
 import { ResourceCostService } from '../economy/resource-cost.service';
 import { GameActionValidationService } from '../validation/game-action-validation.service';
+import { assertRoadPieceAvailable } from '../utils/piece-bank.util';
 import { applyPostActionScoring } from '../utils/scoring.util';
 import {
   assertNoDevCardPlayedThisTurn,
@@ -65,6 +67,7 @@ export class DevCardsService {
     sessionToken: string,
     resource: ResourceType,
   ): void {
+    assertResourceType(resource);
     this.validation.assertPhase(lobby, PLAYABLE_PHASES);
     const player = this.validation.assertCurrentPlayer(lobby, sessionToken);
     assertNoDevCardPlayedThisTurn(player);
@@ -90,6 +93,8 @@ export class DevCardsService {
     first: ResourceType,
     second: ResourceType,
   ): void {
+    assertResourceType(first);
+    assertResourceType(second);
     this.validation.assertPhase(lobby, PLAYABLE_PHASES);
     const player = this.validation.assertCurrentPlayer(lobby, sessionToken);
     assertNoDevCardPlayedThisTurn(player);
@@ -111,9 +116,11 @@ export class DevCardsService {
     assertNoDevCardPlayedThisTurn(player);
     consumeRipenedDevCard(player, DevCardType.RoadBuilding);
     this.validation.assertLegalRoadEdge(lobby, player, firstEdgeId);
+    assertRoadPieceAvailable(lobby, player.seat);
     lobby.roads.push({ seat: player.seat, edgeId: firstEdgeId });
     if (secondEdgeId !== undefined && secondEdgeId.length > 0) {
       this.validation.assertLegalRoadEdge(lobby, player, secondEdgeId);
+      assertRoadPieceAvailable(lobby, player.seat);
       lobby.roads.push({ seat: player.seat, edgeId: secondEdgeId });
     }
     markDevCardPlayedThisTurn(player);

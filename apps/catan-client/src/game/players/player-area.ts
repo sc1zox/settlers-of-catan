@@ -175,8 +175,9 @@ export class PlayerArea {
     resources: readonly ResourceKind[],
     devCount: number,
     devKinds: readonly DevKind[] | null = null,
+    hiddenResourceCount: number | null = null,
   ): void {
-    this.hand.setHand(resources, devCount, devKinds);
+    this.hand.setHand(resources, devCount, devKinds, hiddenResourceCount);
     this.refreshCardList();
   }
 

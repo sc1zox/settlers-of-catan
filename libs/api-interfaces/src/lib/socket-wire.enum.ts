@@ -17,3 +17,7 @@ export enum SocketGatewayNamespace {
 export enum SocketIoLobbyRoomPrefix {
   Lobby = 'lobby:',
 }
+
+export enum SocketClientDataKey {
+  AccessExpiryTimer = 'accessExpiryTimer',
+}

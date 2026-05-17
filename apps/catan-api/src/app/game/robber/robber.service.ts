@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { ActionRejectCode, GamePhase, PlayerSeat, ResourceType } from '@catan/api-interfaces';
+import {
+  ActionRejectCode,
+  assertValidResourceDiscardMap,
+  GamePhase,
+  PlayerSeat,
+  ResourceType,
+} from '@catan/api-interfaces';
 import { GameActionValidationService } from '../validation/game-action-validation.service';
 import { LobbyRuntime } from '../lobby/lobby-runtime';
 import { applyRobberMove } from './robber.util';
@@ -32,6 +38,7 @@ export class RobberService {
     if (!lobby.pendingRobberDiscardSeats.includes(player.seat)) {
       throw new Error(ActionRejectCode.WrongPhase);
     }
+    assertValidResourceDiscardMap(discard);
     const expected = lobby.requiredRobberDiscardCount(player);
     let actual = 0;
     const resourceKeys = Object.values(ResourceType);

@@ -1,11 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import {
-  ActionRejectCode,
-  GamePhase,
-  PlayerSeat,
-  ResourceType,
-  TileType,
-} from '@catan/api-interfaces';
+import { Injectable, Logger } from '@nestjs/common';
+import { GamePhase, PlayerSeat, ResourceType, TileType } from '@catan/api-interfaces';
 import { collectRobberVictimSeats } from '@catan/shared-game-field';
 import { Server } from 'socket.io';
 import { GameActionValidationService } from '../validation/game-action-validation.service';
@@ -52,6 +46,7 @@ export interface DemoMainGameCallbacks {
 
 @Injectable()
 export class DemoBotService {
+  private readonly logger = new Logger(DemoBotService.name);
   private readonly autoplayLobbyIds = new Set<string>();
   private mainGameDrainActive = false;
 
@@ -72,7 +67,12 @@ export class DemoBotService {
     this.mainGameDrainActive = true;
     try {
       for (let step = 0; step < DEMO_MAIN_GAME_DRAIN_MAX_STEPS; step += 1) {
-        if (!this.tryOneDemoMainGameAction(lobbyId, server, callbacks)) {
+        try {
+          if (!this.tryOneDemoMainGameAction(lobbyId, server, callbacks)) {
+            return;
+          }
+        } catch (error: unknown) {
+          this.logAutoplayFailure(lobbyId, error);
           return;
         }
       }
@@ -152,7 +152,11 @@ export class DemoBotService {
     if (!current || !this.isDemoBotSessionToken(current.sessionToken)) {
       return;
     }
-    this.runSingleDemoSetupBotTurn(lobbyId, nextLobby, current, server, callbacks);
+    if (
+      !this.runSingleDemoSetupBotTurn(lobbyId, nextLobby, current, server, callbacks)
+    ) {
+      return;
+    }
     this.runDemoSetupAutoplayStep(lobbyId, server, callbacks, depth + 1);
   }
 
@@ -162,21 +166,37 @@ export class DemoBotService {
     bot: LobbyPlayerSlot,
     server: Server,
     callbacks: DemoSetupBotCallbacks,
-  ): void {
+  ): boolean {
     const settlementVertexId = this.pickLegalSetupSettlementVertex(lobby, bot);
     if (settlementVertexId === null) {
-      throw new Error(ActionRejectCode.IllegalPlacement);
+      return false;
     }
-    callbacks.buildSettlement(lobbyId, bot.sessionToken, settlementVertexId, server);
+    try {
+      callbacks.buildSettlement(lobbyId, bot.sessionToken, settlementVertexId, server);
+    } catch (error: unknown) {
+      this.logAutoplayFailure(lobbyId, error);
+      return false;
+    }
     const pendingVertexId = lobby.pendingSetupRoadFromVertexId;
     if (pendingVertexId === null) {
-      throw new Error(ActionRejectCode.IllegalPlacement);
+      return false;
     }
     const roadEdgeId = this.pickLegalSetupRoadEdge(lobby, bot, pendingVertexId);
     if (roadEdgeId === null) {
-      throw new Error(ActionRejectCode.IllegalPlacement);
+      return false;
     }
-    callbacks.buildRoad(lobbyId, bot.sessionToken, roadEdgeId, server);
+    try {
+      callbacks.buildRoad(lobbyId, bot.sessionToken, roadEdgeId, server);
+    } catch (error: unknown) {
+      this.logAutoplayFailure(lobbyId, error);
+      return false;
+    }
+    return true;
+  }
+
+  private logAutoplayFailure(lobbyId: string, error: unknown): void {
+    const detail = error instanceof Error ? error.message : String(error);
+    this.logger.warn(`demo autoplay stopped for ${lobbyId}: ${detail}`);
   }
 
   private tryOneDemoMainGameAction(

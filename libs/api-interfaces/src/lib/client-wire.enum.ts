@@ -37,6 +37,7 @@ export enum ProductionClientApiOrigin {
 export enum SessionHttpAction {
   Bootstrap = 'bootstrap',
   Refresh = 'refresh',
+  Logout = 'logout',
 }
 
 export enum SessionRestPath {

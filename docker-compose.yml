@@ -48,6 +48,8 @@ services:
     container_name: catan-api
     working_dir: /workspace
     command: npx nx serve catan-api --host=0.0.0.0 --outputStyle=stream
+    env_file:
+      - .env
     environment:
       NODE_ENV: development
       PORT: "3000"
@@ -55,10 +57,13 @@ services:
       CHOKIDAR_USEPOLLING: "1"
       REDIS_URL: redis://redis:6379
       LOBBY_IDLE_TTL_SECONDS: "300"
-      LIVEKIT_API_KEY: devkey
-      LIVEKIT_API_SECRET: devsecret
+      PLAYER_SESSION_JWT_SECRET: ${PLAYER_SESSION_JWT_SECRET}
+      PLAYER_SESSION_ACCESS_TTL: ${PLAYER_SESSION_ACCESS_TTL:-15m}
+      PLAYER_SESSION_REFRESH_TTL: ${PLAYER_SESSION_REFRESH_TTL:-30d}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
       LIVEKIT_HTTP_URL: http://livekit:7880
-      LIVEKIT_PUBLIC_URL: ws://localhost:7880
+      LIVEKIT_PUBLIC_URL: ${LIVEKIT_PUBLIC_URL:-ws://localhost:7880}
     ports:
       - "3000:3000"
     depends_on:

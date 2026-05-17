@@ -32,6 +32,7 @@ export class PlayerSessionService {
     localStorage.removeItem(ClientStorageKey.RefreshToken);
     localStorage.removeItem(ClientStorageKey.SessionToken);
     this.accessSignal.set('');
+    void this.postLogout();
   }
 
   public ensureReady(): Promise<void> {
@@ -41,14 +42,10 @@ export class PlayerSessionService {
   }
 
   public tryRefresh(): Observable<boolean> {
-    const refreshToken = this.readRefresh();
-    if (refreshToken.length === 0) {
-      return of(false);
-    }
     const url = this.buildSessionUrl(SessionHttpAction.Refresh);
-    const body = JSON.stringify({ refreshToken });
-    const req = new HttpRequest('POST', url, body, {
+    const req = new HttpRequest('POST', url, JSON.stringify({}), {
       headers: new HttpHeaders({ 'Content-Type': 'application/json' }),
+      withCredentials: true,
     });
     return this.backend.handle(req).pipe(
       filter((e): e is HttpResponse<unknown> => e instanceof HttpResponse),
@@ -59,34 +56,27 @@ export class PlayerSessionService {
 
   private async hydrateFromStorageOrNetwork(): Promise<void> {
     const sessionId = this.readSessionId();
-    const refresh = this.readRefresh();
+    if (sessionId.length === 0) {
+      await this.postBootstrap();
+      return;
+    }
     const access = this.readAccess();
-    if (
-      sessionId.length > 0 &&
-      refresh.length > 0 &&
-      access.length > 0 &&
-      !this.isJwtNearExpiry(access, 60)
-    ) {
+    if (access.length > 0 && !this.isJwtNearExpiry(access, 60)) {
       this.accessSignal.set(access);
       return;
     }
-    if (sessionId.length > 0 && refresh.length > 0) {
-      const ok = await firstValueFrom(this.tryRefresh());
-      if (ok) {
-        return;
-      }
-      this.clear();
+    const refreshed = await firstValueFrom(this.tryRefresh());
+    if (refreshed) {
+      return;
     }
-    const legacy = this.readLegacyUuid();
-    await this.postBootstrap(legacy);
+    await this.postBootstrap();
   }
 
-  private async postBootstrap(legacySessionId: string | undefined): Promise<void> {
+  private async postBootstrap(): Promise<void> {
     const url = this.buildSessionUrl(SessionHttpAction.Bootstrap);
-    const body =
-      legacySessionId !== undefined ? JSON.stringify({ legacySessionId }) : JSON.stringify({});
-    const req = new HttpRequest('POST', url, body, {
+    const req = new HttpRequest('POST', url, JSON.stringify({}), {
       headers: new HttpHeaders({ 'Content-Type': 'application/json' }),
+      withCredentials: true,
     });
     try {
       const ev = await firstValueFrom(
@@ -96,15 +86,24 @@ export class PlayerSessionService {
       );
       const ok = this.applyBundleFromUnknown(ev.body);
       if (!ok) {
-        this.clear();
-        return;
+        this.clearLocalOnly();
       }
     } catch {
-      this.clear();
-      return;
+      this.clearLocalOnly();
     }
-    if (legacySessionId !== undefined) {
-      localStorage.removeItem(ClientStorageKey.SessionToken);
+  }
+
+  private async postLogout(): Promise<void> {
+    const url = this.buildSessionUrl(SessionHttpAction.Logout);
+    const req = new HttpRequest('POST', url, null, {
+      withCredentials: true,
+    });
+    try {
+      await firstValueFrom(
+        this.backend.handle(req).pipe(filter((e): e is HttpResponse<unknown> => e instanceof HttpResponse)),
+      );
+    } catch {
+      // Cookie may already be absent.
     }
   }
 
@@ -116,19 +115,23 @@ export class PlayerSessionService {
     const rec = data as Record<string, unknown>;
     const sessionId = rec['sessionId'];
     const accessToken = rec['accessToken'];
-    const refreshToken = rec['refreshToken'];
-    if (
-      typeof sessionId !== 'string' ||
-      typeof accessToken !== 'string' ||
-      typeof refreshToken !== 'string'
-    ) {
+    if (typeof sessionId !== 'string' || typeof accessToken !== 'string') {
       return false;
     }
     localStorage.setItem(ClientStorageKey.PlayerSessionId, sessionId);
-    localStorage.setItem(ClientStorageKey.AccessToken, accessToken);
-    localStorage.setItem(ClientStorageKey.RefreshToken, refreshToken);
+    localStorage.removeItem(ClientStorageKey.AccessToken);
+    localStorage.removeItem(ClientStorageKey.RefreshToken);
+    localStorage.removeItem(ClientStorageKey.SessionToken);
     this.accessSignal.set(accessToken);
     return true;
+  }
+
+  private clearLocalOnly(): void {
+    localStorage.removeItem(ClientStorageKey.PlayerSessionId);
+    localStorage.removeItem(ClientStorageKey.AccessToken);
+    localStorage.removeItem(ClientStorageKey.RefreshToken);
+    localStorage.removeItem(ClientStorageKey.SessionToken);
+    this.accessSignal.set('');
   }
 
   private unwrapData(body: unknown): unknown {
@@ -143,23 +146,7 @@ export class PlayerSessionService {
   }
 
   private readAccess(): string {
-    return localStorage.getItem(ClientStorageKey.AccessToken) ?? '';
-  }
-
-  private readRefresh(): string {
-    return localStorage.getItem(ClientStorageKey.RefreshToken) ?? '';
-  }
-
-  private readLegacyUuid(): string | undefined {
-    const v = localStorage.getItem(ClientStorageKey.SessionToken) ?? '';
-    if (this.isUuid(v)) {
-      return v;
-    }
-    return undefined;
-  }
-
-  private isUuid(value: string): boolean {
-    return /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(value);
+    return this.accessSignal();
   }
 
   private isJwtNearExpiry(token: string, skewSec: number): boolean {
@@ -188,7 +175,7 @@ export class PlayerSessionService {
     }
   }
 
-  private buildSessionUrl(action: SessionHttpAction): string {
+  private buildSessionUrl(action: string): string {
     return `${environment.apiBaseUrl}/${ApiGlobalPathPrefix.Rest}/${SessionRestPath.Prefix}/${action}`;
   }
 }

@@ -12,7 +12,7 @@ import {
   type LobbyJoinedPayload,
   type LobbyTerminatedPayload,
 } from '@catan/api-interfaces';
-import { Server } from 'socket.io';
+import { Server, Socket } from 'socket.io';
 import { LiveKitRoomService } from '../../infrastructure/livekit/livekit-room.service';
 import { RedisLobbyStoreService } from '../../infrastructure/redis/redis-lobby-store.service';
 import { DemoBotService } from '../demo-bot/demo-bot.service';
@@ -97,7 +97,7 @@ export class LobbyOrchestratorService {
     return { lobby, joined };
   }
 
-  public fillLobbyWithBots(lobbyId: string, sessionToken: string, server: Server): void {
+  public fillLobbyWithBots(lobbyId: string, sessionToken: string): LobbyRuntime {
     const lobby = this.lobby.requireLobby(lobbyId);
     if (lobby.fsm.getPhase() !== GamePhase.LobbyWaiting) {
       throw new Error(ActionRejectCode.WrongPhase);
@@ -107,6 +107,27 @@ export class LobbyOrchestratorService {
       throw new Error(ActionRejectCode.LobbyHostOnly);
     }
     this.demoBots.fillDemoLobbyWithBots(lobby);
+    return lobby;
+  }
+
+  public async resumeSessionSocket(
+    sessionToken: string,
+    client: Socket,
+    server: Server,
+  ): Promise<void> {
+    const found = this.lobby.findLobbyByPlayerToken(sessionToken);
+    if (found === undefined) {
+      return;
+    }
+    const { lobby, player } = found;
+    if (player.isBot || lobby.isTearingDown) {
+      return;
+    }
+    await client.join(formatSocketIoLobbyRoomId(lobby.lobbyId));
+    lobby.clearDisconnectTimer(player);
+    player.socketId = client.id;
+    player.disconnectGraceExpiresAt = null;
+    player.awaitingAdminDecision = false;
     this.lobby.broadcastFullState(server, lobby);
   }
 

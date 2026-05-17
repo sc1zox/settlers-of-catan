@@ -23,7 +23,12 @@ export class PlayerSessionJwtService {
 
   public async mintPair(
     sessionId: string,
-  ): Promise<{ accessToken: string; refreshToken: string; accessExpiresInSec: number }> {
+  ): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    accessExpiresInSec: number;
+    refreshTtlSec: number;
+  }> {
     const accessToken = await this.jwt.signAsync(
       {
         sub: sessionId,
@@ -42,7 +47,21 @@ export class PlayerSessionJwtService {
       accessToken,
       refreshToken,
       accessExpiresInSec: this.parseTtlToSeconds(this.accessTtl),
+      refreshTtlSec: this.parseTtlToSeconds(this.refreshTtl),
     };
+  }
+
+  public readAccessTokenExpiryMs(token: string): number | undefined {
+    const decoded = this.jwt.decode(token);
+    if (decoded === null || typeof decoded !== 'object') {
+      return undefined;
+    }
+    const record = decoded as Record<string, unknown>;
+    const exp = record['exp'];
+    if (typeof exp !== 'number' || !Number.isFinite(exp)) {
+      return undefined;
+    }
+    return exp * 1000;
   }
 
   public verifyAccessToken(token: string): string {

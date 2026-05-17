@@ -15,6 +15,7 @@ export interface LobbyScenePlayerState {
   readonly isBot: boolean;
   readonly isConnected: boolean;
   readonly resources: Readonly<Record<ResourceType, number>>;
+  readonly totalResourceCards: number;
   readonly devCardsInHand: number;
   /**
    * Only populated for the viewer's own seat. Other seats receive `null`;

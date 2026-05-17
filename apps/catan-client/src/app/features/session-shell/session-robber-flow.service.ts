@@ -12,7 +12,6 @@ import { RobberTilePick } from '../../game-canvas/game-canvas';
 import { RobberVictimCandidate, RobberVictimModel } from '../../game-canvas/robber-victim-popover';
 import { LobbyShellGameUiService } from '../lobby-game-ui/lobby-shell-game-ui.service';
 import { ShellFeedbackService } from '../shell-feedback/shell-feedback.service';
-import { totalResourceCards } from '../../shared/helper/lobby-game-ui/resource-card-totals';
 import { UiFeedbackTone } from '../../shared/types/lobby-ui-state';
 
 @Injectable()
@@ -69,7 +68,7 @@ export class SessionRobberFlowService {
         })),
         payload.players.map((p: LobbyPlayerPublicDto) => ({
           seat: p.seat,
-          totalResourceCards: totalResourceCards(p.resources),
+          totalResourceCards: p.totalResourceCards,
         })),
         selfSeat,
         pick.q,

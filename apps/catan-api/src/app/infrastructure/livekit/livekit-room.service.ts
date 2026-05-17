@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PlayerSeat, ProcessEnvKey } from '@catan/api-interfaces';
 import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
+import { optionalEnvString, requireEnvString } from '../../config/required-env.util';
 
 export interface LiveKitJoinGrant {
   readonly serverUrl: string;
@@ -17,10 +18,10 @@ export class LiveKitRoomService {
   private readonly roomClient: RoomServiceClient | null;
 
   public constructor() {
-    this.apiKey = process.env[ProcessEnvKey.LiveKitApiKey] ?? 'devkey';
-    this.apiSecret = process.env[ProcessEnvKey.LiveKitApiSecret] ?? 'devsecret';
-    this.publicUrl = process.env[ProcessEnvKey.LiveKitPublicUrl] ?? 'ws://localhost:7880';
-    const httpUrl = process.env[ProcessEnvKey.LiveKitHttpUrl] ?? 'http://127.0.0.1:7880';
+    this.apiKey = requireEnvString(ProcessEnvKey.LiveKitApiKey);
+    this.apiSecret = requireEnvString(ProcessEnvKey.LiveKitApiSecret);
+    this.publicUrl = optionalEnvString(ProcessEnvKey.LiveKitPublicUrl, 'ws://localhost:7880');
+    const httpUrl = optionalEnvString(ProcessEnvKey.LiveKitHttpUrl, 'http://127.0.0.1:7880');
     this.roomClient = new RoomServiceClient(httpUrl, this.apiKey, this.apiSecret);
   }
 

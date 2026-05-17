@@ -7,6 +7,7 @@ import { DevCardsSocketFacade } from './dev-cards/dev-cards-socket.facade';
 import { EconomyModule } from './economy/economy.module';
 import { GameActionValidationModule } from './validation/game-action-validation.module';
 import { GameGateway } from './gateway/game.gateway';
+import { GameGatewayExceptionFilter } from './gateway/game-gateway-exception.filter';
 import { GatewayAuthService } from './gateway/gateway-auth.service';
 import {
   GatewayActionRejectService,
@@ -47,6 +48,7 @@ import { TurnFlowModule } from './turn/turn-flow.module';
     GameService,
     SocketConnectionRegistry,
     TradeSocketFacade,
+    GameGatewayExceptionFilter,
     GatewayAuthService,
     GatewayActionRejectService,
     GatewaySocketSessionService,

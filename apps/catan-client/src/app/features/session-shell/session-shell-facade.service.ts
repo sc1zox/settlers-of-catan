@@ -1,6 +1,7 @@
-import { computed, effect, inject, Injectable } from '@angular/core';
+import { computed, DestroyRef, effect, inject, Injectable } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, Validators } from '@angular/forms';
-import { DefaultDisplayName, ResourceType } from '@catan/api-interfaces';
+import { DefaultDisplayName, GamePhase, ResourceType } from '@catan/api-interfaces';
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslateService } from '@ngx-translate/core';
 import { GameStateResource } from '../../core/game/game-state.resource';
@@ -16,6 +17,7 @@ import { SessionBuildInteractionService } from './session-build-interaction.serv
 import { SessionRobberFlowService } from './session-robber-flow.service';
 import { SessionTradingPanelService } from './session-trading-panel.service';
 import { SessionDevCardOverlayService } from './session-dev-card-overlay.service';
+import { GameSocketService } from '../../core/socket/game-socket.service';
 
 @Injectable()
 export class SessionShellFacadeService {
@@ -34,6 +36,8 @@ export class SessionShellFacadeService {
   public readonly lobbyDepartedFeed = inject(LobbyDepartedFeedService);
   public readonly gameSettings = inject(GameSettingsService);
   public readonly spectatorCamService = inject(SpectatorCameraService);
+  private readonly sockets = inject(GameSocketService);
+  private readonly destroyRef = inject(DestroyRef);
 
   public readonly sessionForm = this.fb.nonNullable.group({
     displayName: this.fb.nonNullable.control<string>(DefaultDisplayName.PlayerDe, {
@@ -41,7 +45,7 @@ export class SessionShellFacadeService {
     }),
   });
   public readonly lobbyForm = this.fb.nonNullable.group({
-    lobbyCode: this.fb.nonNullable.control<string>('catan-runde', {
+    lobbyCode: this.fb.nonNullable.control<string>('', {
       validators: [Validators.required, Validators.minLength(2)],
     }),
   });
@@ -80,6 +84,28 @@ export class SessionShellFacadeService {
       }
       previousLobbyCode = currentLobbyCode;
     });
+    let previousPhase: GamePhase | undefined;
+    effect(() => {
+      const phase = this.lobbyGameUi.lobbyUiState()?.phase;
+      if (phase === undefined) {
+        previousPhase = undefined;
+        return;
+      }
+      if (previousPhase !== undefined && previousPhase !== phase) {
+        this.resetInteractionModes();
+      }
+      previousPhase = phase;
+    });
+    this.sockets.actionRejected$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        this.resetInteractionModes();
+      });
+  }
+
+  private resetInteractionModes(): void {
+    this.buildFlow.resetForLobbyLeave();
+    this.robberFlow.resetForLobbyLeave();
   }
 
   public lobbyCodeValue(): string {

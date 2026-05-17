@@ -61,35 +61,42 @@ export class LobbyActionCapabilitiesUiService {
 
   public readonly canBuildSettlement = computed<boolean>(() => {
     const lobbyUi = this.state.lobbyUiState();
+    const raw = this.state.rawLobbyState();
     const seat = this.state.selfSeat();
-    if (lobbyUi === null) {
+    if (lobbyUi === null || raw === undefined) {
       return false;
     }
     const setupPendingForSelf =
       seat !== null &&
       lobbyUi.pendingSetupRoadSeat === seat &&
       lobbyUi.pendingSetupRoadFromVertexId !== null;
-    return (
+    const phaseAllows =
       this.state.isSelfTurn() &&
       (lobbyUi.phase === GamePhase.Building ||
         ((lobbyUi.phase === GamePhase.SetupForward || lobbyUi.phase === GamePhase.SetupBackward) &&
-          !setupPendingForSelf))
-    );
+          !setupPendingForSelf));
+    return phaseAllows && raw.legalSettlementVertexIds.length > 0;
   });
 
   public readonly canBuildRoad = computed<boolean>(() => {
     const lobbyUi = this.state.lobbyUiState();
-    if (lobbyUi === null || !this.state.isSelfTurn()) {
+    const raw = this.state.rawLobbyState();
+    if (lobbyUi === null || raw === undefined || !this.state.isSelfTurn()) {
       return false;
     }
     if (lobbyUi.phase === GamePhase.Building) {
-      return true;
+      return raw.legalRoadEdgeIds.length > 0;
     }
     if (lobbyUi.phase === GamePhase.SetupForward || lobbyUi.phase === GamePhase.SetupBackward) {
-      return this.setupPendingRoadVertexId() !== null;
+      return (
+        this.setupPendingRoadVertexId() !== null && raw.legalRoadEdgeIds.length > 0
+      );
     }
     return false;
   });
 
-  public readonly canBuildCity = computed<boolean>(() => this.canEndTurn());
+  public readonly canBuildCity = computed<boolean>(() => {
+    const raw = this.state.rawLobbyState();
+    return this.canEndTurn() && raw !== undefined && raw.legalCityVertexIds.length > 0;
+  });
 }

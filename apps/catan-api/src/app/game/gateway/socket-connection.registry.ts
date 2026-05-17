@@ -2,13 +2,17 @@ export class SocketConnectionRegistry {
   private readonly socketToSession = new Map<string, string>();
   private readonly sessionToSocket = new Map<string, string>();
 
-  public bind(socketId: string, sessionToken: string): void {
+  public bind(socketId: string, sessionToken: string): string | undefined {
     const previousSocket = this.sessionToSocket.get(sessionToken);
     if (previousSocket && previousSocket !== socketId) {
       this.socketToSession.delete(previousSocket);
     }
     this.socketToSession.set(socketId, sessionToken);
     this.sessionToSocket.set(sessionToken, socketId);
+    if (previousSocket !== undefined && previousSocket !== socketId) {
+      return previousSocket;
+    }
+    return undefined;
   }
 
   public unbindSocket(socketId: string): string | undefined {

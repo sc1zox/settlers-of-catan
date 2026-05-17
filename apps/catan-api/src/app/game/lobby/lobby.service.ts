@@ -15,6 +15,10 @@ import { RedisLobbyStoreService } from '../../infrastructure/redis/redis-lobby-s
 import { TradeService } from '../trade/trade.service';
 import { GameActionValidationService } from '../validation/game-action-validation.service';
 import { LobbyPlayerSlot, LobbyRuntime, pickFallbackHumanAdminSessionToken } from './lobby-runtime';
+import {
+  countResourceCards,
+  emptyPublicResourceRecord,
+} from '../utils/public-player-resources.util';
 import { resolveHarborRates } from '../utils/harbor-rate.util';
 import { getTotalVictoryPoints } from '../utils/scoring.util';
 
@@ -98,24 +102,28 @@ export class LobbyService {
 
   public toFullState(lobby: LobbyRuntime, viewerSessionToken: string): LobbyFullStatePayload {
     this.ensureLobbyAdminConsistent(lobby);
-    const players = lobby.players.map((p) => ({
-      seat: p.seat,
-      displayName: p.displayName,
-      isBot: p.isBot,
-      isConnected: p.socketId !== null,
-      isSelf: p.sessionToken === viewerSessionToken,
-      resources: { ...p.resources },
-      devCardsInHand: p.devCards.length,
-      devCardsBoughtThisTurn: p.devCardsBoughtThisTurn.length,
-      hasPlayedDevCardThisTurn: p.hasPlayedDevCardThisTurn,
-      playedKnights: p.playedKnights,
-      visibleVictoryPoints: p.visibleVictoryPoints,
-      totalVictoryPoints: getTotalVictoryPoints(p),
-      longestRoadLength: p.longestRoadLength,
-      harborRates: resolveHarborRates(lobby, p.seat),
-      disconnectGraceExpiresAt: p.disconnectGraceExpiresAt,
-      awaitingAdminDecision: p.awaitingAdminDecision,
-    }));
+    const players = lobby.players.map((p) => {
+      const isSelf = p.sessionToken === viewerSessionToken;
+      return {
+        seat: p.seat,
+        displayName: p.displayName,
+        isBot: p.isBot,
+        isConnected: p.socketId !== null,
+        isSelf,
+        resources: isSelf ? { ...p.resources } : emptyPublicResourceRecord(),
+        totalResourceCards: countResourceCards(p),
+        devCardsInHand: p.devCards.length,
+        devCardsBoughtThisTurn: p.devCardsBoughtThisTurn.length,
+        hasPlayedDevCardThisTurn: p.hasPlayedDevCardThisTurn,
+        playedKnights: p.playedKnights,
+        visibleVictoryPoints: p.visibleVictoryPoints,
+        totalVictoryPoints: getTotalVictoryPoints(p),
+        longestRoadLength: p.longestRoadLength,
+        harborRates: resolveHarborRates(lobby, p.seat),
+        disconnectGraceExpiresAt: p.disconnectGraceExpiresAt,
+        awaitingAdminDecision: p.awaitingAdminDecision,
+      };
+    });
     const viewer = lobby.findPlayerByToken(viewerSessionToken);
     const legalMoves = viewer
       ? this.validation.computeLegalMoves(lobby, viewer.seat)

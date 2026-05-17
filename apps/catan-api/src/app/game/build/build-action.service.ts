@@ -9,6 +9,11 @@ import { EconomyService } from '../economy/economy.service';
 import { ResourceCostService } from '../economy/resource-cost.service';
 import { GameActionValidationService } from '../validation/game-action-validation.service';
 import { LobbyRuntime } from '../lobby/lobby-runtime';
+import {
+  assertCityPieceAvailable,
+  assertRoadPieceAvailable,
+  assertSettlementPieceAvailable,
+} from '../utils/piece-bank.util';
 import { applyPostActionScoring } from '../utils/scoring.util';
 import { TurnFlowService } from '../turn/turn-flow.service';
 
@@ -38,6 +43,7 @@ export class BuildActionService {
       throw new Error(ActionRejectCode.WrongPhase);
     }
     this.validation.assertLegalSettlementVertex(lobby, player, vertexId, !isSetupPhase);
+    assertSettlementPieceAvailable(lobby, player.seat);
     if (phase === GamePhase.Building) {
       this.validation.assertSettlementCost(player);
       this.resourceCost.deductSettlementCost(player);
@@ -88,6 +94,7 @@ export class BuildActionService {
       this.validation.assertLegalRoadEdge(lobby, player, edgeId);
       this.resourceCost.deductRoadCost(player);
     }
+    assertRoadPieceAvailable(lobby, player.seat);
     lobby.roads.push({ seat: player.seat, edgeId });
     if (isSetupPhase) {
       if (
@@ -130,6 +137,7 @@ export class BuildActionService {
     if (!settlement || settlement.isCity) {
       throw new Error(ActionRejectCode.IllegalPlacement);
     }
+    assertCityPieceAvailable(lobby, player.seat);
     this.resourceCost.deductCityCost(player);
     settlement.isCity = true;
     player.visibleVictoryPoints += 1;

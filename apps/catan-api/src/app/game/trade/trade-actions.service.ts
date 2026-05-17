@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   ActionRejectCode,
+  assertValidResourceTradeMap,
   GamePhase,
   PlayerSeat,
   ResourceType,
@@ -43,6 +44,8 @@ export class TradeActionsService {
       throw new Error(ActionRejectCode.NotYourTurn);
     }
     const recipients = this.normalizeRecipients(lobby, from.seat, payload.recipients);
+    assertValidResourceTradeMap(payload.offer);
+    assertValidResourceTradeMap(payload.request);
     this.assertCanPayMap(from, payload.offer);
     // Supersede previous open offers FIRST so order on the wire is
     // Superseded→Open (Socket.IO preserves order). Superseded is distinct
@@ -84,6 +87,7 @@ export class TradeActionsService {
       return { cancelled: [], updates: [], lobbyId: lobby.lobbyId };
     }
     // Accept-as-recipient just records intent; resources move on finalize.
+    assertValidResourceTradeMap(offer.request);
     this.assertCanPayMap(actor, offer.request);
     const updated = this.tradeService.updateRecipient(offer.id, actor.seat, {
       status: TradeRecipientStatus.Accepted,
@@ -111,6 +115,8 @@ export class TradeActionsService {
     this.requireRecipientSlot(offer, actor.seat);
     // counter.offer = what sender gives, counter.request = what sender receives
     // → recipient must own counter.request.
+    assertValidResourceTradeMap(payload.offer);
+    assertValidResourceTradeMap(payload.request);
     this.assertCanPayMap(actor, payload.request);
     const updated = this.tradeService.updateRecipient(offer.id, actor.seat, {
       status: TradeRecipientStatus.Countered,
@@ -191,6 +197,8 @@ export class TradeActionsService {
     } else {
       throw new Error(ActionRejectCode.TradeNotOpen);
     }
+    assertValidResourceTradeMap(giveMap);
+    assertValidResourceTradeMap(takeMap);
     this.assertCanPayMap(actor, giveMap);
     this.assertCanPayMap(recipient, takeMap);
     this.applyResourceDelta(actor, giveMap, -1);
@@ -293,6 +301,9 @@ export class TradeActionsService {
     for (let i = 0; i < keys.length; i += 1) {
       const k = keys[i];
       const need = cost[k] ?? 0;
+      if (need <= 0) {
+        throw new Error(ActionRejectCode.InvalidPayload);
+      }
       if ((player.resources[k] ?? 0) < need) {
         throw new Error(ActionRejectCode.InsufficientResources);
       }

@@ -25,10 +25,7 @@ export class GatewayLobbyHandlers {
   ) {}
 
   public async joinLobby(server: Server, client: Socket, payload: JoinLobbyPayload): Promise<void> {
-    const sessionToken = this.sessions.getSessionToken(client);
-    if (!sessionToken) {
-      return;
-    }
+    const sessionToken = this.sessions.requireSessionToken(client);
     const lobbyCode = payload.lobbyCode.trim();
     const displayName = payload.displayName.trim() || DefaultDisplayName.PlayerEn;
     const { lobby, joined } = await this.gameService.joinLobby(
@@ -48,10 +45,7 @@ export class GatewayLobbyHandlers {
     client: Socket,
     payload: CreateLobbyPayload,
   ): Promise<void> {
-    const sessionToken = this.sessions.getSessionToken(client);
-    if (!sessionToken) {
-      return;
-    }
+    const sessionToken = this.sessions.requireSessionToken(client);
     const lobbyCode = payload.lobbyCode.trim();
     const displayName = payload.displayName.trim() || DefaultDisplayName.PlayerEn;
     const { lobby, joined } = await this.gameService.createLobby(
@@ -71,10 +65,7 @@ export class GatewayLobbyHandlers {
     client: Socket,
     payload: LeaveLobbyPayload,
   ): Promise<void> {
-    const sessionToken = this.sessions.getSessionToken(client);
-    if (!sessionToken) {
-      return;
-    }
+    const sessionToken = this.sessions.requireSessionToken(client);
     await this.gameService.leaveLobby(payload.lobbyId, sessionToken, server);
   }
 

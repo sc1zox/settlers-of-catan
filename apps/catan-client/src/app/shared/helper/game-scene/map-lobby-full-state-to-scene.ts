@@ -12,6 +12,7 @@ export function mapLobbyFullStateToSceneState(payload: LobbyFullStatePayload): L
       isBot: p.isBot,
       isConnected: p.isConnected,
       resources: p.resources,
+      totalResourceCards: p.totalResourceCards,
       devCardsInHand: p.devCardsInHand,
       devCardTypes: p.isSelf ? payload.selfDevCards : null,
     });

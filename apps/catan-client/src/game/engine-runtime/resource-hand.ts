@@ -17,6 +17,10 @@ export function expandResourceHand(
   return hand;
 }
 
+export function computeOpponentHandSignature(totalResourceCards: number, devCardsInHand: number): string {
+  return `opp|${totalResourceCards}|${devCardsInHand}`;
+}
+
 export function computeHandSignature(
   resources: Readonly<Record<ResourceType, number>>,
   devCardsInHand: number,

@@ -15,6 +15,7 @@ import { TRANSLATE_HTTP_LOADER_CONFIG, TranslateHttpLoader } from '@ngx-translat
 import { firstValueFrom } from 'rxjs';
 import { AppInitService } from './core/bootstrap/app-init.service';
 import { apiEnvelopeInterceptor } from './core/http/api-envelope.interceptor';
+import { credentialsInterceptor } from './core/http/credentials.interceptor';
 import { sessionBearerInterceptor } from './core/http/session-token.interceptor';
 import { sessionHttpErrorInterceptor } from './core/http/session-http-error.interceptor';
 import { registerTranslationMarkers } from '../shared/i18n/register-translation-markers';
@@ -25,6 +26,7 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideHttpClient(
       withInterceptors([
+        credentialsInterceptor,
         sessionBearerInterceptor,
         apiEnvelopeInterceptor,
         sessionHttpErrorInterceptor,

@@ -62,7 +62,11 @@ import { FocusCardFan } from './engine-runtime/focus-cards';
 import { FrustumCull } from './engine-runtime/frustum-cull';
 import { OrbitCameraAid } from './engine-runtime/orbit-camera';
 import { PerfStatsAggregator } from './engine-runtime/perf-stats';
-import { computeHandSignature, expandResourceHand } from './engine-runtime/resource-hand';
+import {
+  computeHandSignature,
+  computeOpponentHandSignature,
+  expandResourceHand,
+} from './engine-runtime/resource-hand';
 import type { PerformanceStatsHandler } from './engine-runtime/types';
 
 export type { PerformanceSnapshot, PerformanceStatsHandler } from './engine-runtime/types';
@@ -628,16 +632,22 @@ export class GameEngine {
         playerState.devCardTypes === null
           ? null
           : playerState.devCardTypes.map((type) => DEV_CARD_TYPE_TO_KIND[type]);
-      const handSignature = computeHandSignature(
-        playerState.resources,
-        playerState.devCardsInHand,
-        playerState.devCardTypes,
-      );
+      const handSignature = playerState.isSelf
+        ? computeHandSignature(
+            playerState.resources,
+            playerState.devCardsInHand,
+            playerState.devCardTypes,
+          )
+        : computeOpponentHandSignature(
+            playerState.totalResourceCards,
+            playerState.devCardsInHand,
+          );
       if (this.handSignatureBySeat[playerState.seat] !== handSignature) {
         area.setHand(
-          expandResourceHand(playerState.resources),
+          playerState.isSelf ? expandResourceHand(playerState.resources) : [],
           playerState.devCardsInHand,
           devKinds,
+          playerState.isSelf ? null : playerState.totalResourceCards,
         );
         this.handSignatureBySeat[playerState.seat] = handSignature;
       }

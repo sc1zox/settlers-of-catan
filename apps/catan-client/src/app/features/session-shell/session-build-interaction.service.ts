@@ -65,6 +65,7 @@ export class SessionBuildInteractionService {
     } else {
       this.gameState.buildCity(pending.id);
     }
+    this.exitBuildMode();
   }
 
   public cancelBuild(): void {

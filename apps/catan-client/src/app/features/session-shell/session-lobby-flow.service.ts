@@ -1,8 +1,10 @@
-import { computed, effect, inject, Injectable, signal } from '@angular/core';
+import { computed, DestroyRef, effect, inject, Injectable, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslateService } from '@ngx-translate/core';
 import { GamePhase, LiveKitCredentialsPayload, isLobbyCodeValid } from '@catan/api-interfaces';
 import { GameStateResource } from '../../core/game/game-state.resource';
+import { GameSocketService } from '../../core/socket/game-socket.service';
 import { PlayerSessionService } from '../../core/session/player-session.service';
 import { GameSettingsService } from '../game-settings/game-settings.service';
 import { LobbyLiveKitService } from '../webcam-head/lobby-livekit.service';
@@ -13,6 +15,7 @@ import { SpectatorCameraService } from '../spectator-camera/spectator-camera.ser
 @Injectable()
 export class SessionLobbyFlowService {
   private readonly gameState = inject(GameStateResource);
+  private readonly sockets = inject(GameSocketService);
   private readonly shellFeedback = inject(ShellFeedbackService);
   private readonly playerSession = inject(PlayerSessionService);
   private readonly liveKit = inject(LobbyLiveKitService);
@@ -20,6 +23,7 @@ export class SessionLobbyFlowService {
   private readonly spectatorCamService = inject(SpectatorCameraService);
   private readonly translate = inject(TranslateService);
   private readonly lobbyGameUi = inject(LobbyShellGameUiService);
+  private readonly destroyRef = inject(DestroyRef);
 
   public readonly uiStep = signal<LobbyUiStep>(LobbyUiStep.SignIn);
   public readonly sessionState = signal<SessionUiState | null>(null);
@@ -27,6 +31,10 @@ export class SessionLobbyFlowService {
   public readonly leaveLobbyPromptOpen = signal<boolean>(false);
 
   public readonly isJoinInProgress = computed<boolean>(() => this.joinInProgress());
+
+  public readonly summaryScreenVisible = computed<boolean>(() => {
+    return this.lobbyGameUi.lobbyUiState()?.phase === GamePhase.Summary;
+  });
 
   public constructor() {
     this.lobbyGameUi.attachUiStep(this.uiStep);
@@ -50,11 +58,27 @@ export class SessionLobbyFlowService {
         this.spectatorCamService.reset();
       }
     });
+    this.sockets.lobbyTerminated$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        this.backToJoinLobby();
+        this.shellFeedback.setFeedback(
+          UiFeedbackTone.Info,
+          this.translate.instant(marker('shell.lobbyTerminated')),
+        );
+      });
   }
 
-  public leaveLobbyIfPreGame(): void {
-    if (this.lobbyGameUi.lobbyUiState()?.phase === GamePhase.LobbyWaiting) {
+  public leaveCurrentLobby(): void {
+    const phase = this.lobbyGameUi.lobbyUiState()?.phase;
+    if (phase === GamePhase.LobbyWaiting) {
       this.gameState.leaveLobby();
+      return;
+    }
+    if (phase !== undefined) {
+      // Mid-game / finished: the server's `LeaveLobby` handler ignores us here.
+      // Drop the socket so the existing disconnect → grace → cleanup pipeline runs.
+      this.sockets.disconnect();
     }
   }
 
@@ -95,7 +119,7 @@ export class SessionLobbyFlowService {
   }
 
   public backToJoinLobby(): void {
-    this.leaveLobbyIfPreGame();
+    this.leaveCurrentLobby();
     void this.liveKit.abandonPrimedLocalVideoCapture();
     void this.liveKit.disconnect();
     this.gameState.disconnectLobby();
@@ -109,7 +133,7 @@ export class SessionLobbyFlowService {
   }
 
   public resetSession(): void {
-    this.leaveLobbyIfPreGame();
+    this.leaveCurrentLobby();
     void this.liveKit.abandonPrimedLocalVideoCapture();
     void this.liveKit.disconnect();
     this.gameState.disconnectLobby();

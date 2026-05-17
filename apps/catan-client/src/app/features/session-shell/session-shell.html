@@ -27,6 +27,10 @@
       >
         <span class="shell-back-btn__icon" aria-hidden="true">&#8592;</span>
       </button>
+      <app-disconnect-banner />
+      @if (ui.lobbyFlow.summaryScreenVisible()) {
+        <app-summary-screen (returnToMenu)="ui.lobbyFlow.backToJoinLobby()" />
+      }
       @if (ui.lobbyDepartedFeed.entries().length > 0) {
         <aside
           class="shell-activity-feed"

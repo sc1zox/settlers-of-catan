@@ -16,6 +16,7 @@ import {
   Vector3,
   VideoTexture,
 } from 'three';
+import { PlayerColor } from './player-color.enum';
 
 export interface AvatarSeatOptions {
   readonly tableTopY: number;
@@ -63,12 +64,14 @@ export class AvatarSeat {
   private readonly namePlateMesh: Mesh;
   private namePlateTexture: CanvasTexture | null = null;
   private namePlateLabel = '';
+  private readonly namePlateColor: number;
   private namePlateTime = 0;
   private readonly onVideoFrameGeometryReady = (): void => {
     this.ensureVideoTextureFromAttached();
   };
 
   public constructor(options: AvatarSeatOptions) {
+    this.namePlateColor = options.bodyColor;
     const seatY = options.tableTopY - 2.05;
     this.group.position.set(0, seatY, options.outerEdgeZ + 4.9);
     this.group.rotation.y = Math.PI;
@@ -101,6 +104,7 @@ export class AvatarSeat {
       this.namePlateMaterial,
     );
     this.namePlateMesh.position.set(0, NAME_PLATE_Y, NAME_PLATE_Z);
+    this.namePlateMesh.scale.x = -1;
     this.avatarRoot.add(this.namePlateMesh);
     this.buildMinimalBody(bodyMat, limbMat);
     this.buildSquareHead();
@@ -171,7 +175,7 @@ export class AvatarSeat {
       this.namePlateTexture.dispose();
       this.namePlateTexture = null;
     }
-    this.namePlateTexture = AvatarSeat.buildNamePlateTexture(normalized);
+    this.namePlateTexture = AvatarSeat.buildNamePlateTexture(normalized, this.namePlateColor);
     this.namePlateMaterial.map = this.namePlateTexture;
     this.namePlateMaterial.needsUpdate = true;
   }
@@ -290,7 +294,7 @@ export class AvatarSeat {
     return texture;
   }
 
-  private static buildNamePlateTexture(name: string): CanvasTexture {
+  private static buildNamePlateTexture(name: string, playerColor: number): CanvasTexture {
     const canvas = document.createElement('canvas');
     canvas.width = NAME_PLATE_TEXTURE_WIDTH;
     canvas.height = NAME_PLATE_TEXTURE_HEIGHT;
@@ -301,6 +305,7 @@ export class AvatarSeat {
       return fallback;
     }
 
+    const palette = AvatarSeat.namePlatePalette(playerColor);
     const w = canvas.width;
     const h = canvas.height;
     const padX = 56;
@@ -316,25 +321,25 @@ export class AvatarSeat {
 
     AvatarSeat.tracePlatePath(ctx, plateLeft, plateTop, plateRight, plateBottom, notch);
     const fill = ctx.createLinearGradient(0, plateTop, 0, plateBottom);
-    fill.addColorStop(0, 'rgba(14, 22, 38, 0.94)');
-    fill.addColorStop(1, 'rgba(8, 14, 26, 0.94)');
+    fill.addColorStop(0, palette.fillTop);
+    fill.addColorStop(1, palette.fillBottom);
     ctx.fillStyle = fill;
     ctx.fill();
 
     const accentTop = plateTop + 6;
     const accentBottom = plateBottom - 6;
     const accent = ctx.createLinearGradient(0, accentTop, 0, accentBottom);
-    accent.addColorStop(0, 'rgba(120, 240, 255, 1)');
-    accent.addColorStop(0.5, 'rgba(180, 110, 255, 1)');
-    accent.addColorStop(1, 'rgba(120, 240, 255, 1)');
+    accent.addColorStop(0, palette.border);
+    accent.addColorStop(0.5, palette.borderBright);
+    accent.addColorStop(1, palette.border);
     ctx.strokeStyle = accent;
     ctx.lineWidth = 4;
-    ctx.shadowColor = 'rgba(0, 230, 255, 0.85)';
+    ctx.shadowColor = palette.borderGlow;
     ctx.shadowBlur = 14;
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    ctx.fillStyle = 'rgba(120, 240, 255, 0.9)';
+    ctx.fillStyle = palette.tick;
     const tickThickness = 6;
     const tickHeight = plateHeight * 0.46;
     const tickYTop = plateTop + (plateHeight - tickHeight) / 2;
@@ -347,10 +352,10 @@ export class AvatarSeat {
     ctx.font = baseFont;
     const trackingPx = 6;
     AvatarSeat.fillTrackedText(ctx, upper, w / 2, h / 2 + 4, trackingPx, {
-      fill: 'rgba(238, 252, 255, 1)',
-      glow: 'rgba(120, 230, 255, 0.85)',
+      fill: palette.textFill,
+      glow: palette.textGlow,
       glowBlur: 18,
-      stroke: 'rgba(6, 12, 22, 0.85)',
+      stroke: palette.textStroke,
       strokeWidth: 2,
     });
 
@@ -363,6 +368,49 @@ export class AvatarSeat {
     texture.anisotropy = 8;
     texture.needsUpdate = true;
     return texture;
+  }
+
+  private static namePlatePalette(playerColor: number): {
+    fillTop: string;
+    fillBottom: string;
+    border: string;
+    borderBright: string;
+    borderGlow: string;
+    tick: string;
+    textFill: string;
+    textGlow: string;
+    textStroke: string;
+  } {
+    const base = new Color(playerColor);
+    const isWhite = playerColor === PlayerColor.White;
+    const fillDark = base.clone().multiplyScalar(isWhite ? 0.38 : 0.2);
+    const fillDarker = base.clone().multiplyScalar(isWhite ? 0.24 : 0.11);
+    const border = base.clone();
+    if (isWhite) {
+      border.multiplyScalar(0.72);
+    } else {
+      border.multiplyScalar(1.08);
+    }
+    const borderBright = border.clone().lerp(new Color(1, 1, 1), isWhite ? 0.35 : 0.42);
+    const tick = borderBright.clone().lerp(new Color(1, 1, 1), 0.2);
+    return {
+      fillTop: AvatarSeat.rgba(fillDark, 0.94),
+      fillBottom: AvatarSeat.rgba(fillDarker, 0.96),
+      border: AvatarSeat.rgba(border, 1),
+      borderBright: AvatarSeat.rgba(borderBright, 1),
+      borderGlow: AvatarSeat.rgba(borderBright, 0.72),
+      tick: AvatarSeat.rgba(tick, 0.92),
+      textFill: isWhite ? 'rgba(18, 24, 36, 0.98)' : 'rgba(248, 252, 255, 0.98)',
+      textGlow: isWhite ? AvatarSeat.rgba(borderBright, 0.55) : AvatarSeat.rgba(borderBright, 0.88),
+      textStroke: isWhite ? 'rgba(255, 255, 255, 0.75)' : 'rgba(6, 12, 22, 0.88)',
+    };
+  }
+
+  private static rgba(color: Color, alpha: number): string {
+    const r = Math.round(color.r * 255);
+    const g = Math.round(color.g * 255);
+    const b = Math.round(color.b * 255);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
   private static tracePlatePath(

@@ -23,9 +23,11 @@ import {
   GameSocketClientEvent,
   GameSocketServerEvent,
   JoinLobbyPayload,
+  KickAndReplaceWithBotPayload,
   LeaveLobbyPayload,
   LobbyFullStatePayload,
   LobbyJoinedPayload,
+  LobbyTerminatedPayload,
   MoveRobberPayload,
   PlayerSeat,
   ResourceType,
@@ -56,6 +58,7 @@ export class GameSocketService implements OnDestroy {
   private readonly actionRejectedSubject = new Subject<ActionRejectedPayload>();
   private readonly bonusAwardedSubject = new Subject<BonusAwardedPayload>();
   private readonly lobbyJoinedSubject = new Subject<LobbyJoinedPayload>();
+  private readonly lobbyTerminatedSubject = new Subject<LobbyTerminatedPayload>();
 
   public readonly fullState$ = this.fullStateSubject.asObservable();
   public readonly lobbyJoined$ = this.lobbyJoinedSubject.asObservable();
@@ -64,6 +67,7 @@ export class GameSocketService implements OnDestroy {
   public readonly tradeUpdated$ = this.tradeUpdatedSubject.asObservable();
   public readonly actionRejected$ = this.actionRejectedSubject.asObservable();
   public readonly bonusAwarded$ = this.bonusAwardedSubject.asObservable();
+  public readonly lobbyTerminated$ = this.lobbyTerminatedSubject.asObservable();
 
   private socket: Socket | null = null;
   private connectErrorRetries = 0;
@@ -105,7 +109,15 @@ export class GameSocketService implements OnDestroy {
   }
 
   public ngOnDestroy(): void {
-    this.socket?.disconnect();
+    this.disconnect();
+  }
+
+  public disconnect(): void {
+    if (this.socket === null) {
+      return;
+    }
+    this.socket.removeAllListeners();
+    this.socket.disconnect();
     this.socket = null;
   }
 
@@ -135,6 +147,14 @@ export class GameSocketService implements OnDestroy {
     }
     const payload: LeaveLobbyPayload = { lobbyId };
     this.socket?.emit(GameSocketClientEvent.LeaveLobby, payload);
+  }
+
+  public kickAndReplaceWithBot(lobbyId: string, seat: PlayerSeat): void {
+    if (lobbyId.length === 0) {
+      return;
+    }
+    const payload: KickAndReplaceWithBotPayload = { lobbyId, seat };
+    this.socket?.emit(GameSocketClientEvent.KickAndReplaceWithBot, payload);
   }
 
   public buildSettlement(lobbyId: string, vertexId: string): void {
@@ -258,8 +278,12 @@ export class GameSocketService implements OnDestroy {
     s.off(GameSocketServerEvent.ActionRejected);
     s.off(GameSocketServerEvent.BonusAwarded);
     s.off(GameSocketServerEvent.LobbyJoined);
+    s.off(GameSocketServerEvent.LobbyTerminated);
     s.on(GameSocketServerEvent.LobbyJoined, (payload: LobbyJoinedPayload) => {
       this.lobbyJoinedSubject.next(payload);
+    });
+    s.on(GameSocketServerEvent.LobbyTerminated, (payload: LobbyTerminatedPayload) => {
+      this.lobbyTerminatedSubject.next(payload);
     });
     s.on(GameSocketServerEvent.FullState, (payload: LobbyFullStatePayload) => {
       this.fullStateSubject.next(payload);

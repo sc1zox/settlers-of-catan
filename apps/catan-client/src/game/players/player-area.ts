@@ -98,6 +98,10 @@ export class PlayerArea {
     return this._cards;
   }
 
+  public setFeltVisible(visible: boolean): void {
+    this.selfPad.setVisible(visible);
+  }
+
   public setSelfSeatHighlight(active: boolean): void {
     this.selfPad.setActive(active);
   }

@@ -10,6 +10,7 @@ import {
   FinishTradingPayload,
   GameSocketClientEvent,
   JoinLobbyPayload,
+  KickAndReplaceWithBotPayload,
   LeaveLobbyPayload,
   MoveRobberPayload,
   PlayKnightPayload,
@@ -146,6 +147,18 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ): void {
     try {
       this.lobbyHandlers.fillLobbyWithBots(this.server, client, payload);
+    } catch (e) {
+      this.reject.emit(client, e);
+    }
+  }
+
+  @SubscribeMessage(GameSocketClientEvent.KickAndReplaceWithBot)
+  public handleKickAndReplaceWithBot(
+    @MessageBody() payload: KickAndReplaceWithBotPayload,
+    @ConnectedSocket() client: Socket,
+  ): void {
+    try {
+      this.lobbyHandlers.kickAndReplaceWithBot(this.server, client, payload);
     } catch (e) {
       this.reject.emit(client, e);
     }

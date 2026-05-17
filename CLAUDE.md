@@ -87,6 +87,8 @@ Errors thrown inside a handler are caught and emitted as `ActionRejected` with a
 
 Angular 21 standalone components, **zoneless change detection** (`provideZonelessChangeDetection()` in `app.config.ts`) — there is no `NgZone` and no `ngZone.runOutsideAngular` boundary anymore. Signals + `rxResource` drive everything.
 
+**Component file layout (Angular 21 style).** New UI under `app/features/<feature>/` or `app/game-canvas/` uses **no** `.component` in filenames: `disconnect-banner.ts` + `disconnect-banner.scss`, not `disconnect-banner.component.ts`. The `@Component` class may omit the `Component` suffix when the name is already clear (`DisconnectBanner`, `SummaryScreen`, `GameSettingsToggle`); longer shells may keep it (`SessionShellComponent`, `GameCanvasComponent`). Co-locate styles as `<name>.scss` with `styleUrl: './<name>.scss'`. Selectors stay `app-<kebab-name>`. When touching legacy `*.component.ts` files, rename to this scheme in the same change.
+
 ### HTTP & socket plumbing
 
 `app.config.ts` registers `provideAppInitializer(() => inject(AppInitService).initialize())` so `AppInitService` (`app/core/bootstrap/`) runs before the root view renders (currently: cold-start `PlayerSessionService.ensureReady()`). It registers three interceptors in order (under `app/core/http/`): `sessionBearerInterceptor` (attaches `Authorization: Bearer <accessToken>`), `apiEnvelopeInterceptor` (unwraps `{data,requestId}`), `sessionHttpErrorInterceptor` (catches 401 and refreshes). `PlayerSessionService` (`app/core/session/`) owns access/refresh tokens, persisted under `ClientStorageKey.AccessToken` / `RefreshToken` in localStorage.
@@ -168,5 +170,5 @@ Build mode is **owned by Angular**, not the engine. The server sends the legal-m
 
 - Enum-style constants: prefer a TypeScript `enum` in `@catan/api-interfaces` over inline string literals for anything that travels over the wire or appears in storage keys. Examples already in place: `ProcessEnvKey`, `ClientStorageKey`, `KnownLobbyId`, `SocketAuthPayloadKey`, `ApiEnvelopeFieldKey`, `HttpHeaderNameLowercase`.
 - ESLint disables `@typescript-eslint/prefer-for-of` workspace-wide — classic `for (let i = 0; i < arr.length; i++)` is idiomatic here, especially in hot paths inside `GameEngine`.
-- Angular component selectors use the `app-` prefix; directives use camelCase (`app-eslint` config).
+- Angular component selectors use the `app-` prefix; directives use camelCase (`app-eslint` config). Component **files** omit `.component` (see Client section above).
 - The client environment file (`apps/catan-client/src/environments/environment.ts`) points at `DevelopmentApiOrigin.LocalHttp` — there is no production environment.ts yet.

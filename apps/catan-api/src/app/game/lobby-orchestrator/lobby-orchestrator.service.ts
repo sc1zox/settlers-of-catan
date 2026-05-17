@@ -1,12 +1,16 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import {
   ActionRejectCode,
   formatSocketIoLobbyRoomId,
   GamePhase,
+  GameSocketServerEvent,
   isLobbyCodeValid,
+  LobbyTerminationReason,
   normalizeLobbyCode,
   PlayerSeat,
   type LobbyJoinedPayload,
+  type LobbyTerminatedPayload,
 } from '@catan/api-interfaces';
 import { Server } from 'socket.io';
 import { LiveKitRoomService } from '../../infrastructure/livekit/livekit-room.service';
@@ -18,6 +22,11 @@ import {
   pickFallbackHumanAdminSessionToken,
 } from '../lobby/lobby-runtime';
 import { LobbyService } from '../lobby/lobby.service';
+
+const PLAYER_DISCONNECT_GRACE_MS = 120_000;
+const EMPTY_LOBBY_CLEANUP_DELAY_MS = 30_000;
+const SUMMARY_ENTRY_DELAY_MS = 15_000;
+const SUMMARY_HARD_END_DELAY_MS = 5 * 60_000;
 
 @Injectable()
 export class LobbyOrchestratorService {
@@ -112,10 +121,75 @@ export class LobbyOrchestratorService {
       void this.removePlayerFromLobby(lobby, player, server, 'disconnect in lobby waiting');
       return;
     }
-    lobby.startDisconnectHold(player, 60_000, () => {
-      void this.removePlayerFromLobby(lobby, player, server, 'grace period ended');
+    player.disconnectGraceExpiresAt = Date.now() + PLAYER_DISCONNECT_GRACE_MS;
+    player.awaitingAdminDecision = false;
+    lobby.startDisconnectHold(player, PLAYER_DISCONNECT_GRACE_MS, () => {
+      this.onDisconnectGraceExpired(lobby, player, server);
     });
     this.lobby.broadcastFullState(server, lobby);
+    void this.maybeCloseVideoLobby(lobby);
+  }
+
+  private onDisconnectGraceExpired(
+    lobby: LobbyRuntime,
+    player: LobbyPlayerSlot,
+    server: Server,
+  ): void {
+    // Player slot lives on as `awaitingAdminDecision` — admin (or anyone reconnecting on
+    // the same session token) decides next. The 30s no-connected-humans timer in
+    // maybeCloseVideoLobby is the safety net if nobody is around to make that call.
+    player.disconnectGraceExpiresAt = null;
+    player.awaitingAdminDecision = true;
+    this.logger.log(
+      `grace expired for ${player.sessionToken} in ${lobby.lobbyCode}; awaiting admin decision`,
+    );
+    this.lobby.broadcastFullState(server, lobby);
+    void this.maybeCloseVideoLobby(lobby);
+  }
+
+  /**
+   * Mutates the disconnected slot into a bot slot in place. Does NOT broadcast —
+   * GameService.kickAndReplaceWithBot owns the broadcast + bot-autoplay drain so
+   * the new bot actually takes its turn.
+   */
+  public kickAndReplaceWithBot(
+    lobbyId: string,
+    requesterSessionToken: string,
+    seat: PlayerSeat,
+  ): LobbyRuntime {
+    const lobby = this.lobby.requireLobby(lobbyId);
+    this.lobby.assertLobbyOpen(lobby);
+    this.lobby.ensureLobbyAdminConsistent(lobby);
+    if (lobby.adminSessionToken !== requesterSessionToken) {
+      throw new Error(ActionRejectCode.LobbyHostOnly);
+    }
+    const target = lobby.findPlayerBySeat(seat);
+    if (!target || target.isBot) {
+      throw new Error(ActionRejectCode.InvalidPayload);
+    }
+    if (!target.awaitingAdminDecision) {
+      throw new Error(ActionRejectCode.WrongPhase);
+    }
+    const oldSessionToken = target.sessionToken;
+    const wasAdmin = lobby.adminSessionToken === oldSessionToken;
+    // Mutate the slot in place — slot identity carries the player's pieces, resources, devs.
+    target.sessionToken = `bot-${randomUUID()}`;
+    target.displayName = this.demoBots.getDemoBotDisplayName(seat);
+    target.isBot = true;
+    target.socketId = null;
+    target.disconnectGraceExpiresAt = null;
+    target.awaitingAdminDecision = false;
+    lobby.clearDisconnectTimer(target);
+    if (wasAdmin) {
+      lobby.adminSessionToken = pickFallbackHumanAdminSessionToken(lobby);
+    }
+    void this.redisLobby.removeMember(lobby.lobbyId, oldSessionToken).catch((error: unknown) => {
+      this.logger.warn(`Redis removeMember kicked ${oldSessionToken}: ${String(error)}`);
+    });
+    this.logger.log(
+      `admin ${requesterSessionToken} kicked seat ${seat} (${oldSessionToken}) in ${lobby.lobbyCode}, replaced with bot`,
+    );
+    return lobby;
   }
 
   public async leaveLobby(lobbyId: string, sessionToken: string, server: Server): Promise<void> {
@@ -155,22 +229,117 @@ export class LobbyOrchestratorService {
   }
 
   private async maybeCloseVideoLobby(lobby: LobbyRuntime): Promise<void> {
-    let humans = 0;
-    for (let i = 0; i < lobby.players.length; i += 1) {
-      if (!lobby.players[i].isBot) {
-        humans += 1;
-      }
-    }
-    if (humans > 0) {
+    if (this.countConnectedHumans(lobby) > 0) {
+      lobby.clearEmptyLobbyCleanupTimer();
       return;
+    }
+    if (lobby.emptyLobbyCleanupTimer !== null || lobby.isTearingDown) {
+      return;
+    }
+    this.logger.log(
+      `lobby ${lobby.lobbyCode} has no connected humans, scheduling cleanup in ${EMPTY_LOBBY_CLEANUP_DELAY_MS}ms`,
+    );
+    lobby.startEmptyLobbyCleanupHold(EMPTY_LOBBY_CLEANUP_DELAY_MS, () => {
+      void this.finalizeEmptyLobbyCleanup(lobby);
+    });
+  }
+
+  private async finalizeEmptyLobbyCleanup(lobby: LobbyRuntime): Promise<void> {
+    lobby.emptyLobbyCleanupTimer = null;
+    if (this.countConnectedHumans(lobby) > 0) {
+      return;
+    }
+    if (lobby.isTearingDown) {
+      return;
+    }
+    if (this.lobby.getLobby(lobby.lobbyId) !== lobby) {
+      return;
+    }
+    await this.tearDownLobby(lobby, 'no connected humans');
+  }
+
+  /**
+   * Atomic teardown sequence used by both empty-lobby cleanup and summary hard-end.
+   * Order matters: set the flag (joins reject immediately), release the Redis alias
+   * (so future joiners get UnknownLobby), then drop in-memory state and LiveKit.
+   */
+  private async tearDownLobby(lobby: LobbyRuntime, reason: string): Promise<void> {
+    if (lobby.isTearingDown) {
+      return;
+    }
+    lobby.isTearingDown = true;
+    this.logger.log(`tearing down lobby ${lobby.lobbyCode} (${lobby.lobbyId}): ${reason}`);
+    lobby.clearAllDisconnectTimers();
+    try {
+      await this.redisLobby.deleteLobby(lobby.lobbyId, lobby.lobbyCode);
+    } catch (error: unknown) {
+      this.logger.warn(`Redis deleteLobby ${lobby.lobbyCode}: ${String(error)}`);
     }
     this.lobby.removeLobby(lobby.lobbyId, lobby.lobbyCode);
-    const redisHumans = await this.redisLobby.listHumanMembers(lobby.lobbyId);
-    if (redisHumans.length > 0) {
+    try {
+      await this.liveKit.deleteRoom(lobby.lobbyId);
+    } catch (error: unknown) {
+      this.logger.warn(`LiveKit deleteRoom ${lobby.lobbyId}: ${String(error)}`);
+    }
+  }
+
+  /**
+   * Called once after every state-changing broadcast. If a winner has just been declared
+   * and we haven't queued the Summary transition yet, schedule it. Idempotent.
+   */
+  public maybeScheduleSummaryEntry(lobby: LobbyRuntime, server: Server): void {
+    if (lobby.winnerSeat === null) {
       return;
     }
-    await this.liveKit.deleteRoom(lobby.lobbyId);
-    await this.redisLobby.deleteLobby(lobby.lobbyId, lobby.lobbyCode);
+    if (lobby.fsm.getPhase() !== GamePhase.Finished) {
+      return;
+    }
+    if (lobby.summaryEntryTimer !== null) {
+      return;
+    }
+    this.logger.log(`scheduling Summary entry for ${lobby.lobbyCode} in ${SUMMARY_ENTRY_DELAY_MS}ms`);
+    lobby.startSummaryEntryHold(SUMMARY_ENTRY_DELAY_MS, () => {
+      this.enterSummary(lobby, server);
+    });
+  }
+
+  private enterSummary(lobby: LobbyRuntime, server: Server): void {
+    lobby.summaryEntryTimer = null;
+    if (lobby.fsm.getPhase() !== GamePhase.Finished) {
+      return;
+    }
+    lobby.fsm.onSummaryEntered();
+    this.logger.log(
+      `lobby ${lobby.lobbyCode} entered Summary; hard end in ${SUMMARY_HARD_END_DELAY_MS}ms`,
+    );
+    lobby.startSummaryHardEndHold(SUMMARY_HARD_END_DELAY_MS, () => {
+      void this.onSummaryHardEnd(lobby, server);
+    });
+    this.lobby.broadcastFullState(server, lobby);
+  }
+
+  private async onSummaryHardEnd(lobby: LobbyRuntime, server: Server): Promise<void> {
+    lobby.summaryHardEndTimer = null;
+    if (lobby.fsm.getPhase() !== GamePhase.Summary) {
+      return;
+    }
+    const payload: LobbyTerminatedPayload = {
+      lobbyId: lobby.lobbyId,
+      reason: LobbyTerminationReason.SummaryTimeout,
+    };
+    server.to(formatSocketIoLobbyRoomId(lobby.lobbyId)).emit(GameSocketServerEvent.LobbyTerminated, payload);
+    await this.tearDownLobby(lobby, 'summary hard end');
+  }
+
+  private countConnectedHumans(lobby: LobbyRuntime): number {
+    let connected = 0;
+    for (let i = 0; i < lobby.players.length; i += 1) {
+      const p = lobby.players[i];
+      if (!p.isBot && p.socketId !== null) {
+        connected += 1;
+      }
+    }
+    return connected;
   }
 
   private async joinLobbyCore(
@@ -179,6 +348,10 @@ export class LobbyOrchestratorService {
     displayName: string,
     socketId: string,
   ): Promise<LobbyJoinedPayload> {
+    if (lobby.isTearingDown) {
+      throw new BadRequestException(ActionRejectCode.LobbyAlreadyExists);
+    }
+    lobby.clearEmptyLobbyCleanupTimer();
     const player = lobby.findPlayerByToken(sessionToken);
     if (!player) {
       let seat: PlayerSeat;
@@ -216,6 +389,8 @@ export class LobbyOrchestratorService {
     }
     lobby.clearDisconnectTimer(player);
     player.socketId = socketId;
+    player.disconnectGraceExpiresAt = null;
+    player.awaitingAdminDecision = false;
     await this.redisLobby.addMember(lobby.lobbyId, lobby.lobbyCode, {
       sessionToken,
       seat: player.seat,

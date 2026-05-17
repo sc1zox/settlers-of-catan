@@ -9,4 +9,5 @@ export enum GamePhase {
   Building = 'building',
   EndTurn = 'end_turn',
   Finished = 'finished',
+  Summary = 'summary',
 }

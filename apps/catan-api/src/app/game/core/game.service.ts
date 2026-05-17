@@ -91,6 +91,7 @@ export class GameService {
 
   public broadcastFullState(server: Server, lobby: LobbyRuntime): void {
     this.lobby.broadcastFullState(server, lobby);
+    this.lobbyOrchestrator.maybeScheduleSummaryEntry(lobby, server);
     const lobbyId = lobby.lobbyId;
     this.demoBots.afterLobbyBroadcast(lobbyId, server, {
       getLobby: (id: string) => this.lobby.getLobby(id),
@@ -127,6 +128,26 @@ export class GameService {
 
   public async leaveLobby(lobbyId: string, sessionToken: string, server: Server): Promise<void> {
     await this.lobbyOrchestrator.leaveLobby(lobbyId, sessionToken, server);
+  }
+
+  public kickAndReplaceWithBot(
+    lobbyId: string,
+    sessionToken: string,
+    seat: PlayerSeat,
+    server: Server,
+  ): void {
+    const lobby = this.lobbyOrchestrator.kickAndReplaceWithBot(lobbyId, sessionToken, seat);
+    this.broadcastFullState(server, lobby);
+    // Setup phase needs its own autoplay drain hook (broadcastFullState only kicks the main-game drain).
+    this.demoBots.runDemoSetupAutoplay(lobby.lobbyId, server, {
+      getLobby: (id: string) => this.lobby.getLobby(id),
+      buildSettlement: (id, botSessionToken, vId, srv) => {
+        this.buildSettlement(id, botSessionToken, vId, srv);
+      },
+      buildRoad: (id, botSessionToken, eId, srv) => {
+        this.buildRoad(id, botSessionToken, eId, srv);
+      },
+    });
   }
 
   public buildSettlement(

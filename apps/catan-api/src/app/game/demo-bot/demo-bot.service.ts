@@ -193,7 +193,8 @@ export class DemoBotService {
       phase === GamePhase.LobbyWaiting ||
       phase === GamePhase.SetupForward ||
       phase === GamePhase.SetupBackward ||
-      phase === GamePhase.Finished
+      phase === GamePhase.Finished ||
+      phase === GamePhase.Summary
     ) {
       return false;
     }
@@ -364,7 +365,7 @@ export class DemoBotService {
     return null;
   }
 
-  private getDemoBotDisplayName(seat: PlayerSeat): string {
+  public getDemoBotDisplayName(seat: PlayerSeat): string {
     const namesBySeat: Record<PlayerSeat, string> = {
       [PlayerSeat.North]: 'Bot Nord',
       [PlayerSeat.East]: 'Bot Ost',

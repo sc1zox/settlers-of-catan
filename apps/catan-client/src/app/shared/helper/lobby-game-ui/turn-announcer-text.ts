@@ -82,7 +82,7 @@ export function buildTurnAnnouncerText(
     }
     return instant(marker('announcer.buildingOther'), { activeName: active });
   }
-  if (phase === GamePhase.Finished) {
+  if (phase === GamePhase.Finished || phase === GamePhase.Summary) {
     return '';
   }
   if (phase === GamePhase.EndTurn) {

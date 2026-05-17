@@ -7,6 +7,7 @@ import {
   formatSocketIoLobbyRoomId,
   GameSocketServerEvent,
   JoinLobbyPayload,
+  KickAndReplaceWithBotPayload,
   LeaveLobbyPayload,
   LobbyJoinedPayload,
   StartLobbyPayload,
@@ -89,5 +90,14 @@ export class GatewayLobbyHandlers {
   ): void {
     const sessionToken = this.sessions.requireSessionToken(client);
     this.lobbySocket.fillLobbyWithBots(payload.lobbyId, sessionToken, server);
+  }
+
+  public kickAndReplaceWithBot(
+    server: Server,
+    client: Socket,
+    payload: KickAndReplaceWithBotPayload,
+  ): void {
+    const sessionToken = this.sessions.requireSessionToken(client);
+    this.gameService.kickAndReplaceWithBot(payload.lobbyId, sessionToken, payload.seat, server);
   }
 }

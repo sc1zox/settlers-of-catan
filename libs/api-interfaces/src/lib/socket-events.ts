@@ -107,6 +107,20 @@ export interface FillLobbyWithBotsPayload {
   readonly lobbyId: string;
 }
 
+export interface KickAndReplaceWithBotPayload {
+  readonly lobbyId: string;
+  readonly seat: PlayerSeat;
+}
+
+export enum LobbyTerminationReason {
+  SummaryTimeout = 'summary_timeout',
+}
+
+export interface LobbyTerminatedPayload {
+  readonly lobbyId: string;
+  readonly reason: LobbyTerminationReason;
+}
+
 export enum GameSocketClientEvent {
   CreateLobby = 'game:createLobby',
   JoinLobby = 'game:joinLobby',
@@ -132,6 +146,7 @@ export enum GameSocketClientEvent {
   TradeReject = 'game:tradeReject',
   TradeCounter = 'game:tradeCounter',
   TradeFinalize = 'game:tradeFinalize',
+  KickAndReplaceWithBot = 'game:kickAndReplaceWithBot',
 }
 
 export enum GameSocketServerEvent {
@@ -143,6 +158,7 @@ export enum GameSocketServerEvent {
   TradeUpdated = 'game:tradeUpdated',
   BonusAwarded = 'game:bonusAwarded',
   ActionRejected = 'game:actionRejected',
+  LobbyTerminated = 'game:lobbyTerminated',
 }
 
 export type {

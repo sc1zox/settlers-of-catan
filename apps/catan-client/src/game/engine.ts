@@ -540,6 +540,7 @@ export class GameEngine {
       this.selfSeat !== null &&
       this.playerAreaActiveAtTable[this.selfSeat];
     for (let s = 0; s < this.players.length; s += 1) {
+      this.players[s].setFeltVisible(this.playerAreaActiveAtTable[s]);
       this.players[s].setSelfSeatHighlight(showSelfPadOnly && s === this.selfSeat);
     }
     this.legalSettlementVertexIds = state.legalSettlementVertexIds;

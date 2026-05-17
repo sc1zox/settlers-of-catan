@@ -46,6 +46,10 @@ export interface LobbyPlayerPublicDto {
   readonly totalVictoryPoints: number;
   readonly longestRoadLength: number;
   readonly harborRates: PlayerHarborRatesDto;
+  /** Epoch ms when the reconnect grace expires; null means connected or already past grace. */
+  readonly disconnectGraceExpiresAt: number | null;
+  /** True after grace expired without reconnect — admin may kick & replace with a bot. */
+  readonly awaitingAdminDecision: boolean;
 }
 
 export interface LobbySettlementDto {

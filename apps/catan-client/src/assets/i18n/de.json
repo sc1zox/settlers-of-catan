@@ -100,7 +100,20 @@
     "activityFeedHeading": "Mitteilungen",
     "activityFeedAria": "Mitteilungen, nur zum Lesen",
     "playerLeftLobby": "{{playerName}} hat die Lobby verlassen.",
-    "playerLeftGame": "{{playerName}} hat das Spiel verlassen."
+    "playerLeftGame": "{{playerName}} hat das Spiel verlassen.",
+    "lobbyTerminated": "Lobby wurde nach Spielende automatisch beendet."
+  },
+  "disconnectBanner": {
+    "reconnectIn": "Verbindung verloren — Reconnect in {{countdown}}",
+    "awaitingAdmin": "Verbindung verloren — wartet auf Admin",
+    "kickButton": "Durch Bot ersetzen"
+  },
+  "summaryScreen": {
+    "title": "Spiel beendet",
+    "winnerLine": "{{winnerName}} hat gewonnen",
+    "noWinner": "Keine Wertung verfuegbar",
+    "statsPlaceholder": "Detaillierte Statistiken folgen in einer naechsten Version.",
+    "returnToMenu": "Zurueck ins Menue"
   },
   "seat": {
     "north": "Nord",
@@ -118,7 +131,8 @@
     "trading": "Handel",
     "building": "Bauen",
     "endTurn": "Rundenende",
-    "finished": "Spielende"
+    "finished": "Spielende",
+    "summary": "Zusammenfassung"
   },
   "lobby": {
     "waitingForPlayer": "Wartet auf Spieler"

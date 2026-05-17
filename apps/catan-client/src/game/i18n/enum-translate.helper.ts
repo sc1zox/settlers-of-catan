@@ -52,6 +52,8 @@ export class EnumTranslate {
         return 'phase.endTurn';
       case GamePhase.Finished:
         return 'phase.finished';
+      case GamePhase.Summary:
+        return 'phase.summary';
     }
   }
 

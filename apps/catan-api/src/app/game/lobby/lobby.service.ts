@@ -113,6 +113,8 @@ export class LobbyService {
       totalVictoryPoints: getTotalVictoryPoints(p),
       longestRoadLength: p.longestRoadLength,
       harborRates: resolveHarborRates(lobby, p.seat),
+      disconnectGraceExpiresAt: p.disconnectGraceExpiresAt,
+      awaitingAdminDecision: p.awaitingAdminDecision,
     }));
     const viewer = lobby.findPlayerByToken(viewerSessionToken);
     const legalMoves = viewer

@@ -7,6 +7,8 @@ import { DevCardModalComponent } from '../dev-cards/dev-card-modal';
 import { GameCanvasComponent } from '../../game-canvas/game-canvas';
 import { RobberVictimPopoverComponent } from '../../game-canvas/robber-victim-popover';
 import { TradePanelComponent } from '../trading/trade-panel.component';
+import { DisconnectBanner } from '../disconnect-banner/disconnect-banner';
+import { SummaryScreen } from '../summary-screen/summary-screen';
 import { GameSettingsToggle } from '../game-settings/game-settings-toggle';
 import { SpectatorCameraToggle } from '../spectator-camera/spectator-camera-toggle';
 import { SessionLobbyFlowService } from './session-lobby-flow.service';
@@ -30,6 +32,8 @@ import { SessionShellFacadeService } from './session-shell-facade.service';
     RobberVictimPopoverComponent,
     SpectatorCameraToggle,
     GameSettingsToggle,
+    DisconnectBanner,
+    SummaryScreen,
     TranslatePipe,
   ],
   templateUrl: './session-shell.html',

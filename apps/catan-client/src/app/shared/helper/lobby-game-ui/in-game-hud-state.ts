@@ -6,7 +6,7 @@ export function computeHudGameplayLocked(ui: LobbyUiState | null, isSelfTurn: bo
     return true;
   }
   const phase = ui.phase;
-  if (phase === GamePhase.LobbyWaiting || phase === GamePhase.Finished) {
+  if (phase === GamePhase.LobbyWaiting || phase === GamePhase.Finished || phase === GamePhase.Summary) {
     return true;
   }
   if (phase === GamePhase.RobberDiscard) {
@@ -36,7 +36,7 @@ export function computeHudShowPassiveWait(
   if (hudRobberDiscardSelf) {
     return false;
   }
-  if (phase === GamePhase.Finished) {
+  if (phase === GamePhase.Finished || phase === GamePhase.Summary) {
     return false;
   }
   return true;

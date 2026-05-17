@@ -63,6 +63,10 @@ export interface LobbyPlayerSlot {
   hasLongestRoad: boolean;
   hasLargestArmy: boolean;
   disconnectTimer: NodeJS.Timeout | null;
+  /** Epoch ms when the grace timer expires, null if connected or already past grace. */
+  disconnectGraceExpiresAt: number | null;
+  /** True after grace expired without reconnect — waits for admin to kick (Bot) or wait longer. */
+  awaitingAdminDecision: boolean;
 }
 
 export interface LobbySettlementSlot {
@@ -105,6 +109,14 @@ export class LobbyRuntime {
   /** Last seat we emitted a Largest-Army `BonusAwarded` for — used to detect transitions. */
   public lastAnnouncedLargestArmySeat: PlayerSeat | null = null;
   public winnerSeat: PlayerSeat | null = null;
+  /** Pending teardown after the last connected human left. Cleared if anyone (re)joins in time. */
+  public emptyLobbyCleanupTimer: NodeJS.Timeout | null = null;
+  /** Pending Finished → Summary transition (15s after winner). */
+  public summaryEntryTimer: NodeJS.Timeout | null = null;
+  /** Pending hard end-of-summary teardown (5min after Summary started). */
+  public summaryHardEndTimer: NodeJS.Timeout | null = null;
+  /** True while finalizeEmptyLobbyCleanup / forceTerminate is mid-flight — joins reject as LobbyAlreadyExists. */
+  public isTearingDown = false;
 
   public constructor(lobbyId: string, lobbyCode: string) {
     this.lobbyId = lobbyId;
@@ -211,6 +223,8 @@ export class LobbyRuntime {
       hasLongestRoad: false,
       hasLargestArmy: false,
       disconnectTimer: null,
+      disconnectGraceExpiresAt: null,
+      awaitingAdminDecision: false,
     });
     return seat;
   }
@@ -233,11 +247,50 @@ export class LobbyRuntime {
     for (let i = 0; i < this.players.length; i += 1) {
       this.clearDisconnectTimer(this.players[i]);
     }
+    this.clearEmptyLobbyCleanupTimer();
+    this.clearSummaryEntryTimer();
+    this.clearSummaryHardEndTimer();
   }
 
   public startDisconnectHold(player: LobbyPlayerSlot, delayMs: number, onExpire: () => void): void {
     this.clearDisconnectTimer(player);
     player.disconnectTimer = setTimeout(onExpire, delayMs);
+  }
+
+  public clearEmptyLobbyCleanupTimer(): void {
+    if (this.emptyLobbyCleanupTimer) {
+      clearTimeout(this.emptyLobbyCleanupTimer);
+      this.emptyLobbyCleanupTimer = null;
+    }
+  }
+
+  public startEmptyLobbyCleanupHold(delayMs: number, onExpire: () => void): void {
+    this.clearEmptyLobbyCleanupTimer();
+    this.emptyLobbyCleanupTimer = setTimeout(onExpire, delayMs);
+  }
+
+  public clearSummaryEntryTimer(): void {
+    if (this.summaryEntryTimer) {
+      clearTimeout(this.summaryEntryTimer);
+      this.summaryEntryTimer = null;
+    }
+  }
+
+  public startSummaryEntryHold(delayMs: number, onExpire: () => void): void {
+    this.clearSummaryEntryTimer();
+    this.summaryEntryTimer = setTimeout(onExpire, delayMs);
+  }
+
+  public clearSummaryHardEndTimer(): void {
+    if (this.summaryHardEndTimer) {
+      clearTimeout(this.summaryHardEndTimer);
+      this.summaryHardEndTimer = null;
+    }
+  }
+
+  public startSummaryHardEndHold(delayMs: number, onExpire: () => void): void {
+    this.clearSummaryHardEndTimer();
+    this.summaryHardEndTimer = setTimeout(onExpire, delayMs);
   }
 
   public countTotalResources(player: LobbyPlayerSlot): number {

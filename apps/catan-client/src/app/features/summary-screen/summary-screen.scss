@@ -1,0 +1,64 @@
+.summary-screen {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 10, 14, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+  backdrop-filter: blur(6px);
+}
+
+.summary-screen__card {
+  background: linear-gradient(140deg, #161b22, #0d1117);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1.25rem;
+  padding: 2.5rem 3rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.2rem;
+  max-width: 32rem;
+  width: 90%;
+  text-align: center;
+  color: #e5e7eb;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+}
+
+.summary-screen__title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+.summary-screen__winner {
+  font-size: 1.15rem;
+  margin: 0;
+  color: #fbbf24;
+}
+
+.summary-screen__placeholder {
+  margin: 0;
+  font-size: 0.92rem;
+  color: rgba(229, 231, 235, 0.7);
+  line-height: 1.45;
+}
+
+.summary-screen__back {
+  margin-top: 0.6rem;
+  padding: 0.85rem 1.8rem;
+  font-size: 1rem;
+  font-weight: 600;
+  background: linear-gradient(120deg, #2563eb, #1d4ed8);
+  color: #fff;
+  border: 1px solid rgba(96, 165, 250, 0.6);
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease;
+}
+
+.summary-screen__back:hover {
+  background: linear-gradient(120deg, #3b82f6, #2563eb);
+  transform: translateY(-1px);
+}

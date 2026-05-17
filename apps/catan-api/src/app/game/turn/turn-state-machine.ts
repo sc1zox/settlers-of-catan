@@ -14,7 +14,11 @@ export class TurnStateMachine {
   }
 
   public isFinished(): boolean {
-    return this.phase === GamePhase.Finished;
+    return this.phase === GamePhase.Finished || this.phase === GamePhase.Summary;
+  }
+
+  public isSummary(): boolean {
+    return this.phase === GamePhase.Summary;
   }
 
   public assertOneOf(allowed: readonly GamePhase[]): void {
@@ -77,9 +81,17 @@ export class TurnStateMachine {
    * once a winner has been declared.
    */
   public onWinnerDeclared(): void {
-    if (this.phase === GamePhase.Finished) {
+    if (this.phase === GamePhase.Finished || this.phase === GamePhase.Summary) {
       return;
     }
     this.phase = GamePhase.Finished;
+  }
+
+  /** Idempotent: Finished → Summary. No effect from Summary or non-Finished states. */
+  public onSummaryEntered(): void {
+    if (this.phase !== GamePhase.Finished) {
+      return;
+    }
+    this.phase = GamePhase.Summary;
   }
 }

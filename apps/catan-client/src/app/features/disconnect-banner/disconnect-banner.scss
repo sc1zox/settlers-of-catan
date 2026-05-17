@@ -1,0 +1,70 @@
+.disconnect-banner {
+  position: fixed;
+  top: 1rem;
+  left: 4.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-width: 22rem;
+  z-index: 14;
+  pointer-events: auto;
+}
+
+.disconnect-banner__row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.8rem;
+  background: rgba(20, 22, 28, 0.86);
+  border: 1px solid rgba(248, 113, 113, 0.55);
+  border-radius: 0.6rem;
+  color: #fef3f3;
+  font-size: 0.85rem;
+  line-height: 1.25;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+}
+
+.disconnect-banner__dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: #f87171;
+  box-shadow: 0 0 6px rgba(248, 113, 113, 0.8);
+  animation: disconnect-banner-pulse 1.4s ease-in-out infinite;
+}
+
+.disconnect-banner__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.disconnect-banner__name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.disconnect-banner__kick {
+  padding: 0.35rem 0.6rem;
+  background: rgba(220, 38, 38, 0.75);
+  color: #fff;
+  border: 1px solid rgba(248, 113, 113, 0.7);
+  border-radius: 0.45rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.disconnect-banner__kick:hover {
+  background: rgba(220, 38, 38, 0.95);
+}
+
+@keyframes disconnect-banner-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}

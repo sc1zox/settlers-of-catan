@@ -284,6 +284,14 @@ export class GameStateResource {
     this.sockets.leaveLobby(lobbyId);
   }
 
+  public kickAndReplaceWithBot(seat: PlayerSeat): void {
+    const lobbyId = this.canonicalLobbyId();
+    if (lobbyId.length === 0) {
+      return;
+    }
+    this.sockets.kickAndReplaceWithBot(lobbyId, seat);
+  }
+
   public disconnectLobby(): void {
     this.subscriptionParamsSignal.set(undefined);
     this.canonicalLobbyIdSignal.set('');

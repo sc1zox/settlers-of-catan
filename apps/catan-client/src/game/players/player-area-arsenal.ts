@@ -26,9 +26,20 @@ export interface PlayerAreaArsenalOptions {
   readonly innerEdgeZ: number;
 }
 
+export interface ArsenalPlacedPieces {
+  readonly settlements: number;
+  readonly cities: number;
+  readonly roads: number;
+}
+
 export class PlayerAreaArsenal {
   private readonly figureMats: PlayerFigureMaterials;
   private readonly arsenalFigures: Object3D[] = [];
+  private readonly figuresByKind: Record<BuildKind, Object3D[]> = {
+    [BuildKind.Settlement]: [],
+    [BuildKind.City]: [],
+    [BuildKind.Road]: [],
+  };
   private readonly presenceDimmer = new PresenceMaterialDimmer();
 
   private activatedFigure: Object3D | null = null;
@@ -219,6 +230,35 @@ export class PlayerAreaArsenal {
     figure.userData[SceneUserDataKey.Kind] = SceneObjectKind.Arsenal;
     figure.userData[SceneUserDataKey.BuildKind] = buildKind;
     this.arsenalFigures.push(figure);
+    this.figuresByKind[buildKind].push(figure);
+  }
+
+  /**
+   * Reconcile arsenal visibility against server-authoritative placement counts.
+   * Idempotent — call on every full-state apply. The currently flying figure is
+   * left alone so the flight controls its own arrival visibility.
+   */
+  public setPlacedPieces(placed: ArsenalPlacedPieces): void {
+    this.applyKindPlaced(BuildKind.Settlement, placed.settlements);
+    this.applyKindPlaced(BuildKind.City, placed.cities);
+    this.applyKindPlaced(BuildKind.Road, placed.roads);
+  }
+
+  private applyKindPlaced(kind: BuildKind, placed: number): void {
+    const figures = this.figuresByKind[kind];
+    const remaining = Math.max(0, figures.length - placed);
+    let visibleSoFar = 0;
+    for (let i = 0; i < figures.length; i += 1) {
+      const figure = figures[i];
+      if (figure === this.flyingFigure) {
+        continue;
+      }
+      const shouldBeVisible = visibleSoFar < remaining;
+      figure.visible = shouldBeVisible;
+      if (shouldBeVisible) {
+        visibleSoFar += 1;
+      }
+    }
   }
 
   private layoutRoads(centreZ: number, tableY: number): void {

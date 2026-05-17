@@ -5,7 +5,7 @@ import { Card } from '../cards/card';
 import { createBonusCard } from '../cards/bonus-card';
 import { createCostCard } from '../cards/cost-card';
 import { PlayerColor, playerColorLabel } from './colors';
-import { PlayerAreaArsenal } from './player-area-arsenal';
+import { ArsenalPlacedPieces, PlayerAreaArsenal } from './player-area-arsenal';
 import { PlayerAreaAvatar } from './player-area-avatar';
 import { PlayerAreaHand } from './player-area-hand';
 import { PlayerAreaSelfPad } from './player-area-self-pad';
@@ -156,6 +156,10 @@ export class PlayerArea {
 
   public hasActivatedArsenalFigure(kind: BuildKind): boolean {
     return this.arsenalKit.hasActivatedArsenalFigure(kind);
+  }
+
+  public setPlacedArsenalPieces(placed: ArsenalPlacedPieces): void {
+    this.arsenalKit.setPlacedPieces(placed);
   }
 
   public flyActivatedFigureToWorld(

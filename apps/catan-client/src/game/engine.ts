@@ -394,6 +394,39 @@ export class GameEngine {
     return this.players[this.selfSeat]?.hasActivatedArsenalFigure(kind) ?? false;
   }
 
+  /**
+   * Drive every seat's arsenal visibility from the server-authoritative
+   * `settlements` / `roads` arrays. Bug-history note: arsenal counts used to be
+   * implicit local state (the figure flew away and stayed invisible), which
+   * leaked across lobbies and never reflected other players' builds.
+   */
+  private syncArsenalRemainingPieces(
+    settlements: LobbySceneState['settlements'],
+    roads: LobbySceneState['roads'],
+  ): void {
+    const settlementsPlacedBySeat: number[] = [0, 0, 0, 0];
+    const citiesPlacedBySeat: number[] = [0, 0, 0, 0];
+    const roadsPlacedBySeat: number[] = [0, 0, 0, 0];
+    for (let i = 0; i < settlements.length; i += 1) {
+      const dto = settlements[i];
+      if (dto.isCity) {
+        citiesPlacedBySeat[dto.seat] += 1;
+      } else {
+        settlementsPlacedBySeat[dto.seat] += 1;
+      }
+    }
+    for (let i = 0; i < roads.length; i += 1) {
+      roadsPlacedBySeat[roads[i].seat] += 1;
+    }
+    for (let s = 0; s < this.players.length; s += 1) {
+      this.players[s].setPlacedArsenalPieces({
+        settlements: settlementsPlacedBySeat[s],
+        cities: citiesPlacedBySeat[s],
+        roads: roadsPlacedBySeat[s],
+      });
+    }
+  }
+
   private startArsenalFlyIn(piece: SpawnedBuildPiece): void {
     if (this.selfSeat === null) {
       return;
@@ -554,6 +587,9 @@ export class GameEngine {
     for (let i = 0; i < flyIns.length; i += 1) {
       this.startArsenalFlyIn(flyIns[i]);
     }
+    // Must run after startArsenalFlyIn so flyingFigure is set — the sync below
+    // skips that figure to avoid teleporting it back to the arsenal mid-flight.
+    this.syncArsenalRemainingPieces(state.settlements, state.roads);
     this.robberFigure.syncCoord(state.robberCoord.q, state.robberCoord.r, boardJustRebuilt);
     for (let i = 0; i < state.players.length; i += 1) {
       const playerState = state.players[i];

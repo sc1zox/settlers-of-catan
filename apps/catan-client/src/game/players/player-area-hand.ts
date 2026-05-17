@@ -23,6 +23,7 @@ export class PlayerAreaHand {
   private handMaterials: MeshStandardMaterial[] = [];
   private resourceCounts: Record<ResourceKind, number>;
   private devCount = 0;
+  private presenceDimmed = false;
 
   public constructor(
     private readonly group: Group,
@@ -93,6 +94,21 @@ export class PlayerAreaHand {
     this.handCards = cards;
     this.resourceCounts = nextCounts;
     this.devCount = nextDevCount;
+    this.applyPresenceDimToHand();
+  }
+
+  public setPresenceDimmed(dimmed: boolean): void {
+    if (this.presenceDimmed === dimmed) {
+      return;
+    }
+    this.presenceDimmed = dimmed;
+    this.applyPresenceDimToHand();
+  }
+
+  private applyPresenceDimToHand(): void {
+    for (let i = 0; i < this.handCards.length; i += 1) {
+      this.handCards[i].setPresenceDimmed(this.presenceDimmed);
+    }
   }
 
   public update(dt: number): void {

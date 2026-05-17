@@ -8,6 +8,7 @@ import {
   Vector3,
 } from 'three';
 import { CardHoverInfo } from '../shared/card-hover';
+import { PresenceMaterialDimmer } from '../players/presence-material-dimmer';
 import { SceneObjectKind, SceneUserDataKey } from '@catan/api-interfaces';
 
 export type CardMode = 'rest' | 'focused';
@@ -55,6 +56,7 @@ export class Card {
   private readonly localSize: CardLocalSize;
   private readonly hoverInfo: CardHoverInfo | null;
   private groupKey: string | null = null;
+  private readonly presenceDimmer = new PresenceMaterialDimmer();
 
   constructor(options: CardOptions) {
     const { width, height, thickness, backMaterial, faceMaterial, edgeMaterial } = options;
@@ -80,6 +82,11 @@ export class Card {
     this.originalDepthWrite = backMaterial.depthWrite;
     this.localSize = { x: height, y: thickness, z: width };
     this.hoverInfo = options.hoverInfo ?? null;
+    this.presenceDimmer.register(this.allMaterials);
+  }
+
+  public setPresenceDimmed(dimmed: boolean): void {
+    this.presenceDimmer.setDimmed(dimmed);
   }
 
   /** Set the card's resting pose. Call before adding it to the scene. */

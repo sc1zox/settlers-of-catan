@@ -63,6 +63,23 @@ export class SessionShellFacadeService {
       this.tradingPanel.resetForSpectatorMode();
       this.devOverlay.resetForSpectatorMode();
     });
+    // Whenever the active lobby changes (leave, hop, or kick), wipe any UI
+    // overlay state that was bound to the previous lobby. The render layer
+    // already follows the server FullState; this is the same guarantee for
+    // local mode signals (build mode, robber pick, trade panel, dev-card
+    // overlay) so a fresh lobby always starts with a clean UI.
+    let previousLobbyCode = '';
+    effect(() => {
+      const params = this.gameState.subscriptionParams();
+      const currentLobbyCode = params?.lobbyCode ?? '';
+      if (previousLobbyCode !== '' && previousLobbyCode !== currentLobbyCode) {
+        this.buildFlow.resetForLobbyLeave();
+        this.robberFlow.resetForLobbyLeave();
+        this.tradingPanel.resetForLobbyLeave();
+        this.devOverlay.resetForLobbyLeave();
+      }
+      previousLobbyCode = currentLobbyCode;
+    });
   }
 
   public lobbyCodeValue(): string {

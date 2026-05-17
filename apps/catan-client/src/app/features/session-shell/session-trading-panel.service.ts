@@ -69,6 +69,17 @@ export class SessionTradingPanelService {
     this.tradeOpen.set(false);
   }
 
+  /**
+   * Wipe everything that's lobby-scoped — the transition tracker also has to
+   * forget the previous lobby's last trade so a brand-new trade in the next
+   * lobby isn't mis-classified as a stale repeat.
+   */
+  public resetForLobbyLeave(): void {
+    this.tradeOpen.set(false);
+    this.lastSeenTradeId = null;
+    this.lastSeenTradeStatus = null;
+  }
+
   public openTrade(): void {
     this.tradeOpen.set(true);
   }

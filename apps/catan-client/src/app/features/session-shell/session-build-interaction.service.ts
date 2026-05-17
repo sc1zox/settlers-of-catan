@@ -21,6 +21,13 @@ export class SessionBuildInteractionService {
     this.roadBuildingFirstEdgeId.set(null);
   }
 
+  public resetForLobbyLeave(): void {
+    this.buildMode.set(null);
+    this.freeRoadMode.set(false);
+    this.buildConfirm.set(null);
+    this.roadBuildingFirstEdgeId.set(null);
+  }
+
   public onArsenalBuild(kind: BuildKind): void {
     if (kind === BuildKind.Settlement && this.lobbyGameUi.canBuildSettlement()) {
       this.enterBuildMode(BuildKind.Settlement);

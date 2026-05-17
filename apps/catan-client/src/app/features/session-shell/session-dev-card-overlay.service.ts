@@ -19,6 +19,10 @@ export class SessionDevCardOverlayService {
     this.devCardOpen.set(false);
   }
 
+  public resetForLobbyLeave(): void {
+    this.devCardOpen.set(false);
+  }
+
   public onDevCardClicked(): void {
     if (this.devCards.canPlayDevCard()) {
       this.devCardOpen.set(true);

@@ -34,6 +34,12 @@ export class SessionRobberFlowService {
     this.robberVictim.set(null);
   }
 
+  public resetForLobbyLeave(): void {
+    this.knightActiveSignal.set(false);
+    this.pendingRobberCoord.set(null);
+    this.robberVictim.set(null);
+  }
+
   public setKnightActive(active: boolean): void {
     this.knightActiveSignal.set(active);
   }

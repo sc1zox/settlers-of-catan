@@ -5,7 +5,6 @@ import {
   TradeOfferDto,
   TradeStatus,
 } from '@catan/api-interfaces';
-import { TradingStateService } from '../trading/trading-state.service';
 import type { TradePartner } from '../../shared/types/trading-ui.types';
 import { LobbyGameUiStateService } from './lobby-game-ui-state.service';
 
@@ -31,7 +30,6 @@ const DEFAULT_HARBOR_RATES: PlayerHarborRatesDto = {
 @Injectable({ providedIn: 'root' })
 export class LobbyTradeUiService {
   private readonly state = inject(LobbyGameUiStateService);
-  private readonly tradingState = inject(TradingStateService);
 
   public readonly tradePartners = computed<readonly TradePartner[]>(() => {
     const payload = this.state.rawLobbyState();
@@ -43,12 +41,33 @@ export class LobbyTradeUiService {
       .map((player) => ({ seat: player.seat, name: player.displayName }));
   });
 
+  /**
+   * Pull the player-relevant open trade straight from the server-authoritative
+   * FullState. A reconnecting client sees the same active offer as everyone
+   * else; the transient `TradeUpdated` event is no longer the source of truth
+   * (it stays around as an animation/UX-transition hint).
+   */
   public readonly pendingTrade = computed<TradeOfferDto | null>(() => {
-    const update = this.tradingState.tradeUpdated.value();
-    if (update === undefined) {
+    const payload = this.state.rawLobbyState();
+    const seat = this.state.selfSeat();
+    if (payload === undefined || seat === null) {
       return null;
     }
-    return update.trade.status === TradeStatus.Open ? update.trade : null;
+    for (let i = 0; i < payload.activeTrades.length; i += 1) {
+      const trade = payload.activeTrades[i];
+      if (trade.status !== TradeStatus.Open) {
+        continue;
+      }
+      if (trade.fromSeat === seat) {
+        return trade;
+      }
+      for (let j = 0; j < trade.recipients.length; j += 1) {
+        if (trade.recipients[j].seat === seat) {
+          return trade;
+        }
+      }
+    }
+    return null;
   });
 
   public readonly selfResources = computed<Readonly<Record<ResourceType, number>>>(

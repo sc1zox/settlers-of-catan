@@ -1,4 +1,4 @@
-import { PlayerSeat, ResourceType } from '@catan/api-interfaces';
+import { PlayerHarborRatesDto, PlayerSeat, ResourceType } from '@catan/api-interfaces';
 import { hexRing } from '@catan/shared-game-field';
 import { makeTileKey } from '@catan/shared-game-field';
 import { LobbyRuntime } from '../lobby/lobby-runtime';
@@ -24,12 +24,9 @@ const NEIGHBOR_DIRS: readonly { q: number; r: number }[] = [
   { q: 0, r: 1 },
 ];
 
-export function resolveHarborRates(
-  lobby: LobbyRuntime,
-  seat: PlayerSeat,
-): Record<ResourceType | 'generic', number> {
-  const rates: Record<ResourceType | 'generic', number> = {
-    generic: 4,
+export function resolveHarborRates(lobby: LobbyRuntime, seat: PlayerSeat): PlayerHarborRatesDto {
+  let generic = 4;
+  const perResource: Record<ResourceType, number> = {
     [ResourceType.Wood]: 4,
     [ResourceType.Brick]: 4,
     [ResourceType.Wheat]: 4,
@@ -44,17 +41,17 @@ export function resolveHarborRates(
       continue;
     }
     if (harbor.resource === null) {
-      rates.generic = Math.min(rates.generic, harbor.ratio);
+      generic = Math.min(generic, harbor.ratio);
     } else {
-      rates[harbor.resource] = Math.min(rates[harbor.resource], harbor.ratio);
+      perResource[harbor.resource] = Math.min(perResource[harbor.resource], harbor.ratio);
     }
   }
   for (const resource of Object.values(ResourceType)) {
-    if (rates.generic < rates[resource]) {
-      rates[resource] = rates.generic;
+    if (generic < perResource[resource]) {
+      perResource[resource] = generic;
     }
   }
-  return rates;
+  return { generic, perResource };
 }
 
 function playerOwnsAnyVertex(

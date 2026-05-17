@@ -47,6 +47,7 @@ export interface BuildAnimationOptions {
  * permanent and owned by the caller.
  */
 export class BuildAnimation {
+  readonly building: Group;
   private readonly stages: StagedChild[];
   private readonly buildDuration: number;
   private readonly dust: Points;
@@ -58,6 +59,7 @@ export class BuildAnimation {
   private finished = false;
 
   constructor(options: BuildAnimationOptions) {
+    this.building = options.building;
     const children = [...options.building.children];
     children.sort((a, b) => a.position.y - b.position.y);
     this.stages = children.map((target, index) => {

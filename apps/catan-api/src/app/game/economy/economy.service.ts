@@ -86,7 +86,7 @@ export class EconomyService {
   ): void {
     const giveN = Math.floor(Number(giveAmount));
     const rates = resolveHarborRates(lobby, player.seat);
-    const expectedGive = rates[giveResource];
+    const expectedGive = rates.perResource[giveResource];
     if (
       !Number.isFinite(giveN) ||
       giveN !== expectedGive ||

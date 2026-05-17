@@ -67,10 +67,12 @@ export class BoardBuildings {
   private readonly lobbySeatMask: boolean[] = [false, false, false, false];
 
   /**
-   * Diff the lobby state against what is rendered; spawn pop-in animations for
-   * new pieces. Pieces the `shouldFlyIn` predicate accepts are spawned hidden
-   * and returned so the caller can fly an arsenal figure into them, then call
-   * `revealPiece` to play the pop-in once the figure lands.
+   * Full reconciliation against the server's truth: the lobby's settlements /
+   * roads arrays *are* the rendered set. Pieces missing from the incoming DTO
+   * are removed; new pieces spawn with a pop-in (or hidden, if `shouldFlyIn`
+   * claims them, so the caller can fly an arsenal figure in and later call
+   * `revealPiece`). No external reset signal is needed — switching lobbies
+   * just sends a payload without the old vertex/edge ids and they vanish here.
    */
   syncToState(
     settlements: readonly LobbySettlementDto[],
@@ -78,8 +80,10 @@ export class BoardBuildings {
     shouldFlyIn?: FlyInPredicate,
   ): SpawnedBuildPiece[] {
     const flyIns: SpawnedBuildPiece[] = [];
+    const presentVertexIds = new Set<string>();
     for (let i = 0; i < settlements.length; i += 1) {
       const dto = settlements[i];
+      presentVertexIds.add(dto.vertexId);
       const existing = this.settlements.get(dto.vertexId);
       if (!existing) {
         const kind = dto.isCity ? BuildKind.City : BuildKind.Settlement;
@@ -94,12 +98,26 @@ export class BoardBuildings {
         }
       }
     }
+    for (const [vertexId, placed] of this.settlements) {
+      if (!presentVertexIds.has(vertexId)) {
+        this.removePiece(placed.group);
+        this.settlements.delete(vertexId);
+      }
+    }
+    const presentEdgeIds = new Set<string>();
     for (let i = 0; i < roads.length; i += 1) {
       const dto = roads[i];
+      presentEdgeIds.add(dto.edgeId);
       if (!this.roads.has(dto.edgeId)) {
         const fly = shouldFlyIn?.(BuildKind.Road, dto.seat) ?? false;
         const figure = this.spawnRoad(dto, fly);
         if (fly) flyIns.push({ kind: BuildKind.Road, id: dto.edgeId, seat: dto.seat, figure });
+      }
+    }
+    for (const [edgeId, placed] of this.roads) {
+      if (!presentEdgeIds.has(edgeId)) {
+        this.removePiece(placed.group);
+        this.roads.delete(edgeId);
       }
     }
     return flyIns;
@@ -268,6 +286,22 @@ export class BoardBuildings {
         this.trackedGeometries.push(object.geometry as BufferGeometry);
       }
     });
+  }
+
+  /**
+   * Remove a placed figure from the scene and cancel any pop-in animation
+   * still targeting it (so its dust cloud doesn't linger after the building
+   * is gone). Caller is responsible for deleting the map entry.
+   */
+  private removePiece(figure: Group): void {
+    for (let i = this.animations.length - 1; i >= 0; i -= 1) {
+      if (this.animations[i].building === figure) {
+        this.animations[i].dispose();
+        this.animations.splice(i, 1);
+      }
+    }
+    this.group.remove(figure);
+    this.releaseGeometries(figure);
   }
 
   private releaseGeometries(figure: Group): void {

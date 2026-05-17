@@ -23,6 +23,13 @@ export interface RoadBuiltDelta {
 
 export type GameDeltaPayload = SettlementBuiltDelta | RoadBuiltDelta;
 
+export interface PlayerHarborRatesDto {
+  /** Best generic (3:1 or 4:1) rate available to this player. */
+  readonly generic: number;
+  /** Effective per-resource rate (already collapses generic via min). */
+  readonly perResource: Readonly<Record<ResourceType, number>>;
+}
+
 export interface LobbyPlayerPublicDto {
   readonly seat: PlayerSeat;
   readonly displayName: string;
@@ -37,7 +44,7 @@ export interface LobbyPlayerPublicDto {
   readonly visibleVictoryPoints: number;
   readonly totalVictoryPoints: number;
   readonly longestRoadLength: number;
-  readonly harborRates: Readonly<Record<ResourceType | 'generic', number>>;
+  readonly harborRates: PlayerHarborRatesDto;
 }
 
 export interface LobbySettlementDto {

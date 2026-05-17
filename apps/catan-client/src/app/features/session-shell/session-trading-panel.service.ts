@@ -48,8 +48,17 @@ export class SessionTradingPanelService {
         // for the replacement trade arrives right after — don't flicker.
         return;
       }
+      if (
+        trade.status === TradeStatus.Cancelled &&
+        seat !== null &&
+        trade.fromSeat === seat
+      ) {
+        // Sender withdrew their own offer — keep the panel open so they drop
+        // straight back into the composer instead of having to reopen it.
+        return;
+      }
       if (trade.status !== TradeStatus.Open && involvesSelf) {
-        // User-facing terminal (Accepted / Rejected / Cancelled by sender) —
+        // User-facing terminal (Accepted / Rejected / Cancelled by other) —
         // close the panel so it doesn't linger on a stale view.
         this.tradeOpen.set(false);
       }

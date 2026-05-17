@@ -1,5 +1,10 @@
 import { computed, inject, Injectable } from '@angular/core';
-import { ResourceType, TradeOfferDto, TradeStatus } from '@catan/api-interfaces';
+import {
+  PlayerHarborRatesDto,
+  ResourceType,
+  TradeOfferDto,
+  TradeStatus,
+} from '@catan/api-interfaces';
 import { TradingStateService } from '../trading/trading-state.service';
 import type { TradePartner } from '../../shared/types/trading-ui.types';
 import { LobbyGameUiStateService } from './lobby-game-ui-state.service';
@@ -10,6 +15,17 @@ const ZERO_RESOURCES: Readonly<Record<ResourceType, number>> = {
   [ResourceType.Wheat]: 0,
   [ResourceType.Wool]: 0,
   [ResourceType.Ore]: 0,
+};
+
+const DEFAULT_HARBOR_RATES: PlayerHarborRatesDto = {
+  generic: 4,
+  perResource: {
+    [ResourceType.Wood]: 4,
+    [ResourceType.Brick]: 4,
+    [ResourceType.Wheat]: 4,
+    [ResourceType.Wool]: 4,
+    [ResourceType.Ore]: 4,
+  },
 };
 
 @Injectable({ providedIn: 'root' })
@@ -37,6 +53,10 @@ export class LobbyTradeUiService {
 
   public readonly selfResources = computed<Readonly<Record<ResourceType, number>>>(
     () => this.state.selfPlayer()?.resources ?? ZERO_RESOURCES,
+  );
+
+  public readonly selfHarborRates = computed<PlayerHarborRatesDto>(
+    () => this.state.selfPlayer()?.harborRates ?? DEFAULT_HARBOR_RATES,
   );
 
   public readonly selfHasOpenTrade = computed<boolean>(() => {

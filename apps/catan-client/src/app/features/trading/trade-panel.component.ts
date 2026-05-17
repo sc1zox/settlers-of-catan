@@ -11,6 +11,7 @@ import {
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
+  PlayerHarborRatesDto,
   PlayerSeat,
   ResourceType,
   TradeRecipientStatus,
@@ -18,17 +19,28 @@ import {
   type TradeRecipientResponse,
 } from '@catan/api-interfaces';
 import { TranslateInstantFn } from '../../../shared/i18n/translate-instant-fn';
-import type {
-  BankTradeRequest,
-  CounterTradeRequest,
-  FinalizeTradeRequest,
-  ProposeTradeRequest,
-  TradePartner,
+import {
+  TradeComposerView,
+  TradePanelMode,
+  TradeResourceSide,
+  type BankTradeRequest,
+  type CounterTradeRequest,
+  type FinalizeTradeRequest,
+  type ProposeTradeRequest,
+  type TradePartner,
 } from '../../shared/types/trading-ui.types';
 import { RESOURCE_TYPE_ORDER, resourceTypeLabel } from '../../shared/resource-labels';
 
-type TradeView = 'bank' | 'player';
-type TradeMode = 'sender' | 'recipient' | 'composer' | 'counter';
+const DEFAULT_HARBOR_RATES: PlayerHarborRatesDto = {
+  generic: 4,
+  perResource: {
+    [ResourceType.Wood]: 4,
+    [ResourceType.Brick]: 4,
+    [ResourceType.Wheat]: 4,
+    [ResourceType.Wool]: 4,
+    [ResourceType.Ore]: 4,
+  },
+};
 
 @Component({
   selector: 'app-trade-panel',
@@ -47,15 +59,15 @@ type TradeMode = 'sender' | 'recipient' | 'composer' | 'counter';
         <div class="modal">
           <header>
             <h3>{{ headerLabel() }}</h3>
-            @if (mode() === 'composer') {
+            @if (mode() === modeEnum.Composer) {
               <div class="tabs">
-                <button type="button" [class.active]="view() === 'bank'" (click)="view.set('bank')">
+                <button type="button" [class.active]="view() === viewEnum.Bank" (click)="view.set(viewEnum.Bank)">
                   {{ 'trade.tabBank' | translate }}
                 </button>
                 <button
                   type="button"
-                  [class.active]="view() === 'player'"
-                  (click)="view.set('player')"
+                  [class.active]="view() === viewEnum.Player"
+                  (click)="view.set(viewEnum.Player)"
                 >
                   {{ 'trade.tabPlayers' | translate }}
                 </button>
@@ -64,7 +76,7 @@ type TradeMode = 'sender' | 'recipient' | 'composer' | 'counter';
           </header>
 
           @switch (mode()) {
-            @case ('sender') {
+            @case (modeEnum.Sender) {
               @let trade = pendingTrade()!;
               <p class="sub-label">{{ 'trade.youOfferLabel' | translate }}</p>
               <div class="trade-summary trade-summary--banner">
@@ -183,7 +195,7 @@ type TradeMode = 'sender' | 'recipient' | 'composer' | 'counter';
               </div>
             }
 
-            @case ('recipient') {
+            @case (modeEnum.Recipient) {
               @let trade = pendingTrade()!;
               @let mySlot = recipientSlot(trade)!;
               <p class="sub-label">
@@ -353,7 +365,7 @@ type TradeMode = 'sender' | 'recipient' | 'composer' | 'counter';
               }
             }
 
-            @case ('counter') {
+            @case (modeEnum.Counter) {
               @let trade = pendingTrade()!;
               <p class="hint hint--info">
                 {{ 'trade.counterHint' | translate: { name: partnerName(trade.fromSeat) } }}
@@ -365,13 +377,15 @@ type TradeMode = 'sender' | 'recipient' | 'composer' | 'counter';
                     @let offerCount = offer()[resource];
                     @let owned = ownedFor(resource);
                     <div class="grid-row">
-                      <span class="label">{{ label(resource) }}</span>
-                      <span class="owned" aria-hidden="true">/ {{ owned }}</span>
+                      <span class="label"
+                        >{{ label(resource) }}
+                        <span class="owned" aria-hidden="true">· {{ owned }}</span>
+                      </span>
                       <div class="stepper">
                         <button
                           type="button"
                           [disabled]="offerCount <= 0"
-                          (click)="adjust('offer', resource, -1)"
+                          (click)="adjust(sideOffer, resource, -1)"
                         >
                           −
                         </button>
@@ -379,7 +393,7 @@ type TradeMode = 'sender' | 'recipient' | 'composer' | 'counter';
                         <button
                           type="button"
                           [disabled]="offerCount >= owned"
-                          (click)="adjust('offer', resource, 1)"
+                          (click)="adjust(sideOffer, resource, 1)"
                         >
                           +
                         </button>
@@ -397,14 +411,14 @@ type TradeMode = 'sender' | 'recipient' | 'composer' | 'counter';
                         <button
                           type="button"
                           [disabled]="requestCount <= 0"
-                          (click)="adjust('request', resource, -1)"
+                          (click)="adjust(sideRequest, resource, -1)"
                         >
                           −
                         </button>
                         <span class="count">{{ requestCount }}</span>
                         <button
                           type="button"
-                          (click)="adjust('request', resource, 1)"
+                          (click)="adjust(sideRequest, resource, 1)"
                         >
                           +
                         </button>
@@ -431,39 +445,28 @@ type TradeMode = 'sender' | 'recipient' | 'composer' | 'counter';
               </div>
             }
 
-            @case ('composer') {
+            @case (modeEnum.Composer) {
               @switch (view()) {
-                @case ('bank') {
+                @case (viewEnum.Bank) {
                   <div class="bank">
                     <div class="field">
                       <span>{{ 'trade.give' | translate }}</span>
                       <div class="picker">
                         @for (resource of order; track resource) {
+                          @let rate = ratesFor(resource);
+                          @let owned = ownedFor(resource);
                           <button
                             type="button"
                             [class.active]="bankGive() === resource"
-                            [disabled]="ownedFor(resource) <= 0"
+                            [class.rate-best]="rate < 4"
+                            [disabled]="owned < rate"
                             (click)="bankGive.set(resource)"
                           >
-                            {{ label(resource) }} ({{ ownedFor(resource) }})
+                            <span class="bank-pick-label">{{ label(resource) }}</span>
+                            <span class="bank-pick-rate">{{ rate }}:1</span>
+                            <span class="bank-pick-owned">· {{ owned }}</span>
                           </button>
                         }
-                      </div>
-                    </div>
-                    <div class="field">
-                      <span>{{ 'trade.amount' | translate }}</span>
-                      <div class="stepper">
-                        <button type="button" (click)="bankAmount.set(max(2, bankAmount() - 1))">
-                          −
-                        </button>
-                        <span class="count">{{ bankAmount() }}</span>
-                        <button
-                          type="button"
-                          [disabled]="bankAmount() >= ownedFor(bankGive())"
-                          (click)="bankAmount.set(bankAmount() + 1)"
-                        >
-                          +
-                        </button>
                       </div>
                     </div>
                     <div class="field">
@@ -473,6 +476,7 @@ type TradeMode = 'sender' | 'recipient' | 'composer' | 'counter';
                           <button
                             type="button"
                             [class.active]="bankReceive() === resource"
+                            [disabled]="resource === bankGive()"
                             (click)="bankReceive.set(resource)"
                           >
                             {{ label(resource) }}
@@ -480,6 +484,17 @@ type TradeMode = 'sender' | 'recipient' | 'composer' | 'counter';
                         }
                       </div>
                     </div>
+                    <p class="bank-summary">
+                      {{
+                        'trade.bankSummary'
+                          | translate
+                            : {
+                                amount: bankRate(),
+                                give: label(bankGive()),
+                                receive: label(bankReceive())
+                              }
+                      }}
+                    </p>
                     <button
                       type="button"
                       class="confirm"
@@ -487,7 +502,7 @@ type TradeMode = 'sender' | 'recipient' | 'composer' | 'counter';
                       (click)="
                         bankTrade.emit({
                           give: bankGive(),
-                          amount: bankAmount(),
+                          amount: bankRate(),
                           receive: bankReceive(),
                         })
                       "
@@ -496,18 +511,30 @@ type TradeMode = 'sender' | 'recipient' | 'composer' | 'counter';
                     </button>
                   </div>
                 }
-                @case ('player') {
+                @case (viewEnum.Player) {
                   <div class="player">
                     <div class="field">
                       <span>{{ 'trade.recipients' | translate }}</span>
-                      <label class="toggle">
-                        <input
-                          type="checkbox"
-                          [checked]="broadcastMode()"
-                          (change)="onBroadcastToggle($event)"
-                        />
-                        <span>{{ 'trade.broadcastToggle' | translate }}</span>
-                      </label>
+                      <div class="segmented" role="radiogroup">
+                        <button
+                          type="button"
+                          role="radio"
+                          [attr.aria-checked]="broadcastMode()"
+                          [class.active]="broadcastMode()"
+                          (click)="setBroadcastMode(true)"
+                        >
+                          {{ 'trade.targetBroadcast' | translate }}
+                        </button>
+                        <button
+                          type="button"
+                          role="radio"
+                          [attr.aria-checked]="!broadcastMode()"
+                          [class.active]="!broadcastMode()"
+                          (click)="setBroadcastMode(false)"
+                        >
+                          {{ 'trade.targetSingle' | translate }}
+                        </button>
+                      </div>
                       @if (!broadcastMode()) {
                         <div class="picker">
                           @for (partner of partners(); track partner.seat) {
@@ -542,7 +569,7 @@ type TradeMode = 'sender' | 'recipient' | 'composer' | 'counter';
                               <button
                                 type="button"
                                 [disabled]="offerCount <= 0"
-                                (click)="adjust('offer', resource, -1)"
+                                (click)="adjust(sideOffer, resource, -1)"
                               >
                                 −
                               </button>
@@ -550,7 +577,7 @@ type TradeMode = 'sender' | 'recipient' | 'composer' | 'counter';
                               <button
                                 type="button"
                                 [disabled]="offerCount >= owned"
-                                (click)="adjust('offer', resource, 1)"
+                                (click)="adjust(sideOffer, resource, 1)"
                               >
                                 +
                               </button>
@@ -568,14 +595,14 @@ type TradeMode = 'sender' | 'recipient' | 'composer' | 'counter';
                               <button
                                 type="button"
                                 [disabled]="requestCount <= 0"
-                                (click)="adjust('request', resource, -1)"
+                                (click)="adjust(sideRequest, resource, -1)"
                               >
                                 −
                               </button>
                               <span class="count">{{ requestCount }}</span>
                               <button
                                 type="button"
-                                (click)="adjust('request', resource, 1)"
+                                (click)="adjust(sideRequest, resource, 1)"
                               >
                                 +
                               </button>
@@ -791,29 +818,59 @@ type TradeMode = 'sender' | 'recipient' | 'composer' | 'counter';
         color: rgba(247, 241, 225, 0.55);
         margin-bottom: 0.3rem;
       }
-      .toggle {
+      .segmented {
         display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
-        margin-bottom: 0.45rem;
-        font-size: 0.78rem;
-        cursor: pointer;
-        user-select: none;
+        margin-bottom: 0.5rem;
+        padding: 0.18rem;
+        gap: 0.18rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.1);
       }
-      .toggle input {
-        accent-color: #d59a3a;
-        width: 0.95rem;
-        height: 0.95rem;
+      .segmented button {
+        border: 0;
+        background: transparent;
+        color: rgba(247, 241, 225, 0.7);
+        padding: 0.3rem 0.8rem;
+        border-radius: 999px;
+        font-size: 0.78rem;
+      }
+      .segmented button.active {
+        background: linear-gradient(180deg, #4f8be0, #3563b4);
+        color: #fff;
+        box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
       }
       .picker {
         display: flex;
         flex-wrap: wrap;
         gap: 0.35rem;
       }
+      .bank-pick-label {
+        margin-right: 0.3rem;
+      }
+      .bank-pick-rate {
+        font-size: 0.72rem;
+        opacity: 0.9;
+      }
+      .bank-pick-owned {
+        font-size: 0.72rem;
+        opacity: 0.6;
+        margin-left: 0.3rem;
+      }
+      .rate-best:not(.active) {
+        border-color: rgba(213, 154, 58, 0.55);
+        background: rgba(213, 154, 58, 0.1);
+      }
+      .bank-summary {
+        margin: 0.2rem 0 0.6rem;
+        font-size: 0.92rem;
+        text-align: center;
+        color: rgba(247, 241, 225, 0.9);
+      }
       .trade-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0.8rem;
+        grid-template-columns: auto 1fr;
+        gap: 0.4rem 1.4rem;
         margin: 0.4rem 0 0.6rem;
       }
       .col p {
@@ -823,17 +880,19 @@ type TradeMode = 'sender' | 'recipient' | 'composer' | 'counter';
       }
       .grid-row {
         display: grid;
-        grid-template-columns: auto auto 1fr;
+        grid-template-columns: 1fr auto;
         align-items: center;
-        gap: 0.35rem;
+        gap: 0.6rem;
         margin-bottom: 0.32rem;
       }
       .grid-row .label {
         font-size: 0.78rem;
+        white-space: nowrap;
       }
       .grid-row .owned {
         font-size: 0.7rem;
         color: rgba(247, 241, 225, 0.45);
+        margin-left: 0.15rem;
       }
       .grid-row .stepper {
         justify-self: end;
@@ -943,6 +1002,7 @@ export class TradePanelComponent {
   readonly open = input<boolean>(false);
   readonly selfSeat = input<PlayerSeat | null>(null);
   readonly selfResources = input<Readonly<Record<ResourceType, number>>>(this.zeroCounts());
+  readonly selfHarborRates = input<PlayerHarborRatesDto>(DEFAULT_HARBOR_RATES);
   readonly partnerList = input<readonly TradePartner[]>([]);
   readonly pendingTrade = input<TradeOfferDto | null>(null);
 
@@ -956,6 +1016,10 @@ export class TradePanelComponent {
 
   protected readonly order = RESOURCE_TYPE_ORDER;
   protected readonly recipientStatusEnum = TradeRecipientStatus;
+  protected readonly modeEnum = TradePanelMode;
+  protected readonly viewEnum = TradeComposerView;
+  protected readonly sideOffer = TradeResourceSide.Offer;
+  protected readonly sideRequest = TradeResourceSide.Request;
   protected readonly partners = computed<readonly TradePartner[]>(() => this.partnerList());
 
   /** Composer↔counter toggle (only set true while a trade is open and self is a recipient). */
@@ -964,28 +1028,30 @@ export class TradePanelComponent {
     computation: () => false,
   });
 
-  protected readonly mode = computed<TradeMode>(() => {
+  protected readonly mode = computed<TradePanelMode>(() => {
     const trade = this.pendingTrade();
     const seat = this.selfSeat();
     if (trade !== null && seat !== null) {
       if (trade.fromSeat === seat) {
-        return 'sender';
+        return TradePanelMode.Sender;
       }
       if (this.isRecipient(trade, seat)) {
-        return this.counterRequested() ? 'counter' : 'recipient';
+        return this.counterRequested() ? TradePanelMode.Counter : TradePanelMode.Recipient;
       }
     }
-    return 'composer';
+    return TradePanelMode.Composer;
   });
 
-  protected readonly view = linkedSignal<TradeMode, TradeView>({
-    source: () => this.mode(),
-    computation: () => 'bank',
-  });
+  /** User-chosen composer tab; never auto-resets so a withdraw drops back into the same tab. */
+  protected readonly view = signal<TradeComposerView>(TradeComposerView.Bank);
 
   protected readonly bankGive = signal<ResourceType>(ResourceType.Wood);
   protected readonly bankReceive = signal<ResourceType>(ResourceType.Brick);
-  protected readonly bankAmount = signal<number>(4);
+
+  /** Fix harbor/bank rate for the currently selected give resource (4:1, 3:1, or 2:1). */
+  protected readonly bankRate = computed<number>(
+    () => this.selfHarborRates().perResource[this.bankGive()] ?? 4,
+  );
 
   protected readonly broadcastMode = signal<boolean>(true);
 
@@ -997,7 +1063,7 @@ export class TradePanelComponent {
   protected readonly offer = linkedSignal<string, Record<ResourceType, number>>({
     source: () => `${this.mode()}|${this.pendingTrade()?.id ?? ''}`,
     computation: () => {
-      if (this.mode() === 'counter') {
+      if (this.mode() === TradePanelMode.Counter) {
         const trade = this.pendingTrade();
         if (trade !== null) {
           // Recipient perspective: prefill "Du gibst" with what the sender
@@ -1012,7 +1078,7 @@ export class TradePanelComponent {
   protected readonly request = linkedSignal<string, Record<ResourceType, number>>({
     source: () => `${this.mode()}|${this.pendingTrade()?.id ?? ''}`,
     computation: () => {
-      if (this.mode() === 'counter') {
+      if (this.mode() === TradePanelMode.Counter) {
         const trade = this.pendingTrade();
         if (trade !== null) {
           // Recipient perspective: prefill "Du erhältst" with what the sender
@@ -1043,24 +1109,22 @@ export class TradePanelComponent {
     return this.hasAnyMovementInComposer();
   });
 
-  protected readonly canSubmitCounter = computed<boolean>(() => {
-    return this.hasAnyMovementInComposer();
-  });
+  protected readonly canSubmitCounter = computed<boolean>(() => this.hasAnyMovementInComposer());
 
   protected readonly canSubmitBank = computed<boolean>(() => {
     if (this.bankGive() === this.bankReceive()) {
       return false;
     }
-    return this.ownedFor(this.bankGive()) >= this.bankAmount();
+    return this.ownedFor(this.bankGive()) >= this.bankRate();
   });
 
   protected headerLabel(): string {
     switch (this.mode()) {
-      case 'sender':
+      case TradePanelMode.Sender:
         return this.instant(marker('trade.senderHeader'));
-      case 'recipient':
+      case TradePanelMode.Recipient:
         return this.instant(marker('trade.incomingHeader'));
-      case 'counter':
+      case TradePanelMode.Counter:
         return this.instant(marker('trade.counterHeader'));
       default:
         return this.instant(marker('trade.title'));
@@ -1101,6 +1165,10 @@ export class TradePanelComponent {
     return this.selfResources()[resource] ?? 0;
   }
 
+  protected ratesFor(resource: ResourceType): number {
+    return this.selfHarborRates().perResource[resource] ?? 4;
+  }
+
   protected readMap(
     map: Readonly<Partial<Record<ResourceType, number>>>,
     resource: ResourceType,
@@ -1116,10 +1184,6 @@ export class TradePanelComponent {
       }
     }
     return true;
-  }
-
-  protected max(a: number, b: number): number {
-    return Math.max(a, b);
   }
 
   protected recipientSlot(trade: TradeOfferDto): TradeRecipientResponse | null {
@@ -1156,16 +1220,15 @@ export class TradePanelComponent {
     return false;
   }
 
-  protected onBroadcastToggle(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    this.broadcastMode.set(input.checked);
+  protected setBroadcastMode(value: boolean): void {
+    this.broadcastMode.set(value);
   }
 
-  protected adjust(side: 'offer' | 'request', resource: ResourceType, delta: number): void {
-    const target = side === 'offer' ? this.offer : this.request;
+  protected adjust(side: TradeResourceSide, resource: ResourceType, delta: number): void {
+    const target = side === TradeResourceSide.Offer ? this.offer : this.request;
     const counts = { ...target() };
     const next = Math.max(0, counts[resource] + delta);
-    if (side === 'offer' && next > this.ownedFor(resource)) {
+    if (side === TradeResourceSide.Offer && next > this.ownedFor(resource)) {
       return;
     }
     counts[resource] = next;

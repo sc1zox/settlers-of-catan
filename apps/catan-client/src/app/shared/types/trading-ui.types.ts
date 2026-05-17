@@ -1,5 +1,22 @@
 import { PlayerSeat, ResourceType } from '@catan/api-interfaces';
 
+export enum TradePanelMode {
+  Sender = 'sender',
+  Recipient = 'recipient',
+  Composer = 'composer',
+  Counter = 'counter',
+}
+
+export enum TradeComposerView {
+  Bank = 'bank',
+  Player = 'player',
+}
+
+export enum TradeResourceSide {
+  Offer = 'offer',
+  Request = 'request',
+}
+
 export interface TradePartner {
   readonly seat: PlayerSeat;
   readonly name: string;

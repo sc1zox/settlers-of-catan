@@ -52,5 +52,6 @@ export class LobbyShellGameUiService {
   public readonly tradePartners = this.tradeUi.tradePartners;
   public readonly pendingTrade = this.tradeUi.pendingTrade;
   public readonly selfTradeResources = this.tradeUi.selfResources;
+  public readonly selfHarborRates = this.tradeUi.selfHarborRates;
   public readonly selfHasOpenTrade = this.tradeUi.selfHasOpenTrade;
 }

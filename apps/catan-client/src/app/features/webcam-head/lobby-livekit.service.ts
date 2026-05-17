@@ -14,8 +14,8 @@ import {
 } from 'livekit-client';
 import type { VideoCaptureOptions } from 'livekit-client';
 import { GameSettingsService } from '../game-settings/game-settings.service';
-import { isLikelyMobileWebcamHost } from '../../shared/helper/webcam/mobile-webcam-host';
-import { webcamQualityPreset } from '../../shared/helper/webcam/webcam-quality-preset';
+import { isLikelyMobileWebcamHost } from './mobile-webcam-host';
+import { webcamQualityPreset } from './webcam-quality-preset';
 
 interface LiveKitParticipantMetadata {
   readonly seat?: PlayerSeat;
@@ -145,8 +145,7 @@ export class LobbyLiveKitService implements OnDestroy {
       if (this.gameSettings.webcamEnabled()) {
         try {
           await this.publishCameraTrack(room, preset.width, preset.height, preset.frameRate);
-        } catch (publishError: unknown) {
-          console.error('LiveKit camera publish failed', publishError);
+        } catch {
           await this.abandonPrimedLocalVideoCapture();
           this.localVideoElement.set(null);
         }

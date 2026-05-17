@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { PlayerSeat } from '@catan/api-interfaces';
@@ -23,12 +23,32 @@ interface PlayerStatsRow {
   imports: [TranslatePipe],
   template: `
     @if (rows().length > 0) {
-      <aside class="player-stats" role="complementary" [attr.aria-label]="ariaLabel()">
-        <header class="player-stats__header">
+      <aside
+        class="player-stats"
+        [class.player-stats--collapsed]="!expanded()"
+        role="complementary"
+        [attr.aria-label]="ariaLabel()"
+      >
+        <button
+          type="button"
+          class="player-stats__header"
+          [attr.aria-expanded]="expanded()"
+          [attr.aria-label]="toggleAriaLabel()"
+          (click)="toggleExpanded()"
+        >
           <span>{{ 'playerStats.title' | translate }}</span>
-        </header>
-        <ul class="player-stats__list">
-          @for (row of rows(); track row.seat) {
+          <svg
+            class="player-stats__chevron"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path fill="currentColor" d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41Z" />
+          </svg>
+        </button>
+        @if (expanded()) {
+          <ul class="player-stats__list">
+            @for (row of rows(); track row.seat) {
             <li
               class="player-stats__row"
               [class.player-stats__row--self]="row.isSelf"
@@ -70,6 +90,7 @@ interface PlayerStatsRow {
             </li>
           }
         </ul>
+        }
       </aside>
     }
   `,
@@ -78,6 +99,8 @@ interface PlayerStatsRow {
 export class PlayerStatsPanel {
   private readonly gameState = inject(GameStateResource);
   private readonly translate = inject(TranslateService);
+
+  public readonly expanded = signal(false);
 
   public readonly rows = computed<readonly PlayerStatsRow[]>(() => {
     const lobby = this.gameState.lobby.value();
@@ -103,7 +126,18 @@ export class PlayerStatsPanel {
     return out;
   });
 
+  public toggleExpanded(): void {
+    this.expanded.update((open) => !open);
+  }
+
   public ariaLabel(): string {
     return this.translate.instant(marker('playerStats.ariaLabel'));
+  }
+
+  public toggleAriaLabel(): string {
+    const key = this.expanded()
+      ? marker('playerStats.ariaCollapse')
+      : marker('playerStats.ariaExpand');
+    return this.translate.instant(key);
   }
 }

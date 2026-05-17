@@ -7,7 +7,7 @@ import {
   Quaternion,
   Vector3,
 } from 'three';
-import { CardHoverInfo } from '../shared/card-hover';
+import { CardHoverInfo } from '../interaction/card-hover';
 import { PresenceMaterialDimmer } from '../players/presence-material-dimmer';
 import { SceneObjectKind, SceneUserDataKey } from '@catan/api-interfaces';
 

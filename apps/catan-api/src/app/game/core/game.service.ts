@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   ActionRejectCode,
-  DescribeErrorMessage,
+  asActionRejectCode,
   DiceRolledPayload,
   GameSocketServerEvent,
   PlayerSeat,
@@ -21,16 +21,6 @@ import { LobbyService } from '../lobby/lobby.service';
 import { LobbyOrchestratorService } from '../lobby-orchestrator/lobby-orchestrator.service';
 import { MatchFlowService } from '../match-flow/match-flow.service';
 import { RobberService } from '../robber/robber.service';
-
-function asRejectCode(message: string): ActionRejectCode {
-  const values = Object.values(ActionRejectCode) as string[];
-  for (let i = 0; i < values.length; i += 1) {
-    if (values[i] === message) {
-      return message as ActionRejectCode;
-    }
-  }
-  return ActionRejectCode.Unknown;
-}
 
 function extractBadRequestMessage(response: string | object): string {
   if (typeof response === 'string') {
@@ -374,17 +364,12 @@ export class GameService {
   }
 
   public describeError(e: unknown): { code: ActionRejectCode; message: string } {
+    let code = ActionRejectCode.Unknown;
     if (e instanceof BadRequestException) {
-      const response = e.getResponse();
-      const message = extractBadRequestMessage(response);
-      return { code: asRejectCode(message), message };
+      code = asActionRejectCode(extractBadRequestMessage(e.getResponse()));
+    } else if (e instanceof Error) {
+      code = asActionRejectCode(e.message);
     }
-    if (e instanceof Error) {
-      return { code: asRejectCode(e.message), message: e.message };
-    }
-    return {
-      code: ActionRejectCode.Unknown,
-      message: DescribeErrorMessage.UnknownError,
-    };
+    return { code, message: code };
   }
 }

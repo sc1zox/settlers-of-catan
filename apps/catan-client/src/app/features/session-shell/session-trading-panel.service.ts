@@ -7,7 +7,7 @@ import type {
   CounterTradeRequest,
   FinalizeTradeRequest,
   ProposeTradeRequest,
-} from '../../shared/types/trading-ui.types';
+} from '../trading/trading-ui.types';
 
 @Injectable()
 export class SessionTradingPanelService {

@@ -12,7 +12,7 @@ import { RobberTilePick } from '../../game-canvas/game-canvas';
 import { RobberVictimCandidate, RobberVictimModel } from '../../game-canvas/robber-victim-popover';
 import { LobbyShellGameUiService } from '../lobby-game-ui/lobby-shell-game-ui.service';
 import { ShellFeedbackService } from '../shell-feedback/shell-feedback.service';
-import { UiFeedbackTone } from '../../shared/types/lobby-ui-state';
+import { UiFeedbackTone } from '../lobby-game-ui/lobby-ui-state';
 
 @Injectable()
 export class SessionRobberFlowService {

@@ -27,15 +27,17 @@ const REJECT_KEY: Record<ActionRejectCode, string> = {
   [ActionRejectCode.Unknown]: 'reject.unknown',
 };
 
+export function actionRejectMessageFromCode(
+  translate: TranslateService,
+  code: ActionRejectCode,
+): string {
+  const key = REJECT_KEY[code] ?? REJECT_KEY[ActionRejectCode.Unknown];
+  return translate.instant(marker(key));
+}
+
 export function actionRejectMessage(
   translate: TranslateService,
   payload: ActionRejectedPayload,
 ): string {
-  const key = REJECT_KEY[payload.code];
-  const base = translate.instant(marker(key));
-  const raw = payload.message.trim();
-  if (raw.length === 0 || raw === payload.code) {
-    return base;
-  }
-  return `${base} — ${raw}`;
+  return actionRejectMessageFromCode(translate, payload.code);
 }

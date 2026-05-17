@@ -8,10 +8,15 @@ import { GameSocketService } from '../../core/socket/game-socket.service';
 import { PlayerSessionService } from '../../core/session/player-session.service';
 import { GameSettingsService } from '../game-settings/game-settings.service';
 import { LobbyLiveKitService } from '../webcam-head/lobby-livekit.service';
-import { LobbyUiStep, SessionUiState, UiFeedbackTone } from '../../shared/types/lobby-ui-state';
+import { LobbyUiStep, SessionUiState, UiFeedbackTone } from '../lobby-game-ui/lobby-ui-state';
 import { LobbyShellGameUiService } from '../lobby-game-ui/lobby-shell-game-ui.service';
 import { ShellFeedbackService } from '../shell-feedback/shell-feedback.service';
 import { SpectatorCameraService } from '../spectator-camera/spectator-camera.service';
+import {
+  resolveUserFacingErrorMessage,
+  userFacingErrorMessageFromCode,
+} from '../shell-feedback/user-facing-error';
+
 @Injectable()
 export class SessionLobbyFlowService {
   private readonly gameState = inject(GameStateResource);
@@ -179,25 +184,12 @@ export class SessionLobbyFlowService {
   }
 
   private connectLiveKitInBackground(credentials: LiveKitCredentialsPayload): void {
-    void this.liveKit.connect(credentials).catch((error: unknown) => {
-      console.error('LiveKit connect failed', credentials.serverUrl, error);
-      const detail =
-        error instanceof Error
-          ? SessionLobbyFlowService.truncateLiveKitDetail(error.message)
-          : SessionLobbyFlowService.truncateLiveKitDetail(String(error));
+    void this.liveKit.connect(credentials).catch(() => {
       this.shellFeedback.setFeedback(
         UiFeedbackTone.Info,
-        this.translate.instant(marker('shell.liveKitConnectFailed'), { detail }),
+        this.translate.instant(marker('shell.liveKitConnectFailed')),
       );
     });
-  }
-
-  private static truncateLiveKitDetail(raw: string): string {
-    const oneLine = raw.replace(/\s+/gu, ' ').trim();
-    if (oneLine.length <= 160) {
-      return oneLine;
-    }
-    return `${oneLine.slice(0, 157)}...`;
   }
 
   private async runStartSession(normalizedDisplayName: string): Promise<void> {
@@ -208,10 +200,12 @@ export class SessionLobbyFlowService {
       sid = this.playerSession.sessionId();
     }
     if (sid.length === 0) {
-      this.shellFeedback.setFeedback(
-        UiFeedbackTone.Error,
-        this.translate.instant(marker('shell.sessionStartFailed')),
-      );
+      const failureCode = this.playerSession.failureCode();
+      const message =
+        failureCode !== null
+          ? userFacingErrorMessageFromCode(this.translate, failureCode)
+          : this.translate.instant(marker('shell.sessionStartFailed'));
+      this.shellFeedback.setFeedback(UiFeedbackTone.Error, message);
       return;
     }
     this.sessionState.set({ displayName: normalizedDisplayName, sessionId: sid });
@@ -270,16 +264,14 @@ export class SessionLobbyFlowService {
       if (joined.liveKit !== undefined) {
         this.connectLiveKitInBackground(joined.liveKit);
       }
-    } catch {
+    } catch (error: unknown) {
       void this.liveKit.abandonPrimedLocalVideoCapture();
       void this.liveKit.disconnect();
       this.gameState.disconnectLobby();
       this.joinInProgress.set(false);
       this.shellFeedback.setFeedback(
         UiFeedbackTone.Error,
-        this.translate.instant(marker('shell.joinFailed'), {
-          lobbyCode: lobbyCodeInput,
-        }),
+        this.resolveLobbyFlowFailureMessage(error, marker('shell.joinFailed'), lobbyCodeInput),
       );
     }
   }
@@ -326,17 +318,23 @@ export class SessionLobbyFlowService {
       if (joined.liveKit !== undefined) {
         this.connectLiveKitInBackground(joined.liveKit);
       }
-    } catch {
+    } catch (error: unknown) {
       void this.liveKit.abandonPrimedLocalVideoCapture();
       void this.liveKit.disconnect();
       this.gameState.disconnectLobby();
       this.joinInProgress.set(false);
       this.shellFeedback.setFeedback(
         UiFeedbackTone.Error,
-        this.translate.instant(marker('shell.createFailed'), {
-          lobbyCode: lobbyCodeInput,
-        }),
+        this.resolveLobbyFlowFailureMessage(error, marker('shell.createFailed'), lobbyCodeInput),
       );
     }
+  }
+
+  private resolveLobbyFlowFailureMessage(
+    error: unknown,
+    fallbackKey: string,
+    lobbyCode: string,
+  ): string {
+    return resolveUserFacingErrorMessage(this.translate, error, fallbackKey, { lobbyCode });
   }
 }

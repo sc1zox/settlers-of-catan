@@ -7,13 +7,13 @@ import {
   WebcamMediaScopeKey,
   WebcamQuality,
 } from '@catan/api-interfaces';
-import { parseSceneBrightness } from '../../shared/helper/game-settings/scene-brightness.util';
-import { parseWebcamQuality } from '../../shared/helper/webcam/webcam-quality-preset';
+import { parseSceneBrightness } from './scene-brightness.util';
+import { parseWebcamQuality } from '../webcam-head/webcam-quality-preset';
 import { PerformanceSnapshot } from '../../../game/engine';
 import {
   PerformanceBenchmarkSummary,
   computePerformanceBenchmarkSummary,
-} from '../../shared/helper/game-settings/performance-benchmark';
+} from './performance-benchmark';
 import { parseShadowQuality } from '../../../game/scene/shadow-quality-preset';
 import { ShadowQuality } from '../../../game/scene/shadow-quality.enum';
 

@@ -2,13 +2,13 @@ import { computed, DestroyRef, effect, inject, Injectable, signal } from '@angul
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslateService } from '@ngx-translate/core';
 import { TranslateInstantFn } from '../../../shared/i18n/translate-instant-fn';
-import { buildTurnAnnouncerText } from '../../shared/helper/lobby-game-ui/turn-announcer-text';
+import { buildTurnAnnouncerText } from './turn-announcer-text';
 import {
   computeHudChromeSpectatorPaused,
   computeHudGameplayLocked,
   computeHudRobberDiscardSelf,
   computeHudShowPassiveWait,
-} from '../../shared/helper/lobby-game-ui/in-game-hud-state';
+} from './in-game-hud-state';
 import { LobbyGameUiStateService } from './lobby-game-ui-state.service';
 
 @Injectable({ providedIn: 'root' })

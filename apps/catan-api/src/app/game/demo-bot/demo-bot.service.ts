@@ -194,9 +194,8 @@ export class DemoBotService {
     return true;
   }
 
-  private logAutoplayFailure(lobbyId: string, error: unknown): void {
-    const detail = error instanceof Error ? error.message : String(error);
-    this.logger.warn(`demo autoplay stopped for ${lobbyId}: ${detail}`);
+  private logAutoplayFailure(_lobbyId: string, _error: unknown): void {
+    this.logger.debug('Demo autoplay step skipped');
   }
 
   private tryOneDemoMainGameAction(

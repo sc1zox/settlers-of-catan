@@ -1,5 +1,5 @@
 import { inject, Injectable, Signal } from '@angular/core';
-import { LobbyUiStep } from '../../shared/types/lobby-ui-state';
+import { LobbyUiStep } from './lobby-ui-state';
 import { LobbyActionCapabilitiesUiService } from './lobby-action-capabilities-ui.service';
 import { LobbyDiscardUiService } from './lobby-discard-ui.service';
 import { LobbyGameUiStateService } from './lobby-game-ui-state.service';

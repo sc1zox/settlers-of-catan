@@ -8,7 +8,7 @@ import {
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslateService } from '@ngx-translate/core';
 import { GameStateResource } from '../../core/game/game-state.resource';
-import type { LobbyActivityFeedEntry } from '../../shared/types/lobby-ui-state';
+import type { LobbyActivityFeedEntry } from '../lobby-game-ui/lobby-ui-state';
 
 interface LobbyHumanSnapshot {
   readonly lobbyId: string;

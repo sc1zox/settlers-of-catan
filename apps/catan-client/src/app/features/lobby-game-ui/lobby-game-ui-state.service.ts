@@ -5,13 +5,13 @@ import { TranslateService } from '@ngx-translate/core';
 import { TranslateInstantFn } from '../../../shared/i18n/translate-instant-fn';
 import { EnumTranslate } from '../../../game/i18n/enum-translate.helper';
 import { GameStateResource } from '../../core/game/game-state.resource';
-import { LobbyUiState, LobbyUiStep } from '../../shared/types/lobby-ui-state';
+import { LobbyUiState, LobbyUiStep } from './lobby-ui-state';
 import {
   displayNameForSeat,
   mapLobbyFullStateToUiState,
   phaseLabel,
   seatLabel,
-} from '../../shared/helper/lobby-game-ui/lobby-ui.mapper';
+} from './lobby-ui.mapper';
 
 @Injectable({ providedIn: 'root' })
 export class LobbyGameUiStateService {

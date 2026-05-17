@@ -3,8 +3,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActionRejectedPayload } from '@catan/api-interfaces';
 import { TranslateService } from '@ngx-translate/core';
 import { GameSocketService } from '../../core/socket/game-socket.service';
-import { UiFeedbackState, UiFeedbackTone } from '../../shared/types/lobby-ui-state';
-import { actionRejectMessage } from '../../shared/helper/shell-feedback/action-reject';
+import { UiFeedbackState, UiFeedbackTone } from '../lobby-game-ui/lobby-ui-state';
+import { actionRejectMessage } from './action-reject';
 
 @Injectable({ providedIn: 'root' })
 export class ShellFeedbackService {

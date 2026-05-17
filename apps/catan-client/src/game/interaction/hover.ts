@@ -12,7 +12,7 @@ import { Card } from '../cards/card';
 import { devKindLabel, resourceKindLabel } from '../cards/textures';
 import { gt } from '../i18n-bridge';
 import { Die } from '../dice/die';
-import { CardHoverGroup } from '../shared/card-hover';
+import { CardHoverGroup } from './card-hover';
 import { Harbor } from '../world/harbors';
 import { Tile } from '../tiles/tile';
 

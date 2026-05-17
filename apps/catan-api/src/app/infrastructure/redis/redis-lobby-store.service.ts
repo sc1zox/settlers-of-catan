@@ -30,7 +30,7 @@ export class RedisLobbyStoreService implements OnModuleDestroy {
     const url = process.env[ProcessEnvKey.RedisUrl] ?? 'redis://127.0.0.1:6379';
     this.client = new Redis(url, { maxRetriesPerRequest: 2, lazyConnect: true });
     this.client.connect().catch((error: unknown) => {
-      this.logger.warn(`Redis connect failed: ${String(error)}`);
+      this.logger.debug('Redis connect failed');
     });
   }
 

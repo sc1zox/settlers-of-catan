@@ -20,7 +20,7 @@ import { GameStateResource } from '../core/game/game-state.resource';
 import { GameSettingsService } from '../features/game-settings/game-settings.service';
 import { HeadVideoSyncService } from '../features/webcam-head/head-video-sync.service';
 import { SpectatorCameraService } from '../features/spectator-camera/spectator-camera.service';
-import { mapLobbyFullStateToSceneState } from '../shared/helper/game-scene/map-lobby-full-state-to-scene';
+import { mapLobbyFullStateToSceneState } from '../../shared/game-scene/map-lobby-full-state-to-scene';
 import { HoverState } from '../../game/interaction/hover';
 import { BuildConfirmModel } from './build-confirm-popover';
 import { CardTooltipComponent, CardTooltipModel } from './card-tooltip';
@@ -111,6 +111,8 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
     }
     const scene = mapLobbyFullStateToSceneState(state);
     this.engine.applySceneState(scene);
+    const lastRoll = state.lastDiceRoll;
+    this.engine.setRolledNumberChipHighlight(lastRoll !== null ? lastRoll.sum : null);
     this.headVideoSync.syncToEngine(this.engine, scene);
   });
 

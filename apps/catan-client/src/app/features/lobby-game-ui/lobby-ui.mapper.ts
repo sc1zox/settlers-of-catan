@@ -1,7 +1,7 @@
 import { GamePhase, LobbyFullStatePayload, PlayerSeat } from '@catan/api-interfaces';
-import { TranslateInstantFn } from '../../../../shared/i18n/translate-instant-fn';
-import { EnumTranslate } from '../../../../game/i18n/enum-translate.helper';
-import { LobbySeatUiState, LobbyUiState } from '../../types/lobby-ui-state';
+import { TranslateInstantFn } from '../../../shared/i18n/translate-instant-fn';
+import { EnumTranslate } from '../../../game/i18n/enum-translate.helper';
+import { LobbySeatUiState, LobbyUiState } from './lobby-ui-state';
 
 export function seatLabel(seat: PlayerSeat, instant: TranslateInstantFn): string {
   return EnumTranslate.translateSeat(instant, seat);

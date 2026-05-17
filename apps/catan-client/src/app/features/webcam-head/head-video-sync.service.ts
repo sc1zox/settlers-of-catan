@@ -3,7 +3,7 @@ import { WEBCAM_MEDIA_SCOPE, WebcamMediaScopeKey } from '@catan/api-interfaces';
 import { GameEngine } from '../../../game/engine';
 import { GameSettingsService } from '../game-settings/game-settings.service';
 import { LobbyLiveKitService } from './lobby-livekit.service';
-import type { LobbySceneState } from '../../shared/helper/game-scene/lobby-scene-state';
+import type { LobbySceneState } from '../../../shared/game-scene/lobby-scene-state';
 
 @Injectable({ providedIn: 'root' })
 export class HeadVideoSyncService {

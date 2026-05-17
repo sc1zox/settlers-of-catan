@@ -3,6 +3,8 @@ export * from './lib/avatar-kind.enum';
 export * from './lib/bonus-award.enum';
 export * from './lib/api-envelope.dto';
 export * from './lib/action-reject-code.enum';
+export * from './lib/action-reject-resolve.util';
+export * from './lib/api-error-code.util';
 export * from './lib/board-reexports';
 export * from './lib/build-kind.enum';
 export * from './lib/scene-object.enum';

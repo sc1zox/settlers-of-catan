@@ -28,6 +28,14 @@ export class Board {
     if (tile) tile.settled = true;
   }
 
+  public setRolledNumberHighlight(diceSum: number | null): void {
+    for (let i = 0; i < this.tiles.length; i += 1) {
+      const tile = this.tiles[i];
+      const match = diceSum !== null && tile.number === diceSum;
+      tile.setRolledChipHighlighted(match);
+    }
+  }
+
   update(dt: number, t: number): void {
     for (const tile of this.tiles) tile.update(dt, t);
   }

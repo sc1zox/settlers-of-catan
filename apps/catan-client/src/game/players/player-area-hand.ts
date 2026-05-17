@@ -8,7 +8,7 @@ import {
   makeResourceFaceTexture,
 } from '../cards/textures';
 import { Card } from '../cards/card';
-import { CardHoverGroup } from '../shared/card-hover';
+import { CardHoverGroup } from '../interaction/card-hover';
 import {
   CARD_LONG,
   CARD_SHORT,

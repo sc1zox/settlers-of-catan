@@ -89,13 +89,48 @@ Angular 21 standalone components, **zoneless change detection** (`provideZoneles
 
 **Component file layout (Angular 21 style).** New UI under `app/features/<feature>/` or `app/game-canvas/` uses **no** `.component` in filenames: `disconnect-banner.ts` + `disconnect-banner.scss`, not `disconnect-banner.component.ts`. The `@Component` class may omit the `Component` suffix when the name is already clear (`DisconnectBanner`, `SummaryScreen`, `GameSettingsToggle`); longer shells may keep it (`SessionShellComponent`, `GameCanvasComponent`). Co-locate styles as `<name>.scss` with `styleUrl: './<name>.scss'`. Selectors stay `app-<kebab-name>`. When touching legacy `*.component.ts` files, rename to this scheme in the same change.
 
+### Source layout (`apps/catan-client/src/`)
+
+There is **one** client `shared/` folder. Do not add `app/shared/` or `game/shared/` — those were removed.
+
+```
+src/
+  shared/                 # cross-cutting code used by app/ and/or game/
+    i18n/                 # ngx-translate helpers, resource-labels (DOM UI)
+    http/                 # rxResourceStream, observeAbort, session HTTP context
+    game-scene/           # LobbySceneState + mapLobbyFullStateToSceneState (app↔engine bridge)
+  app/
+    core/                 # bootstrap, session, http interceptors, socket, game-state resource
+    features/<feature>/   # UI feature folders — colocate feature types + pure helpers here
+    game-canvas/          # interactive + passive canvas overlays
+  game/                   # Three.js engine only (no Angular imports)
+```
+
+**Where new code goes**
+
+| Kind | Location | Example |
+|------|----------|---------|
+| Wire-format enum/DTO | `@catan/api-interfaces` | `ActionRejectCode`, `LobbyFullStatePayload` |
+| Board/tile pure logic | `@catan/shared-game-field` | `collectRobberVictimSeats`, `hexRing` |
+| DOM UI i18n | `src/shared/i18n/` | `resource-labels.ts`, `TranslateInstantFn` |
+| HTTP/rxResource utilities | `src/shared/http/` | `rxResourceStream` |
+| API state → scene snapshot | `src/shared/game-scene/` | `lobby-scene-state.ts` |
+| Client-only view model | `app/features/<feature>/` | `lobby-ui-state.ts`, `trading-ui.types.ts` |
+| Connection param next to resource | `app/core/game/` | `lobby-connection-params.ts` |
+| 3D card texture labels | `game/cards/textures-enums-labels.ts` | `resourceKindLabel` (canvas/`gt()`, not ngx-translate) |
+| Feature service / component | `app/features/<feature>/` | `lobby-game-ui-state.service.ts` |
+
+**i18n split.** DOM overlays (`discard-modal`, `trade-panel`, shell) use `shared/i18n/resource-labels.ts` → `EnumTranslate` + ngx-translate. The 3D hand uses `game/cards/textures-enums-labels.ts` (`ResourceKind` + `gt()` marker keys under `cardTex.*`) because the engine renders outside Angular templates.
+
+**`rxResource` + abort.** Long-lived socket subjects wired through `rxResource` must use `rxResourceStream()` from `shared/http/rx-resource-stream.ts` so an abort before the first emission does not trigger NG0991. Inactive resources return `of(undefined)` when params are undefined.
+
 ### HTTP & socket plumbing
 
 `app.config.ts` registers `provideAppInitializer(() => inject(AppInitService).initialize())` so `AppInitService` (`app/core/bootstrap/`) runs before the root view renders (currently: cold-start `PlayerSessionService.ensureReady()`). It registers three interceptors in order (under `app/core/http/`): `sessionBearerInterceptor` (attaches `Authorization: Bearer <accessToken>`), `apiEnvelopeInterceptor` (unwraps `{data,requestId}`), `sessionHttpErrorInterceptor` (catches 401 and refreshes). `PlayerSessionService` (`app/core/session/`) owns access/refresh tokens, persisted under `ClientStorageKey.AccessToken` / `RefreshToken` in localStorage.
 
 `GameSocketService` (`app/core/socket/game-socket.service.ts`) is the only socket.io-client and exposes RxJS subjects (`fullState$`, `tradeUpdated$`, etc.). `GameStateResource` (`app/core/game/game-state.resource.ts`) wraps these in `rxResource<LobbyFullStatePayload | undefined, ...>` so components consume the lobby as a signal-shaped resource. When the lobby changes shape, every `computed(...)` that reads `GameStateResource` re-derives — do not mutate payloads in place.
 
-`SessionShellComponent` (`app/features/session-shell/session-shell.ts`) is the entry UI: sign-in → join lobby → in-game. It owns reactive forms and delegates lobby navigation, build mode, robber flow, trading, and dev-card overlays to **`SessionLobbyFlowService`**, **`SessionBuildInteractionService`**, **`SessionRobberFlowService`**, **`SessionTradingPanelService`**, and **`SessionDevCardOverlayService`** (all provided on `SessionShell`). **`LobbyShellGameUiService`** (`app/features/lobby-game-ui/`, root-provided) holds derived lobby/game UI: mapped `LobbyUiState`, `can…` capability flags, discard/trade models, announcer text, and HUD lock/passive-wait flags. Pure helpers sit alongside (`lobby-ui.mapper.ts`, `turn-announcer-text.ts`, `in-game-hud-state.ts`, `resource-card-totals.ts`). Phase sync between `LobbyWaiting` and in-game is handled by an `effect` in `SessionLobbyFlowService` (which calls `attachUiStep` on the game UI service). Robber victim candidates are built in `robber-victim-candidates.ts`. When adding a new player action, add a `can…` on the game UI service (if it is pure state) and a thin handler on the shell that calls `GameStateResource`. Interactive DOM overlays — `BuildConfirmPopoverComponent`, `DiscardModalComponent`, `DevCardModalComponent`, `TradePanelComponent`, `RobberVictimPopoverComponent` (all under `app/game-canvas/`). `app.ts` is intentionally tiny (`<app-session-shell />`).
+`SessionShellComponent` (`app/features/session-shell/session-shell.ts`) is the entry UI: sign-in → join lobby → in-game. It owns reactive forms and delegates lobby navigation, build mode, robber flow, trading, and dev-card overlays to **`SessionLobbyFlowService`**, **`SessionBuildInteractionService`**, **`SessionRobberFlowService`**, **`SessionTradingPanelService`**, and **`SessionDevCardOverlayService`** (all provided on `SessionShell`). **`LobbyShellGameUiService`** (`app/features/lobby-game-ui/`, root-provided) holds derived lobby/game UI: mapped `LobbyUiState`, `can…` capability flags, discard/trade models, announcer text, and HUD lock/passive-wait flags. Pure helpers and UI types live in the same feature folder (`lobby-ui-state.ts`, `lobby-ui.mapper.ts`, `turn-announcer-text.ts`, `in-game-hud-state.ts`, `resource-card-totals.ts`). Shell feedback helpers (`action-reject.ts`, `user-facing-error.ts`) live under `features/shell-feedback/`. Phase sync between `LobbyWaiting` and in-game is handled by an `effect` in `SessionLobbyFlowService` (which calls `attachUiStep` on the game UI service). Robber victim candidates are built inline in `SessionRobberFlowService` via `collectRobberVictimSeats` from `@catan/shared-game-field`. When adding a new player action, add a `can…` on the game UI service (if it is pure state) and a thin handler on the shell that calls `GameStateResource`. Interactive DOM overlays — `BuildConfirmPopoverComponent`, `DiscardModalComponent`, `DevCardModalComponent`, `TradePanelComponent`, `RobberVictimPopoverComponent` (all under `app/game-canvas/`). `app.ts` is intentionally tiny (`<app-session-shell />`).
 
 New per-feature client code goes under `app/features/<feature>/` (e.g. `features/spectator-camera/` — a root `SpectatorCameraService` signal plus a toggle component; `GameCanvasComponent` mirrors its `mode()` into `engine.setSpectatorCameraMode()` via an `effect`).
 
@@ -108,7 +143,7 @@ New per-feature client code goes under `app/features/<feature>/` (e.g. `features
 
 ### `GameEngine` (`apps/catan-client/src/game/engine.ts`)
 
-Owns the scene graph and lifecycle. Composes — does not subclass — these subsystems, each a self-contained `Group`-bearing class with `update(dt, t)` and `dispose()`:
+Owns the scene graph and lifecycle. Imports scene snapshots from `src/shared/game-scene/` (not from `app/`). Card hover metadata lives in `game/interaction/card-hover.ts`. Composes — does not subclass — these subsystems, each a self-contained `Group`-bearing class with `update(dt, t)` and `dispose()`:
 
 - `Table` — tabletop slab the disc sits on
 - `World` — water surface (everything outside the land disc)

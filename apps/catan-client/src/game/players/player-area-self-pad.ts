@@ -136,36 +136,25 @@ export class PlayerAreaSelfPad {
     const g = Math.round(felt.g * 255);
     const b = Math.round(felt.b * 255);
     const size = FELT_TEXTURE_SIZE;
-    const cx = size / 2;
-    const cy = size / 2;
-    const radius = size * 0.48;
 
-    const baseFill = ctx.createRadialGradient(cx, cy, radius * 0.12, cx, cy, radius);
-    baseFill.addColorStop(0, `rgb(${Math.min(255, r + 18)}, ${Math.min(255, g + 18)}, ${Math.min(255, b + 18)})`);
-    baseFill.addColorStop(0.72, `rgb(${r}, ${g}, ${b})`);
-    baseFill.addColorStop(1, `rgb(${Math.max(0, r - 32)}, ${Math.max(0, g - 32)}, ${Math.max(0, b - 32)})`);
-    ctx.fillStyle = baseFill;
+    ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
     ctx.fillRect(0, 0, size, size);
 
     const weave = ctx.createImageData(size, size);
     for (let y = 0; y < size; y += 1) {
       for (let x = 0; x < size; x += 1) {
-        const dx = x - cx;
-        const dy = y - cy;
-        const dist = Math.sqrt(dx * dx + dy * dy) / radius;
-        if (dist > 1.02) {
-          continue;
-        }
         const idx = (y * size + x) * 4;
         const grain =
           ((x * 17 + y * 31) % 97) / 97 * 0.5 +
           ((x * 7 - y * 13) % 53) / 53 * 0.5;
-        const vignette = Math.max(0, (dist - 0.55) / 0.45);
-        const delta = (grain - 0.5) * 14 - vignette * 22;
+        const edgeX = Math.min(x, size - 1 - x) / (size * 0.08);
+        const edgeY = Math.min(y, size - 1 - y) / (size * 0.08);
+        const edgeFade = Math.min(1, Math.min(edgeX, edgeY));
+        const delta = (grain - 0.5) * 14 - (1 - edgeFade) * 10;
         weave.data[idx] = Math.max(0, Math.min(255, r + delta));
         weave.data[idx + 1] = Math.max(0, Math.min(255, g + delta));
         weave.data[idx + 2] = Math.max(0, Math.min(255, b + delta));
-        weave.data[idx + 3] = Math.round((1 - Math.max(0, dist - 1) * 6) * 255);
+        weave.data[idx + 3] = 255;
       }
     }
     ctx.putImageData(weave, 0, 0);

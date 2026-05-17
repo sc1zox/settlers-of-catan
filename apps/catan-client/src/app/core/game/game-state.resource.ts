@@ -1,6 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import {
+  ClientConnectErrorCode,
   PlayerSeat,
   ResourceType,
   normalizeLobbyCode,
@@ -9,12 +10,12 @@ import {
   type LobbyFullStatePayload,
   type LobbyJoinedPayload,
 } from '@catan/api-interfaces';
-import { EMPTY, firstValueFrom, merge } from 'rxjs';
-import { filter, map, take, takeUntil, timeout } from 'rxjs/operators';
+import { firstValueFrom, merge, of, TimeoutError } from 'rxjs';
+import { filter, map, take, timeout } from 'rxjs/operators';
 import { GameSocketService } from '../socket/game-socket.service';
-import { observeAbort } from '../../shared/helper/http/observe-abort';
-import { matchesLobbyConnection } from '../../shared/helper/lobby-game-ui/matches-lobby-connection';
-import type { LobbyConnectionParams } from '../../shared/types/lobby-connection-params';
+import { rxResourceStream } from '../../../shared/http/rx-resource-stream';
+import { matchesLobbyConnection } from '../../features/lobby-game-ui/matches-lobby-connection';
+import type { LobbyConnectionParams } from './lobby-connection-params';
 
 export type { LobbyConnectionParams };
 
@@ -52,17 +53,20 @@ export class GameStateResource {
     params: () => this.subscriptionParams(),
     stream: ({ params, abortSignal }) => {
       if (params === undefined) {
-        return EMPTY;
+        return of(undefined);
       }
-      return this.sockets.fullState$.pipe(
-        filter((state) =>
-          matchesLobbyConnection(state.lobbyId, state.lobbyCode, {
-            lobbyId: '',
-            lobbyCode: params.lobbyCode,
-            displayName: params.displayName,
-          }),
+      return rxResourceStream(
+        this.sockets.fullState$.pipe(
+          filter((state) =>
+            matchesLobbyConnection(state.lobbyId, state.lobbyCode, {
+              lobbyId: '',
+              lobbyCode: params.lobbyCode,
+              displayName: params.displayName,
+            }),
+          ),
         ),
-        takeUntil(observeAbort(abortSignal)),
+        abortSignal,
+        undefined,
       );
     },
     defaultValue: undefined,
@@ -75,18 +79,21 @@ export class GameStateResource {
     params: () => this.subscriptionParams(),
     stream: ({ params, abortSignal }) => {
       if (params === undefined) {
-        return EMPTY;
+        return of(undefined);
       }
       const lobbyCode = params.lobbyCode;
-      return this.sockets.diceRolled$.pipe(
-        filter((payload) => {
-          const canonical = this.canonicalLobbyId();
-          if (canonical.length === 0) {
-            return false;
-          }
-          return payload.lobbyId === canonical && lobbyCode.length > 0;
-        }),
-        takeUntil(observeAbort(abortSignal)),
+      return rxResourceStream(
+        this.sockets.diceRolled$.pipe(
+          filter((payload) => {
+            const canonical = this.canonicalLobbyId();
+            if (canonical.length === 0) {
+              return false;
+            }
+            return payload.lobbyId === canonical && lobbyCode.length > 0;
+          }),
+        ),
+        abortSignal,
+        undefined,
       );
     },
     defaultValue: undefined,
@@ -99,18 +106,21 @@ export class GameStateResource {
     params: () => this.subscriptionParams(),
     stream: ({ params, abortSignal }) => {
       if (params === undefined) {
-        return EMPTY;
+        return of(undefined);
       }
       const lobbyCode = params.lobbyCode;
-      return this.sockets.bonusAwarded$.pipe(
-        filter((payload) => {
-          const canonical = this.canonicalLobbyId();
-          if (canonical.length === 0) {
-            return false;
-          }
-          return payload.lobbyId === canonical && lobbyCode.length > 0;
-        }),
-        takeUntil(observeAbort(abortSignal)),
+      return rxResourceStream(
+        this.sockets.bonusAwarded$.pipe(
+          filter((payload) => {
+            const canonical = this.canonicalLobbyId();
+            if (canonical.length === 0) {
+              return false;
+            }
+            return payload.lobbyId === canonical && lobbyCode.length > 0;
+          }),
+        ),
+        abortSignal,
+        undefined,
       );
     },
     defaultValue: undefined,
@@ -157,9 +167,12 @@ export class GameStateResource {
       }
       this.canonicalLobbyIdSignal.set(outcome.payload.lobbyId);
       return outcome.payload;
-    } catch (error) {
+    } catch (error: unknown) {
       this.subscriptionParamsSignal.set(undefined);
       this.canonicalLobbyIdSignal.set('');
+      if (error instanceof TimeoutError) {
+        throw new Error(ClientConnectErrorCode.SocketConnectTimeout);
+      }
       throw error;
     }
   }

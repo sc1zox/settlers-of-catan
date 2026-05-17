@@ -1,7 +1,7 @@
 import { GamePhase, LobbyFullStatePayload } from '@catan/api-interfaces';
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
-import { TranslateInstantFn } from '../../../../shared/i18n/translate-instant-fn';
-import { LobbyUiState, LobbyUiStep } from '../../types/lobby-ui-state';
+import { TranslateInstantFn } from '../../../shared/i18n/translate-instant-fn';
+import { LobbyUiState, LobbyUiStep } from './lobby-ui-state';
 import { robberDiscardDisplayNames } from './lobby-ui.mapper';
 
 export function buildTurnAnnouncerText(

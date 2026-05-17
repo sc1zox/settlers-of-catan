@@ -83,7 +83,7 @@ export class LobbyOrchestratorService {
     if (lobbyIdleRecycled) {
       this.lobby.evictLobby(priorCanonical);
       void this.liveKit.deleteRoom(priorCanonical).catch((error: unknown) => {
-        this.logger.warn(`LiveKit deleteRoom stale ${priorCanonical}: ${String(error)}`);
+        this.logger.debug('LiveKit deleteRoom stale failed');
       });
     }
     this.lobby.registerCanonicalIdByLobbyCode(normalizedCode, canonicalLobbyId);
@@ -205,7 +205,7 @@ export class LobbyOrchestratorService {
       lobby.adminSessionToken = pickFallbackHumanAdminSessionToken(lobby);
     }
     void this.redisLobby.removeMember(lobby.lobbyId, oldSessionToken).catch((error: unknown) => {
-      this.logger.warn(`Redis removeMember kicked ${oldSessionToken}: ${String(error)}`);
+      this.logger.debug('Redis removeMember failed');
     });
     this.logger.log(
       `admin ${requesterSessionToken} kicked seat ${seat} (${oldSessionToken}) in ${lobby.lobbyCode}, replaced with bot`,
@@ -294,13 +294,13 @@ export class LobbyOrchestratorService {
     try {
       await this.redisLobby.deleteLobby(lobby.lobbyId, lobby.lobbyCode);
     } catch (error: unknown) {
-      this.logger.warn(`Redis deleteLobby ${lobby.lobbyCode}: ${String(error)}`);
+      this.logger.debug('Redis deleteLobby failed');
     }
     this.lobby.removeLobby(lobby.lobbyId, lobby.lobbyCode);
     try {
       await this.liveKit.deleteRoom(lobby.lobbyId);
     } catch (error: unknown) {
-      this.logger.warn(`LiveKit deleteRoom ${lobby.lobbyId}: ${String(error)}`);
+      this.logger.debug('LiveKit deleteRoom failed');
     }
   }
 

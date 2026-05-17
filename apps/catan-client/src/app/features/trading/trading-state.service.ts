@@ -1,11 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { PlayerSeat, ResourceType, type TradeUpdatedPayload } from '@catan/api-interfaces';
-import { EMPTY } from 'rxjs';
-import { filter, takeUntil } from 'rxjs/operators';
+import { of } from 'rxjs';
+import { filter } from 'rxjs/operators';
 import { GameStateResource } from '../../core/game/game-state.resource';
 import { GameSocketService } from '../../core/socket/game-socket.service';
-import { observeAbort } from '../../shared/helper/http/observe-abort';
+import { rxResourceStream } from '../../../shared/http/rx-resource-stream';
 
 @Injectable({ providedIn: 'root' })
 export class TradingStateService {
@@ -16,14 +16,17 @@ export class TradingStateService {
     params: () => this.gameState.subscriptionParams() !== undefined,
     stream: ({ params: active, abortSignal }) => {
       if (!active) {
-        return EMPTY;
+        return of(undefined);
       }
-      return this.sockets.tradeUpdated$.pipe(
-        filter((payload) => {
-          const canonical = this.gameState.canonicalLobbyId();
-          return canonical.length > 0 && payload.lobbyId === canonical;
-        }),
-        takeUntil(observeAbort(abortSignal)),
+      return rxResourceStream(
+        this.sockets.tradeUpdated$.pipe(
+          filter((payload) => {
+            const canonical = this.gameState.canonicalLobbyId();
+            return canonical.length > 0 && payload.lobbyId === canonical;
+          }),
+        ),
+        abortSignal,
+        undefined,
       );
     },
     defaultValue: undefined,

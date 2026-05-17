@@ -1,12 +1,17 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { loadEnvFile } from 'node:process';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { BadRequestException, Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { IoAdapter } from '@nestjs/platform-socket.io';
-import { ApiGlobalPathPrefix, ProcessEnvKey, SwaggerUiPath } from '@catan/api-interfaces';
+import {
+  ApiGlobalPathPrefix,
+  AuthErrorCode,
+  ProcessEnvKey,
+  SwaggerUiPath,
+} from '@catan/api-interfaces';
 import { AppModule } from './app/app.module';
 import { applyHttpCorsFromEnv } from './app/http/cors-env.util';
 import { assertPlayerSessionJwtSecretConfigured } from './app/session/session-jwt-secret.util';
@@ -29,6 +34,7 @@ async function bootstrap(): Promise<void> {
       forbidNonWhitelisted: true,
       transform: true,
       transformOptions: { enableImplicitConversion: true },
+      exceptionFactory: () => new BadRequestException(AuthErrorCode.InvalidRequest),
     }),
   );
   applyHttpCorsFromEnv(app);

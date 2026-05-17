@@ -1,5 +1,5 @@
 import { normalizeLobbyCode } from '@catan/api-interfaces';
-import type { LobbyConnectionParams } from '../../types/lobby-connection-params';
+import type { LobbyConnectionParams } from '../../core/game/lobby-connection-params';
 
 export function matchesLobbyConnection(
   canonicalLobbyId: string,

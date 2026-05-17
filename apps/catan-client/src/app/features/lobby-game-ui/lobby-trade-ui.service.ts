@@ -5,7 +5,7 @@ import {
   TradeOfferDto,
   TradeStatus,
 } from '@catan/api-interfaces';
-import type { TradePartner } from '../../shared/types/trading-ui.types';
+import type { TradePartner } from '../trading/trading-ui.types';
 import { LobbyGameUiStateService } from './lobby-game-ui-state.service';
 
 const ZERO_RESOURCES: Readonly<Record<ResourceType, number>> = {

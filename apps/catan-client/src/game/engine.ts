@@ -24,14 +24,14 @@ import {
 import type {
   LobbyScenePlayerState,
   LobbySceneState,
-} from '../app/shared/helper/game-scene/lobby-scene-state';
+} from '../shared/game-scene/lobby-scene-state';
 import { Board } from './board/board';
 import { BoardBuildings, type SpawnedBuildPiece } from './board/buildings';
 import { RobberFigure } from './board/robber-figure';
 import { BuildPreview } from './board/build-preview';
 import { HEX_SIZE } from './board/hex';
 import { Card } from './cards/card';
-import { CardHoverGroup } from './shared/card-hover';
+import { CardHoverGroup } from './interaction/card-hover';
 import { DevKind, ResourceKind } from './cards/textures';
 import { DiceResultHandler, DiceTray } from './dice/dice-tray';
 import { HoverHandler, HoverSystem } from './interaction/hover';
@@ -284,15 +284,12 @@ export class GameEngine {
     });
   }
 
+  public setRolledNumberChipHighlight(diceSum: number | null): void {
+    this.board.setRolledNumberHighlight(diceSum);
+  }
+
   private highlightRolledNumber(value: number): void {
-    for (let i = 0; i < this.board.tiles.length; i += 1) {
-      const tile = this.board.tiles[i];
-      if (tile.number === value) {
-        tile.triggerRolledHighlight();
-      } else {
-        tile.clearRolledHighlight();
-      }
-    }
+    this.board.setRolledNumberHighlight(value);
   }
 
   public setFocusChangeHandler(handler: ((focused: boolean) => void) | null): void {

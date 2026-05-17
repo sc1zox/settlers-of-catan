@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpErrorCode } from '@catan/api-interfaces';
 import type { Request } from 'express';
 
 const WINDOW_MS = 60_000;
@@ -23,7 +24,7 @@ export class SessionBootstrapRateLimitService {
     }
     state.count += 1;
     if (state.count > MAX_BOOTSTRAPS_PER_WINDOW) {
-      throw new HttpException('Too many session bootstrap attempts', HttpStatus.TOO_MANY_REQUESTS);
+      throw new HttpException(HttpErrorCode.TooManyRequests, HttpStatus.TOO_MANY_REQUESTS);
     }
   }
 

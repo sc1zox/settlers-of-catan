@@ -1,22 +1,21 @@
 import {
   BufferGeometry,
-  CanvasTexture,
   CylinderGeometry,
   Float32BufferAttribute,
   Group,
   Line,
   LineBasicMaterial,
   Mesh,
-  MeshBasicMaterial,
   MeshStandardMaterial,
-  NormalBlending,
   Sprite,
-  SpriteMaterial,
   Vector3,
 } from 'three';
 import { AxialCoord, HEX_SIZE } from '../board/hex';
 import { TILE_COLOR, TileType } from '@catan/shared-game-field';
-import { SceneObjectKind, SceneUserDataKey } from '@catan/api-interfaces';
+import { NumberBalloon } from './number-balloon';
+import { TILE_HEIGHT, WATER_LEVEL_Y } from './tile-metrics';
+
+export { CHIP_FLOAT_Y, TILE_HEIGHT, WATER_LEVEL_Y } from './tile-metrics';
 
 export interface TileInit {
   readonly coord: AxialCoord;
@@ -25,37 +24,9 @@ export interface TileInit {
   readonly number: number | null;
 }
 
-/** Land tiles sit thick like an island slab so the cliff face is visible. */
-export const TILE_HEIGHT = 1.0;
-/** Orbital height of the number-chip balloons — sits well above any decoration. */
-export const CHIP_FLOAT_Y = TILE_HEIGHT + 4.45;
-/** World Y at which the water surface sits (lower than tile top → visible cliff). */
-export const WATER_LEVEL_Y = -0.4;
-
-const CHIP_BALLOON_REF_BASE_SCALE = 0.55;
-const CHIP_BALLOON_REF_HOVER_SCALE = 1.15;
-const CHIP_BALLOON_REF_BASE_OPACITY = 0.74;
-const CHIP_BALLOON_REF_HOVER_OPACITY = 0.95;
-const CHIP_BALLOON_VISUAL_UPSCALE = 1.62;
-
-const CHIP_BASE_SCALE = CHIP_BALLOON_REF_BASE_SCALE * CHIP_BALLOON_VISUAL_UPSCALE;
-const CHIP_HOVER_SCALE =
-  CHIP_BASE_SCALE * (CHIP_BALLOON_REF_HOVER_SCALE / CHIP_BALLOON_REF_BASE_SCALE);
-const CHIP_BASE_OPACITY = CHIP_BALLOON_REF_BASE_OPACITY;
-const CHIP_HOVER_OPACITY = CHIP_BALLOON_REF_HOVER_OPACITY;
-
-/** Extra scale multiplier stacked on top of hover when a roll just matched this chip. */
-const CHIP_ROLLED_SCALE_BOOST = 0.32;
-/** Extra Y lift while the rolled highlight is at full intensity. */
-const CHIP_ROLLED_LIFT = 1.35;
-/** Extra beam opacity while the rolled highlight is at full intensity. */
-const CHIP_ROLLED_BEAM_BOOST = 0.32;
-/** Seconds for the rolled highlight to decay from 1 → 0. */
-const CHIP_ROLLED_DECAY_SECONDS = 3.2;
-
 /**
  * Base for one hex on the board. Subclasses add decorations and animation,
- * and must call `super.update(dt, t)` to keep the chip balloon bobbing.
+ * and must call `super.update(dt, t)` to keep the number balloon bobbing.
  */
 export abstract class Tile {
   readonly group: Group = new Group();
@@ -65,13 +36,7 @@ export abstract class Tile {
   /** Becomes true when a player has built adjacent. */
   settled = false;
 
-  private chipSprite: Sprite | null = null;
-  private chipBeam: Mesh | null = null;
-  private chipBeamMaterial: MeshBasicMaterial | null = null;
-  private chipPhase = 0;
-  private chipHoverT = 0;
-  private chipPointerHovered = false;
-  private chipRolledT = 0;
+  private readonly numberBalloon: NumberBalloon | null;
 
   constructor(init: TileInit) {
     this.coord = init.coord;
@@ -80,12 +45,18 @@ export abstract class Tile {
     this.group.position.copy(init.position);
     this.buildBase();
     this.buildOutline();
-    if (init.number !== null) this.buildNumberBalloon(init.number);
+    if (init.number !== null) {
+      this.numberBalloon = new NumberBalloon(this.group, {
+        value: init.number,
+        coord: this.coord,
+        tile: this,
+      });
+    } else {
+      this.numberBalloon = null;
+    }
   }
 
   private buildBase(): void {
-    // Slab top at TILE_HEIGHT; bottom extends well below the water surface so the
-    // underside is hidden regardless of waves.
     const slabHeight = TILE_HEIGHT - WATER_LEVEL_Y + 2.0;
     const geom = new CylinderGeometry(HEX_SIZE, HEX_SIZE, slabHeight, 6, 1);
     const mat = new MeshStandardMaterial({
@@ -101,10 +72,8 @@ export abstract class Tile {
     this.group.add(mesh);
   }
 
-  /** Dark hex outline on the tile rim to make borders pop. */
   private buildOutline(): void {
     const points: number[] = [];
-    // CylinderGeometry(R, R, h, 6) places vertices at (sin θ, *, cos θ) — pointy-top.
     for (let i = 0; i <= 6; i++) {
       const theta = (i / 6) * Math.PI * 2;
       points.push(HEX_SIZE * Math.sin(theta), TILE_HEIGHT + 0.01, HEX_SIZE * Math.cos(theta));
@@ -115,100 +84,24 @@ export abstract class Tile {
     this.group.add(new Line(geom, mat));
   }
 
-  private buildNumberBalloon(value: number): void {
-    const tex = makeChipTexture(value);
-    const material = new SpriteMaterial({
-      map: tex,
-      transparent: true,
-      opacity: CHIP_BASE_OPACITY,
-      depthWrite: false,
-      depthTest: true,
-      blending: NormalBlending,
-    });
-    const sprite = new Sprite(material);
-    sprite.scale.set(CHIP_BASE_SCALE, CHIP_BASE_SCALE, 1);
-    sprite.position.set(0, CHIP_FLOAT_Y, 0);
-    sprite.userData[SceneUserDataKey.Kind] = SceneObjectKind.Chip;
-    sprite.userData[SceneUserDataKey.Tile] = this;
-    this.group.add(sprite);
-    this.chipSprite = sprite;
-    this.chipPhase = (this.coord.q * 0.9 + this.coord.r * 1.7) % (Math.PI * 2);
-
-    const beamBottomY = TILE_HEIGHT + 0.02;
-    const beamTopY = CHIP_FLOAT_Y - 0.06;
-    const beamHeight = beamTopY - beamBottomY;
-    const beamRadius = 0.048;
-    const beamGeom = new CylinderGeometry(beamRadius, beamRadius, beamHeight, 10, 1);
-    const beamMat = new MeshBasicMaterial({
-      color: value === 6 || value === 8 ? 0xffc8b8 : 0xc8e8f2,
-      transparent: true,
-      opacity: 0.3,
-      depthWrite: false,
-      blending: NormalBlending,
-    });
-    const beamMesh = new Mesh(beamGeom, beamMat);
-    beamMesh.position.y = beamBottomY + beamHeight / 2;
-    this.chipBeam = beamMesh;
-    this.chipBeamMaterial = beamMat;
-    this.group.add(beamMesh);
+  public getChipSprite(): Sprite | null {
+    return this.numberBalloon?.getPickSprite() ?? null;
   }
 
-  /** Sprite for raycast hover detection. */
-  getChipSprite(): Sprite | null {
-    return this.chipSprite;
+  public setChipHovered(hovered: boolean): void {
+    this.numberBalloon?.setPointerHovered(hovered);
   }
 
-  /** Called by the hover system. */
-  setChipHovered(hovered: boolean): void {
-    this.chipPointerHovered = hovered;
+  public setRolledChipHighlighted(active: boolean): void {
+    this.numberBalloon?.setRolledHighlighted(active);
   }
 
-  /** Flash this chip to signal the rolled number just matched it. */
-  triggerRolledHighlight(): void {
-    if (this.chipSprite) {
-      this.chipRolledT = 1;
-    }
+  public update(dt: number, t: number): void {
+    this.numberBalloon?.update(dt, t);
   }
 
-  /** Reset any active rolled-highlight (e.g. a new roll matched a different number). */
-  clearRolledHighlight(): void {
-    this.chipRolledT = 0;
-  }
-
-  /** Subclasses must call super.update(dt, t). */
-  update(dt: number, t: number): void {
-    if (this.chipSprite) {
-      if (this.chipRolledT > 0) {
-        this.chipRolledT = Math.max(0, this.chipRolledT - dt / CHIP_ROLLED_DECAY_SECONDS);
-      }
-      const hoverEased = easeOutCubic(this.chipHoverT);
-      const rolledEased = easeOutCubic(this.chipRolledT);
-      const emphasis = Math.max(hoverEased, rolledEased);
-      const baseScale = CHIP_BASE_SCALE + (CHIP_HOVER_SCALE - CHIP_BASE_SCALE) * emphasis;
-      // Stack a "rolled" boost on top of the hover envelope, plus a small pulse
-      // while the highlight is active so the eye is drawn to it.
-      const pulse = 1 + Math.sin(t * 5.5) * 0.06 * rolledEased;
-      const scale = baseScale * (1 + CHIP_ROLLED_SCALE_BOOST * rolledEased) * pulse;
-      this.chipSprite.scale.set(scale, scale, 1);
-      // Slow drifty bob — orbital balloon feel.
-      const bob = Math.sin(t * 0.55 + this.chipPhase) * 0.12;
-      const lift = CHIP_ROLLED_LIFT * rolledEased;
-      this.chipSprite.position.y = CHIP_FLOAT_Y + bob + lift;
-      this.chipSprite.material.opacity =
-        CHIP_BASE_OPACITY + (CHIP_HOVER_OPACITY - CHIP_BASE_OPACITY) * emphasis;
-      if (this.chipBeamMaterial) {
-        this.chipBeamMaterial.opacity =
-          0.26 + 0.34 * emphasis + CHIP_ROLLED_BEAM_BOOST * rolledEased;
-      }
-      if (this.chipPointerHovered) {
-        this.chipHoverT = Math.min(1, this.chipHoverT + dt * 8);
-      } else {
-        this.chipHoverT = Math.max(0, this.chipHoverT - dt * 4);
-      }
-    }
-  }
-
-  dispose(): void {
+  public dispose(): void {
+    this.numberBalloon?.dispose();
     this.group.traverse((obj) => {
       if (obj instanceof Mesh) {
         obj.geometry.dispose();
@@ -222,55 +115,5 @@ export abstract class Tile {
         if (!Array.isArray(m)) m.dispose();
       }
     });
-    if (this.chipSprite) {
-      this.chipSprite.material.map?.dispose();
-      this.chipSprite.material.dispose();
-    }
   }
-}
-
-function easeOutCubic(t: number): number {
-  return 1 - Math.pow(1 - t, 3);
-}
-
-function makeChipTexture(value: number): CanvasTexture {
-  const size = 512;
-  const mid = size / 2;
-  const ringRadius = (size / 2) * (92 / 128);
-  const fontPx = Math.round(148 * (size / 256));
-  const ringLineWidth = 4.85 * (size / 256);
-  const digitStrokeWidth = Math.max(2, 2.25 * (size / 256));
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Failed to obtain 2D canvas context for chip texture.');
-
-  const hot = value === 6 || value === 8;
-  const accent = hot ? 'rgba(255, 165, 135, 1)' : 'rgba(200, 248, 255, 1)';
-  const glow = hot ? 'rgba(255, 190, 155, 0.88)' : 'rgba(200, 248, 255, 0.88)';
-
-  ctx.shadowBlur = 12 * (size / 256);
-  ctx.shadowColor = glow;
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = ringLineWidth;
-  ctx.beginPath();
-  ctx.arc(mid, mid, ringRadius, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.shadowBlur = 0;
-  ctx.shadowColor = 'rgba(0, 0, 0, 0)';
-  ctx.font = `700 ${fontPx}px "Inter", "Segoe UI", sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.lineWidth = digitStrokeWidth;
-  ctx.strokeStyle = hot ? 'rgba(90, 35, 28, 0.45)' : 'rgba(35, 55, 62, 0.42)';
-  ctx.strokeText(String(value), mid, mid);
-  ctx.fillStyle = accent;
-  ctx.fillText(String(value), mid, mid);
-
-  const tex = new CanvasTexture(canvas);
-  tex.anisotropy = 8;
-  tex.needsUpdate = true;
-  return tex;
 }

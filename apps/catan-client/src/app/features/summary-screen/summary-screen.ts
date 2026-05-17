@@ -7,7 +7,7 @@ import {
 } from '@angular/core';
 import { TranslatePipe } from '@ngx-translate/core';
 import { LobbyShellGameUiService } from '../lobby-game-ui/lobby-shell-game-ui.service';
-import { displayNameForSeat } from '../../shared/helper/lobby-game-ui/lobby-ui.mapper';
+import { displayNameForSeat } from '../lobby-game-ui/lobby-ui.mapper';
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslateService } from '@ngx-translate/core';
 

@@ -1,7 +1,7 @@
 import { computed, inject, Injectable } from '@angular/core';
 import { GamePhase } from '@catan/api-interfaces';
 import { DiscardModalModel } from '../../game-canvas/discard-modal';
-import { totalResourceCards } from '../../shared/helper/lobby-game-ui/resource-card-totals';
+import { totalResourceCards } from './resource-card-totals';
 import { LobbyGameUiStateService } from './lobby-game-ui-state.service';
 
 @Injectable({ providedIn: 'root' })

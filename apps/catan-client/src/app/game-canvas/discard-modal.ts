@@ -11,7 +11,7 @@ import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { ResourceType } from '@catan/api-interfaces';
 import { TranslateInstantFn } from '../../shared/i18n/translate-instant-fn';
-import { RESOURCE_TYPE_ORDER, resourceTypeLabel } from '../shared/resource-labels';
+import { RESOURCE_TYPE_ORDER, resourceTypeLabel } from '../../shared/i18n/resource-labels';
 
 export interface DiscardModalModel {
   /** Number of cards the player must discard (floor of hand size). */

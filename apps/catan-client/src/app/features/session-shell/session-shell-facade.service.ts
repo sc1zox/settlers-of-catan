@@ -7,7 +7,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { GameStateResource } from '../../core/game/game-state.resource';
 import { GameSettingsService } from '../game-settings/game-settings.service';
 import { DevCardsService } from '../dev-cards/dev-cards.service';
-import { LobbyUiStep, UiFeedbackTone } from '../../shared/types/lobby-ui-state';
+import { LobbyUiStep, UiFeedbackTone } from '../lobby-game-ui/lobby-ui-state';
 import { LobbyShellGameUiService } from '../lobby-game-ui/lobby-shell-game-ui.service';
 import { LobbyDepartedFeedService } from '../shell-feedback/lobby-departed-feed.service';
 import { ShellFeedbackService } from '../shell-feedback/shell-feedback.service';

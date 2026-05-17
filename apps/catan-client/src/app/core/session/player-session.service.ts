@@ -1,13 +1,24 @@
-import { HttpBackend, HttpHeaders, HttpRequest, HttpResponse } from '@angular/common/http';
+import {
+  HttpBackend,
+  HttpErrorResponse,
+  HttpHeaders,
+  HttpRequest,
+  HttpResponse,
+} from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import {
   ApiEnvelopeFieldKey,
   ApiGlobalPathPrefix,
   ClientStorageKey,
+  extractApiErrorCodeFromBody,
+  extractApiErrorCodeFromHttpStatus,
+  InternalApiErrorCode,
+  normalizeUserFacingErrorCode,
   SessionHttpAction,
   SessionRestPath,
+  UserFacingErrorCode,
 } from '@catan/api-interfaces';
-import { Observable, catchError, filter, firstValueFrom, map, of } from 'rxjs';
+import { Observable, catchError, filter, firstValueFrom, map, of, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
@@ -15,6 +26,8 @@ export class PlayerSessionService {
   private readonly backend = inject(HttpBackend);
 
   private readonly accessSignal = signal('');
+
+  private readonly failureCodeSignal = signal<UserFacingErrorCode | null>(null);
 
   private lastChain: Promise<void> = Promise.resolve();
 
@@ -26,12 +39,21 @@ export class PlayerSessionService {
     return this.readSessionId();
   }
 
+  public failureCode(): UserFacingErrorCode | null {
+    return this.failureCodeSignal();
+  }
+
+  public recordHttpFailure(err: unknown): void {
+    this.recordFailure(err);
+  }
+
   public clear(): void {
     localStorage.removeItem(ClientStorageKey.PlayerSessionId);
     localStorage.removeItem(ClientStorageKey.AccessToken);
     localStorage.removeItem(ClientStorageKey.RefreshToken);
     localStorage.removeItem(ClientStorageKey.SessionToken);
     this.accessSignal.set('');
+    this.failureCodeSignal.set(null);
     void this.postLogout();
   }
 
@@ -49,12 +71,22 @@ export class PlayerSessionService {
     });
     return this.backend.handle(req).pipe(
       filter((e): e is HttpResponse<unknown> => e instanceof HttpResponse),
-      map((e) => this.applyBundleFromUnknown(e.body)),
-      catchError(() => of(false)),
+      map((e) => {
+        const ok = this.applyBundleFromUnknown(e.body);
+        if (ok) {
+          this.clearFailure();
+        }
+        return ok;
+      }),
+      catchError((err: unknown) => {
+        this.recordFailure(err);
+        return of(false);
+      }),
     );
   }
 
   private async hydrateFromStorageOrNetwork(): Promise<void> {
+    this.clearFailure();
     const sessionId = this.readSessionId();
     if (sessionId.length === 0) {
       await this.postBootstrap();
@@ -80,14 +112,21 @@ export class PlayerSessionService {
     });
     try {
       const ev = await firstValueFrom(
-        this.backend
-          .handle(req)
-          .pipe(filter((e): e is HttpResponse<unknown> => e instanceof HttpResponse)),
+        this.backend.handle(req).pipe(
+          filter((e): e is HttpResponse<unknown> => e instanceof HttpResponse),
+          catchError((err: unknown) => {
+            this.recordFailure(err);
+            return throwError(() => err);
+          }),
+        ),
       );
       const ok = this.applyBundleFromUnknown(ev.body);
       if (!ok) {
+        this.recordFailure(undefined);
         this.clearLocalOnly();
+        return;
       }
+      this.clearFailure();
     } catch {
       this.clearLocalOnly();
     }
@@ -132,6 +171,39 @@ export class PlayerSessionService {
     localStorage.removeItem(ClientStorageKey.RefreshToken);
     localStorage.removeItem(ClientStorageKey.SessionToken);
     this.accessSignal.set('');
+  }
+
+  private recordFailure(err: unknown): void {
+    if (err instanceof HttpErrorResponse) {
+      const fromBody = extractApiErrorCodeFromBody(err.error);
+      if (fromBody !== undefined) {
+        const normalized = normalizeUserFacingErrorCode(fromBody);
+        if (normalized !== undefined) {
+          this.failureCodeSignal.set(normalized);
+          return;
+        }
+      }
+      const fromStatus = extractApiErrorCodeFromHttpStatus(err.status);
+      if (fromStatus !== undefined) {
+        const normalized = normalizeUserFacingErrorCode(fromStatus);
+        if (normalized !== undefined) {
+          this.failureCodeSignal.set(normalized);
+          return;
+        }
+      }
+    }
+    if (err instanceof Error) {
+      const normalized = normalizeUserFacingErrorCode(err.message);
+      if (normalized !== undefined) {
+        this.failureCodeSignal.set(normalized);
+        return;
+      }
+    }
+    this.failureCodeSignal.set(InternalApiErrorCode.Unexpected);
+  }
+
+  private clearFailure(): void {
+    this.failureCodeSignal.set(null);
   }
 
   private unwrapData(body: unknown): unknown {

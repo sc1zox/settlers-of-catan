@@ -28,8 +28,8 @@ import {
   type FinalizeTradeRequest,
   type ProposeTradeRequest,
   type TradePartner,
-} from '../../shared/types/trading-ui.types';
-import { RESOURCE_TYPE_ORDER, resourceTypeLabel } from '../../shared/resource-labels';
+} from './trading-ui.types';
+import { RESOURCE_TYPE_ORDER, resourceTypeLabel } from '../../../shared/i18n/resource-labels';
 
 const DEFAULT_HARBOR_RATES: PlayerHarborRatesDto = {
   generic: 4,

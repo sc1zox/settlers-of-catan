@@ -1,5 +1,5 @@
 import { GamePhase, PlayerSeat } from '@catan/api-interfaces';
-import { LobbyUiState } from '../../types/lobby-ui-state';
+import { LobbyUiState } from './lobby-ui-state';
 
 export function computeHudGameplayLocked(ui: LobbyUiState | null, isSelfTurn: boolean): boolean {
   if (ui === null) {

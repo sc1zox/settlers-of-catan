@@ -1,6 +1,6 @@
 import { ResourceType } from '@catan/api-interfaces';
 import { EnumTranslate } from '../../game/i18n/enum-translate.helper';
-import { TranslateInstantFn } from '../../shared/i18n/translate-instant-fn';
+import { TranslateInstantFn } from './translate-instant-fn';
 
 export const RESOURCE_TYPE_ORDER: readonly ResourceType[] = [
   ResourceType.Wood,

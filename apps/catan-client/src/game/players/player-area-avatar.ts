@@ -33,6 +33,10 @@ export class PlayerAreaAvatar {
     this.avatarSeat.setDisplayName(name);
   }
 
+  public setPresenceDimmed(dimmed: boolean): void {
+    this.avatarSeat.setPresenceDimmed(dimmed);
+  }
+
   public updateVideoTick(): void {
     this.avatarSeat.update(1 / 60);
   }

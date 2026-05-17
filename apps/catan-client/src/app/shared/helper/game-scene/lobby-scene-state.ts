@@ -12,6 +12,7 @@ export interface LobbyScenePlayerState {
   readonly displayName: string;
   readonly isSelf: boolean;
   readonly isBot: boolean;
+  readonly isConnected: boolean;
   readonly resources: Readonly<Record<ResourceType, number>>;
   readonly devCardsInHand: number;
 }

@@ -17,6 +17,7 @@ import {
   ARSENAL_SWAY_ANGLE,
 } from './player-area-constants';
 import { PlayerColor } from './colors';
+import { PresenceMaterialDimmer } from './presence-material-dimmer';
 
 export interface PlayerAreaArsenalOptions {
   readonly group: Group;
@@ -28,6 +29,7 @@ export interface PlayerAreaArsenalOptions {
 export class PlayerAreaArsenal {
   private readonly figureMats: PlayerFigureMaterials;
   private readonly arsenalFigures: Object3D[] = [];
+  private readonly presenceDimmer = new PresenceMaterialDimmer();
 
   private activatedFigure: Object3D | null = null;
   private readonly activatedBasePos = new Vector3();
@@ -55,6 +57,15 @@ export class PlayerAreaArsenal {
     this.layoutRoads(arsenalZ - 0.35, options.tableTopY);
     this.layoutSettlements(arsenalZ + 0.1, options.tableTopY);
     this.layoutCities(arsenalZ + 0.1, options.tableTopY);
+    this.presenceDimmer.register([
+      this.figureMats.body,
+      this.figureMats.accent,
+      this.figureMats.dark,
+    ]);
+  }
+
+  public setPresenceDimmed(dimmed: boolean): void {
+    this.presenceDimmer.setDimmed(dimmed);
   }
 
   public get arsenal(): readonly Object3D[] {

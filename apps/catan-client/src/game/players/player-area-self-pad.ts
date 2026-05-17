@@ -11,6 +11,7 @@ import {
   ShapeGeometry,
 } from 'three';
 import { PlayerColor } from './player-color.enum';
+import { PresenceMaterialDimmer } from './presence-material-dimmer';
 
 const FELT_HALF_X = 5.25;
 const FELT_HALF_Z = 0.78;
@@ -27,6 +28,8 @@ export class PlayerAreaSelfPad {
   private readonly feltTexture: CanvasTexture;
   private readonly mainMaterial: MeshStandardMaterial;
   private active = false;
+  private presenceDimmed = false;
+  private readonly presenceDimmer = new PresenceMaterialDimmer();
 
   public constructor(color: PlayerColor, tableTopY: number, innerEdgeZ: number) {
     this.accentColor = PlayerAreaSelfPad.feltAccentColor(color);
@@ -48,6 +51,16 @@ export class PlayerAreaSelfPad {
     this.group.add(mesh);
 
     this.group.position.set(CENTER_X, tableTopY + FELT_LIFT, innerEdgeZ + INNER_EDGE_PAD_Z);
+    this.presenceDimmer.register([this.mainMaterial]);
+    this.applyMaterialState();
+  }
+
+  public setPresenceDimmed(dimmed: boolean): void {
+    if (dimmed === this.presenceDimmed) {
+      return;
+    }
+    this.presenceDimmed = dimmed;
+    this.presenceDimmer.setDimmed(dimmed);
     this.applyMaterialState();
   }
 
@@ -77,6 +90,9 @@ export class PlayerAreaSelfPad {
   }
 
   private applyMaterialState(): void {
+    if (this.presenceDimmed) {
+      return;
+    }
     if (this.active) {
       this.mainMaterial.color.setRGB(1.06, 1.06, 1.06);
       this.mainMaterial.roughness = 0.92;

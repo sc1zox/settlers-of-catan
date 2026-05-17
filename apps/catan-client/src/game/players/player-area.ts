@@ -43,6 +43,7 @@ export class PlayerArea {
   private readonly bonusMaterials = new Map<BonusAwardKind, MeshStandardMaterial[]>();
   private readonly bonusCards = new Map<BonusAwardKind, Card>();
   private _cards: Card[];
+  private presenceDimmed = false;
 
   public constructor(options: PlayerAreaOptions) {
     this.info = {
@@ -104,6 +105,21 @@ export class PlayerArea {
 
   public setSelfSeatHighlight(active: boolean): void {
     this.selfPad.setActive(active);
+  }
+
+  public setPresenceDimmed(dimmed: boolean): void {
+    if (this.presenceDimmed === dimmed) {
+      return;
+    }
+    this.presenceDimmed = dimmed;
+    this.avatar.setPresenceDimmed(dimmed);
+    this.selfPad.setPresenceDimmed(dimmed);
+    this.hand.setPresenceDimmed(dimmed);
+    this.costCard.setPresenceDimmed(dimmed);
+    for (const bonus of this.bonusCards.values()) {
+      bonus.setPresenceDimmed(dimmed);
+    }
+    this.arsenalKit.setPresenceDimmed(dimmed);
   }
 
   public getCostCard(): Card {
@@ -181,6 +197,7 @@ export class PlayerArea {
       this.group.add(bonus.card.mesh);
       this.bonusCards.set(kind, bonus.card);
       this.bonusMaterials.set(kind, [...bonus.materials]);
+      bonus.card.setPresenceDimmed(this.presenceDimmed);
       this.refreshCardList();
       return bonus.card;
     }

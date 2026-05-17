@@ -542,6 +542,7 @@ export class GameEngine {
     for (let s = 0; s < this.players.length; s += 1) {
       this.players[s].setFeltVisible(this.playerAreaActiveAtTable[s]);
       this.players[s].setSelfSeatHighlight(showSelfPadOnly && s === this.selfSeat);
+      this.players[s].setPresenceDimmed(false);
     }
     this.legalSettlementVertexIds = state.legalSettlementVertexIds;
     this.legalRoadEdgeIds = state.legalRoadEdgeIds;
@@ -560,6 +561,8 @@ export class GameEngine {
       if (!area || !this.playerAreaActiveAtTable[playerState.seat]) {
         continue;
       }
+      const presenceDimmed = !playerState.isBot && !playerState.isConnected;
+      area.setPresenceDimmed(presenceDimmed);
       area.setDisplayName(playerState.displayName);
       const handSignature = computeHandSignature(playerState.resources, playerState.devCardsInHand);
       if (this.handSignatureBySeat[playerState.seat] !== handSignature) {

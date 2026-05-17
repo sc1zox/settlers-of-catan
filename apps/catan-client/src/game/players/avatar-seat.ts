@@ -16,6 +16,7 @@ import {
   VideoTexture,
 } from 'three';
 import { PlayerColor } from './player-color.enum';
+import { PresenceMaterialDimmer } from './presence-material-dimmer';
 
 export interface AvatarSeatOptions {
   readonly tableTopY: number;
@@ -67,6 +68,8 @@ export class AvatarSeat {
   private namePlateLabel = '';
   private readonly namePlateColor: number;
   private namePlateTime = 0;
+  private presenceDimmed = false;
+  private readonly presenceDimmer = new PresenceMaterialDimmer();
   private readonly onVideoFrameGeometryReady = (): void => {
     this.ensureVideoTextureFromAttached();
   };
@@ -110,6 +113,22 @@ export class AvatarSeat {
     this.avatarRoot.add(this.namePlateRoot);
     this.buildMinimalBody(bodyMat, limbMat);
     this.buildSquareHead();
+    this.presenceDimmer.register([
+      bodyMat,
+      limbMat,
+      this.screenMaterial,
+      this.namePlateMaterial,
+      ...this.materials,
+    ]);
+  }
+
+  public setPresenceDimmed(dimmed: boolean): void {
+    if (dimmed === this.presenceDimmed) {
+      return;
+    }
+    this.presenceDimmed = dimmed;
+    this.presenceDimmer.setDimmed(dimmed);
+    this.applyScreenPresenceState();
   }
 
   public setVideoDisplayGamma(gamma: number): void {
@@ -218,6 +237,15 @@ export class AvatarSeat {
   }
 
   private applyVideoDisplayGamma(): void {
+    this.applyScreenPresenceState();
+  }
+
+  private applyScreenPresenceState(): void {
+    if (this.presenceDimmed) {
+      this.screenMaterial.color.setRGB(0.22, 0.24, 0.28);
+      this.screenMaterial.needsUpdate = true;
+      return;
+    }
     const gamma = this.videoDisplayGamma;
     this.screenMaterial.color.setRGB(gamma, gamma, gamma);
     this.screenMaterial.needsUpdate = true;

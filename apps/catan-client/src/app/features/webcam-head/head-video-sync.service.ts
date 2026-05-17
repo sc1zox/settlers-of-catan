@@ -28,6 +28,10 @@ export class HeadVideoSyncService {
         engine.setHeadVideoForSeat(player.seat, null, false);
         continue;
       }
+      if (!player.isConnected) {
+        engine.setHeadVideoForSeat(player.seat, null, false);
+        continue;
+      }
       if (player.isSelf) {
         const localVideo = this.liveKit.localVideoElement();
         const showPlaceholder = this.gameSettings.webcamEnabled() && localVideo === null;

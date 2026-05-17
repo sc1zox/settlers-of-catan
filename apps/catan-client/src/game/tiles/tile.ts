@@ -44,6 +44,15 @@ const CHIP_HOVER_SCALE =
 const CHIP_BASE_OPACITY = CHIP_BALLOON_REF_BASE_OPACITY;
 const CHIP_HOVER_OPACITY = CHIP_BALLOON_REF_HOVER_OPACITY;
 
+/** Extra scale multiplier stacked on top of hover when a roll just matched this chip. */
+const CHIP_ROLLED_SCALE_BOOST = 0.32;
+/** Extra Y lift while the rolled highlight is at full intensity. */
+const CHIP_ROLLED_LIFT = 1.35;
+/** Extra beam opacity while the rolled highlight is at full intensity. */
+const CHIP_ROLLED_BEAM_BOOST = 0.32;
+/** Seconds for the rolled highlight to decay from 1 → 0. */
+const CHIP_ROLLED_DECAY_SECONDS = 3.2;
+
 /**
  * Base for one hex on the board. Subclasses add decorations and animation,
  * and must call `super.update(dt, t)` to keep the chip balloon bobbing.
@@ -62,6 +71,7 @@ export abstract class Tile {
   private chipPhase = 0;
   private chipHoverT = 0;
   private chipPointerHovered = false;
+  private chipRolledT = 0;
 
   constructor(init: TileInit) {
     this.coord = init.coord;
@@ -153,20 +163,42 @@ export abstract class Tile {
     this.chipPointerHovered = hovered;
   }
 
+  /** Flash this chip to signal the rolled number just matched it. */
+  triggerRolledHighlight(): void {
+    if (this.chipSprite) {
+      this.chipRolledT = 1;
+    }
+  }
+
+  /** Reset any active rolled-highlight (e.g. a new roll matched a different number). */
+  clearRolledHighlight(): void {
+    this.chipRolledT = 0;
+  }
+
   /** Subclasses must call super.update(dt, t). */
   update(dt: number, t: number): void {
     if (this.chipSprite) {
-      const targetT = this.chipHoverT;
-      const eased = easeOutCubic(targetT);
-      const scale = CHIP_BASE_SCALE + (CHIP_HOVER_SCALE - CHIP_BASE_SCALE) * eased;
+      if (this.chipRolledT > 0) {
+        this.chipRolledT = Math.max(0, this.chipRolledT - dt / CHIP_ROLLED_DECAY_SECONDS);
+      }
+      const hoverEased = easeOutCubic(this.chipHoverT);
+      const rolledEased = easeOutCubic(this.chipRolledT);
+      const emphasis = Math.max(hoverEased, rolledEased);
+      const baseScale = CHIP_BASE_SCALE + (CHIP_HOVER_SCALE - CHIP_BASE_SCALE) * emphasis;
+      // Stack a "rolled" boost on top of the hover envelope, plus a small pulse
+      // while the highlight is active so the eye is drawn to it.
+      const pulse = 1 + Math.sin(t * 5.5) * 0.06 * rolledEased;
+      const scale = baseScale * (1 + CHIP_ROLLED_SCALE_BOOST * rolledEased) * pulse;
       this.chipSprite.scale.set(scale, scale, 1);
       // Slow drifty bob — orbital balloon feel.
       const bob = Math.sin(t * 0.55 + this.chipPhase) * 0.12;
-      this.chipSprite.position.y = CHIP_FLOAT_Y + bob;
+      const lift = CHIP_ROLLED_LIFT * rolledEased;
+      this.chipSprite.position.y = CHIP_FLOAT_Y + bob + lift;
       this.chipSprite.material.opacity =
-        CHIP_BASE_OPACITY + (CHIP_HOVER_OPACITY - CHIP_BASE_OPACITY) * eased;
+        CHIP_BASE_OPACITY + (CHIP_HOVER_OPACITY - CHIP_BASE_OPACITY) * emphasis;
       if (this.chipBeamMaterial) {
-        this.chipBeamMaterial.opacity = 0.26 + 0.34 * eased;
+        this.chipBeamMaterial.opacity =
+          0.26 + 0.34 * emphasis + CHIP_ROLLED_BEAM_BOOST * rolledEased;
       }
       if (this.chipPointerHovered) {
         this.chipHoverT = Math.min(1, this.chipHoverT + dt * 8);

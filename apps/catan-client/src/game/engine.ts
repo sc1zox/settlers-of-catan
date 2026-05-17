@@ -270,7 +270,25 @@ export class GameEngine {
   }
 
   public setDiceResultHandler(handler: DiceResultHandler | null): void {
-    this.diceTray.setResultHandler(handler);
+    if (handler === null) {
+      this.diceTray.setResultHandler(null);
+      return;
+    }
+    this.diceTray.setResultHandler((result) => {
+      this.highlightRolledNumber(result.sum);
+      handler(result);
+    });
+  }
+
+  private highlightRolledNumber(value: number): void {
+    for (let i = 0; i < this.board.tiles.length; i += 1) {
+      const tile = this.board.tiles[i];
+      if (tile.number === value) {
+        tile.triggerRolledHighlight();
+      } else {
+        tile.clearRolledHighlight();
+      }
+    }
   }
 
   public setFocusChangeHandler(handler: ((focused: boolean) => void) | null): void {

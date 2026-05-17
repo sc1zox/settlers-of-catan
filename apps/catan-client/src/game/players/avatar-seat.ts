@@ -4,7 +4,6 @@ import {
   ClampToEdgeWrapping,
   Color,
   CylinderGeometry,
-  DoubleSide,
   Group,
   LinearFilter,
   Mesh,
@@ -61,7 +60,9 @@ export class AvatarSeat {
   private emptyDisplayUsesPlaceholder = false;
   private videoDisplayGamma = DEFAULT_VIDEO_DISPLAY_GAMMA;
   private readonly namePlateMaterial: MeshBasicMaterial;
-  private readonly namePlateMesh: Mesh;
+  private readonly namePlateRoot: Group;
+  private readonly namePlateFrontMesh: Mesh;
+  private readonly namePlateBackMesh: Mesh;
   private namePlateTexture: CanvasTexture | null = null;
   private namePlateLabel = '';
   private readonly namePlateColor: number;
@@ -95,17 +96,18 @@ export class AvatarSeat {
       opacity: 1,
       toneMapped: false,
       blending: NormalBlending,
-      side: DoubleSide,
       depthWrite: false,
       depthTest: true,
     });
-    this.namePlateMesh = new Mesh(
-      new PlaneGeometry(NAME_PLATE_WIDTH, NAME_PLATE_HEIGHT),
-      this.namePlateMaterial,
-    );
-    this.namePlateMesh.position.set(0, NAME_PLATE_Y, NAME_PLATE_Z);
-    this.namePlateMesh.scale.x = -1;
-    this.avatarRoot.add(this.namePlateMesh);
+    const namePlateGeometry = new PlaneGeometry(NAME_PLATE_WIDTH, NAME_PLATE_HEIGHT);
+    this.namePlateFrontMesh = new Mesh(namePlateGeometry, this.namePlateMaterial);
+    this.namePlateBackMesh = new Mesh(namePlateGeometry, this.namePlateMaterial);
+    this.namePlateBackMesh.rotation.y = Math.PI;
+    this.namePlateRoot = new Group();
+    this.namePlateRoot.position.set(0, NAME_PLATE_Y, NAME_PLATE_Z);
+    this.namePlateRoot.add(this.namePlateFrontMesh);
+    this.namePlateRoot.add(this.namePlateBackMesh);
+    this.avatarRoot.add(this.namePlateRoot);
     this.buildMinimalBody(bodyMat, limbMat);
     this.buildSquareHead();
   }
@@ -162,7 +164,7 @@ export class AvatarSeat {
     }
     this.namePlateTime += dt;
     const wobble = Math.sin(this.namePlateTime * NAME_PLATE_BOB_SPEED) * NAME_PLATE_BOB_AMPLITUDE;
-    this.namePlateMesh.position.y = NAME_PLATE_Y + wobble;
+    this.namePlateRoot.position.y = NAME_PLATE_Y + wobble;
   }
 
   public setDisplayName(name: string): void {
@@ -205,7 +207,7 @@ export class AvatarSeat {
       this.namePlateTexture = null;
     }
     this.namePlateMaterial.dispose();
-    this.namePlateMesh.geometry.dispose();
+    this.namePlateFrontMesh.geometry.dispose();
     this.screenMaterial.dispose();
     if (this.headMesh !== null) {
       this.headMesh.geometry.dispose();
@@ -383,26 +385,26 @@ export class AvatarSeat {
   } {
     const base = new Color(playerColor);
     const isWhite = playerColor === PlayerColor.White;
-    const fillDark = base.clone().multiplyScalar(isWhite ? 0.38 : 0.2);
-    const fillDarker = base.clone().multiplyScalar(isWhite ? 0.24 : 0.11);
+    const fillDark = base.clone().lerp(new Color(0, 0, 0), isWhite ? 0.52 : 0.28);
+    const fillDarker = base.clone().lerp(new Color(0, 0, 0), isWhite ? 0.68 : 0.42);
     const border = base.clone();
     if (isWhite) {
-      border.multiplyScalar(0.72);
+      border.lerp(new Color(0.55, 0.58, 0.64), 0.35);
     } else {
-      border.multiplyScalar(1.08);
+      border.lerp(new Color(1, 1, 1), 0.18);
     }
-    const borderBright = border.clone().lerp(new Color(1, 1, 1), isWhite ? 0.35 : 0.42);
-    const tick = borderBright.clone().lerp(new Color(1, 1, 1), 0.2);
+    const borderBright = border.clone().lerp(new Color(1, 1, 1), isWhite ? 0.28 : 0.38);
+    const tick = borderBright.clone().lerp(new Color(1, 1, 1), 0.12);
     return {
-      fillTop: AvatarSeat.rgba(fillDark, 0.94),
-      fillBottom: AvatarSeat.rgba(fillDarker, 0.96),
+      fillTop: AvatarSeat.rgba(fillDark, 0.96),
+      fillBottom: AvatarSeat.rgba(fillDarker, 0.98),
       border: AvatarSeat.rgba(border, 1),
       borderBright: AvatarSeat.rgba(borderBright, 1),
-      borderGlow: AvatarSeat.rgba(borderBright, 0.72),
-      tick: AvatarSeat.rgba(tick, 0.92),
+      borderGlow: AvatarSeat.rgba(borderBright, isWhite ? 0.82 : 0.9),
+      tick: AvatarSeat.rgba(tick, 0.98),
       textFill: isWhite ? 'rgba(18, 24, 36, 0.98)' : 'rgba(248, 252, 255, 0.98)',
-      textGlow: isWhite ? AvatarSeat.rgba(borderBright, 0.55) : AvatarSeat.rgba(borderBright, 0.88),
-      textStroke: isWhite ? 'rgba(255, 255, 255, 0.75)' : 'rgba(6, 12, 22, 0.88)',
+      textGlow: AvatarSeat.rgba(borderBright, isWhite ? 0.7 : 0.95),
+      textStroke: isWhite ? 'rgba(255, 255, 255, 0.82)' : 'rgba(6, 12, 22, 0.9)',
     };
   }
 

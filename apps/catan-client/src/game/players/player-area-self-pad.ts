@@ -154,21 +154,6 @@ export class PlayerAreaSelfPad {
     }
     ctx.putImageData(weave, 0, 0);
 
-    const edge = PlayerAreaSelfPad.feltAccentColor(color);
-    const er = Math.round(edge.r * 255);
-    const eg = Math.round(edge.g * 255);
-    const eb = Math.round(edge.b * 255);
-    ctx.strokeStyle = `rgba(${er}, ${eg}, ${eb}, 0.55)`;
-    ctx.lineWidth = 10;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius - 6, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.strokeStyle = `rgba(${Math.max(0, er - 40)}, ${Math.max(0, eg - 40)}, ${Math.max(0, eb - 40)}, 0.35)`;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius - 14, 0, Math.PI * 2);
-    ctx.stroke();
-
     const texture = new CanvasTexture(canvas);
     texture.colorSpace = SRGBColorSpace;
     texture.wrapS = ClampToEdgeWrapping;

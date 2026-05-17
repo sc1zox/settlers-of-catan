@@ -1,4 +1,5 @@
 import type { TilePlacement } from '@catan/shared-game-field';
+import { DevCardType } from './dev-card-type.enum';
 import { GamePhase } from './game-phase.enum';
 import { PlayerSeat } from './player-seat.enum';
 import { ResourceType } from './resource-type.enum';
@@ -94,6 +95,14 @@ export interface LobbyFullStatePayload {
   readonly largestArmySeat: PlayerSeat | null;
   readonly winnerSeat: PlayerSeat | null;
   readonly devDeckCount: number;
+  /**
+   * Viewer-private dev-card identities — populated only with the recipient's
+   * own cards, never with another player's. Ordered as held in the runtime
+   * slot (oldest first). Cards bought this turn appear at the tail; the count
+   * of unripened cards is `players[seat].devCardsBoughtThisTurn` for the same
+   * seat.
+   */
+  readonly selfDevCards: readonly DevCardType[];
   readonly players: readonly LobbyPlayerPublicDto[];
   /**
    * Currently open trade offers in this lobby (status === Open). Source of

@@ -2,7 +2,7 @@ export { DevKind, ResourceKind, devKindLabel, resourceKindLabel } from './textur
 
 export { makeCostCardBackTexture, makeCostCardTexture } from './textures-cost-card';
 
-export { makeDevBackTexture } from './textures-dev-icons';
+export { makeDevBackTexture, makeDevFaceTexture } from './textures-dev-icons';
 
 export {
   makeHarborFlagTexture,

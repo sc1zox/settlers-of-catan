@@ -120,6 +120,7 @@ export class LobbyService {
     const legalMoves = viewer
       ? this.validation.computeLegalMoves(lobby, viewer.seat)
       : { settlements: [], roads: [], cities: [], roadBuilding: [] };
+    const selfDevCards = viewer ? viewer.devCards.slice() : [];
     return {
       lobbyId: lobby.lobbyId,
       lobbyCode: lobby.lobbyCode,
@@ -145,6 +146,7 @@ export class LobbyService {
       largestArmySeat: lobby.largestArmySeat,
       winnerSeat: lobby.winnerSeat,
       devDeckCount: lobby.devDeck.length,
+      selfDevCards,
       players,
       activeTrades: this.trades.findOpenOffersForLobby(lobby.lobbyId),
     };

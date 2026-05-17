@@ -11,6 +11,8 @@ import { DisconnectBanner } from '../disconnect-banner/disconnect-banner';
 import { SummaryScreen } from '../summary-screen/summary-screen';
 import { GameSettingsToggle } from '../game-settings/game-settings-toggle';
 import { SpectatorCameraToggle } from '../spectator-camera/spectator-camera-toggle';
+import { PlayerStatsPanel } from '../player-stats-panel/player-stats-panel';
+import { BonusAnnounceBanner } from '../bonus-announce-banner/bonus-announce-banner';
 import { SessionLobbyFlowService } from './session-lobby-flow.service';
 import { SessionBuildInteractionService } from './session-build-interaction.service';
 import { SessionRobberFlowService } from './session-robber-flow.service';
@@ -34,6 +36,8 @@ import { SessionShellFacadeService } from './session-shell-facade.service';
     GameSettingsToggle,
     DisconnectBanner,
     SummaryScreen,
+    PlayerStatsPanel,
+    BonusAnnounceBanner,
     TranslatePipe,
   ],
   templateUrl: './session-shell.html',

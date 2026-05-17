@@ -48,6 +48,7 @@ import { World } from './world/world';
 import { legalIdsForKind } from './engine-runtime/build-flow';
 import {
   BOARD_OVERLAY_UPDATE_BOUNDS_RADIUS,
+  DEV_CARD_TYPE_TO_KIND,
   DICE_UPDATE_BOUNDS_RADIUS,
   INNER_STRIP_Z,
   OUTER_STRIP_Z,
@@ -573,7 +574,12 @@ export class GameEngine {
       this.selfSeat !== null &&
       this.playerAreaActiveAtTable[this.selfSeat];
     for (let s = 0; s < this.players.length; s += 1) {
-      this.players[s].setFeltVisible(this.playerAreaActiveAtTable[s]);
+      const active = this.playerAreaActiveAtTable[s];
+      // Hide the whole seat group when unoccupied so no placeholder hand,
+      // arsenal, or avatar leaks for empty seats. playerAreaActiveAtTable
+      // remains the truth source for flight/hover gating.
+      this.players[s].group.visible = active;
+      this.players[s].setFeltVisible(active);
       this.players[s].setSelfSeatHighlight(showSelfPadOnly && s === this.selfSeat);
       this.players[s].setPresenceDimmed(false);
     }
@@ -600,9 +606,21 @@ export class GameEngine {
       const presenceDimmed = !playerState.isBot && !playerState.isConnected;
       area.setPresenceDimmed(presenceDimmed);
       area.setDisplayName(playerState.displayName);
-      const handSignature = computeHandSignature(playerState.resources, playerState.devCardsInHand);
+      const devKinds =
+        playerState.devCardTypes === null
+          ? null
+          : playerState.devCardTypes.map((type) => DEV_CARD_TYPE_TO_KIND[type]);
+      const handSignature = computeHandSignature(
+        playerState.resources,
+        playerState.devCardsInHand,
+        playerState.devCardTypes,
+      );
       if (this.handSignatureBySeat[playerState.seat] !== handSignature) {
-        area.setHand(expandResourceHand(playerState.resources), playerState.devCardsInHand);
+        area.setHand(
+          expandResourceHand(playerState.resources),
+          playerState.devCardsInHand,
+          devKinds,
+        );
         this.handSignatureBySeat[playerState.seat] = handSignature;
       }
     }

@@ -1,5 +1,6 @@
 import type {
   AxialCoordDto,
+  DevCardType,
   GamePhase,
   LobbyRoadDto,
   LobbySettlementDto,
@@ -15,6 +16,12 @@ export interface LobbyScenePlayerState {
   readonly isConnected: boolean;
   readonly resources: Readonly<Record<ResourceType, number>>;
   readonly devCardsInHand: number;
+  /**
+   * Only populated for the viewer's own seat. Other seats receive `null`;
+   * those seats show generic backs in the 3D hand, count comes from
+   * `devCardsInHand`.
+   */
+  readonly devCardTypes: readonly DevCardType[] | null;
 }
 
 export interface LobbySceneState {

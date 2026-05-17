@@ -108,6 +108,20 @@
     "awaitingAdmin": "Verbindung verloren — wartet auf Admin",
     "kickButton": "Durch Bot ersetzen"
   },
+  "playerStats": {
+    "title": "Spieleruebersicht",
+    "ariaLabel": "Spielerstatistiken",
+    "botBadge": "Bot",
+    "vp": "SP",
+    "knights": "Ritter",
+    "longestRoad": "Strasse",
+    "badgeLongestRoad": "Laengste Strasse",
+    "badgeLargestArmy": "Groesste Rittermacht"
+  },
+  "bonusAnnounce": {
+    "longestRoad": "{{playerName}} hat die Laengste Handelsstrasse uebernommen!",
+    "largestArmy": "{{playerName}} hat die Groesste Rittermacht uebernommen!"
+  },
   "summaryScreen": {
     "title": "Spiel beendet",
     "winnerLine": "{{winnerName}} hat gewonnen",

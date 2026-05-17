@@ -13,6 +13,7 @@ export function mapLobbyFullStateToSceneState(payload: LobbyFullStatePayload): L
       isConnected: p.isConnected,
       resources: p.resources,
       devCardsInHand: p.devCardsInHand,
+      devCardTypes: p.isSelf ? payload.selfDevCards : null,
     });
   }
   return {

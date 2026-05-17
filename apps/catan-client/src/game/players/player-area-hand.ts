@@ -3,6 +3,7 @@ import {
   DevKind,
   ResourceKind,
   makeDevBackTexture,
+  makeDevFaceTexture,
   makeResourceBackTexture,
   makeResourceFaceTexture,
 } from '../cards/textures';
@@ -47,7 +48,11 @@ export class PlayerAreaHand {
     return false;
   }
 
-  public setHand(resources: readonly ResourceKind[], nextDevCount: number): void {
+  public setHand(
+    resources: readonly ResourceKind[],
+    nextDevCount: number,
+    devKinds: readonly DevKind[] | null = null,
+  ): void {
     const nextCounts = this.emptyResourceCounts();
     for (let i = 0; i < resources.length; i += 1) {
       nextCounts[resources[i]] += 1;
@@ -80,7 +85,11 @@ export class PlayerAreaHand {
 
     const devStartX = handStartX + slot * (CARD_SHORT + HAND_GAP) + 0.4;
     for (let i = 0; i < nextDevCount; i += 1) {
-      const card = this.buildDevCard();
+      // devKinds is set only for the self player — every other seat sees a
+      // generic back. Use the kind to render a face-up card so the owner can
+      // see what they hold.
+      const kind = devKinds !== null && i < devKinds.length ? devKinds[i] : null;
+      const card = this.buildDevCard(kind);
       card.setGroupKey(devGroupKey);
       const x = devStartX + i * (CARD_SHORT + HAND_GAP);
       this.placeCard(card, x, this.cardRowZ, this.tableY);
@@ -179,9 +188,9 @@ export class PlayerAreaHand {
     });
   }
 
-  private buildDevCard(): Card {
+  private buildDevCard(kind: DevKind | null): Card {
     const backTex = makeDevBackTexture();
-    const faceTex = makeDevBackTexture();
+    const faceTex = kind === null ? makeDevBackTexture() : makeDevFaceTexture(kind);
     const faceMat = new MeshStandardMaterial({ map: faceTex, flatShading: true, roughness: 0.85 });
     const backMat = new MeshStandardMaterial({ map: backTex, flatShading: true, roughness: 0.85 });
     const edgeMat = new MeshStandardMaterial({ color: 0x6b4a26, flatShading: true });
@@ -195,7 +204,7 @@ export class PlayerAreaHand {
       edgeMaterial: edgeMat,
       hoverInfo: {
         group: CardHoverGroup.Development,
-        devKind: DevKind.Knight,
+        devKind: kind ?? DevKind.Knight,
       },
     });
   }

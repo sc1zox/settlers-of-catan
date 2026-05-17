@@ -1,7 +1,7 @@
 import { Vector3, Quaternion } from 'three';
 import { HEX_SIZE } from '../board/hex';
-import { ResourceKind } from '../cards/textures';
-import { ResourceType } from '@catan/api-interfaces';
+import { DevKind, ResourceKind } from '../cards/textures';
+import { DevCardType, ResourceType } from '@catan/api-interfaces';
 
 export const TABLE_TOP_Y = -3.5;
 export const TABLE_SIZE = 44;
@@ -42,4 +42,12 @@ export const RESOURCE_TYPE_TO_KIND: Readonly<Record<ResourceType, ResourceKind>>
   [ResourceType.Wheat]: ResourceKind.Grain,
   [ResourceType.Wool]: ResourceKind.Wool,
   [ResourceType.Ore]: ResourceKind.Ore,
+};
+
+export const DEV_CARD_TYPE_TO_KIND: Readonly<Record<DevCardType, DevKind>> = {
+  [DevCardType.Knight]: DevKind.Knight,
+  [DevCardType.RoadBuilding]: DevKind.RoadBuilding,
+  [DevCardType.YearOfPlenty]: DevKind.YearOfPlenty,
+  [DevCardType.Monopoly]: DevKind.Monopoly,
+  [DevCardType.VictoryPoint]: DevKind.VictoryPoint,
 };

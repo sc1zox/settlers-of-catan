@@ -171,8 +171,12 @@ export class PlayerArea {
     this.arsenalKit.flyActivatedFigureToWorld(worldPosition, worldQuaternion, worldScale, onArrive);
   }
 
-  public setHand(resources: readonly ResourceKind[], devCount: number): void {
-    this.hand.setHand(resources, devCount);
+  public setHand(
+    resources: readonly ResourceKind[],
+    devCount: number,
+    devKinds: readonly DevKind[] | null = null,
+  ): void {
+    this.hand.setHand(resources, devCount, devKinds);
     this.refreshCardList();
   }
 

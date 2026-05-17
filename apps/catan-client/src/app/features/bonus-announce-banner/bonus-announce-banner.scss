@@ -1,0 +1,39 @@
+.bonus-announce {
+  position: absolute;
+  top: 5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(
+    135deg,
+    rgba(60, 30, 10, 0.92),
+    rgba(120, 70, 25, 0.92)
+  );
+  color: #ffeccd;
+  padding: 0.85rem 1.6rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 200, 120, 0.5);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  font-weight: 600;
+  font-size: 1.05rem;
+  text-align: center;
+  pointer-events: none;
+  z-index: 22;
+  animation: bonus-announce-pop 280ms ease-out;
+  max-width: min(28rem, calc(100vw - 2rem));
+}
+
+.bonus-announce__text {
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+@keyframes bonus-announce-pop {
+  0% {
+    transform: translate(-50%, -1rem);
+    opacity: 0;
+  }
+  100% {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}

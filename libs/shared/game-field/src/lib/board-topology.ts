@@ -31,7 +31,7 @@ export interface BoardTopologyRuntime {
   edgesById: Map<string, BoardEdgeRuntime>;
 }
 
-const CORNER_OFFSETS: readonly IntCubeCoord[] = Object.freeze([
+export const CORNER_OFFSETS: readonly IntCubeCoord[] = Object.freeze([
   { x2: 1, y2: 1, z2: -2 },
   { x2: 2, y2: -1, z2: -1 },
   { x2: 1, y2: -2, z2: 1 },

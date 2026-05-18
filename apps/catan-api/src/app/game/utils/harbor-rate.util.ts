@@ -1,6 +1,5 @@
 import { PlayerHarborRatesDto, PlayerSeat, ResourceType } from '@catan/api-interfaces';
-import { hexRing } from '@catan/shared-game-field';
-import { makeTileKey } from '@catan/shared-game-field';
+import { CORNER_OFFSETS, hexRing } from '@catan/shared-game-field';
 import { LobbyRuntime } from '../lobby/lobby-runtime';
 
 const HARBOR_HEX_INDICES: readonly number[] = [0, 1, 2, 4, 5, 6, 8, 9, 10];
@@ -82,17 +81,16 @@ function getHarborVertexSets(
     if (!tile) {
       continue;
     }
-    const tileKey = makeTileKey(tile.q, tile.r);
     const side = findOuterSideDirection(tile.q, tile.r);
     if (!side) {
       continue;
     }
-    const edge = findTileSideEdge(lobby, tileKey, side.q, side.r);
-    if (!edge) {
+    const vertexIds = computeOuterEdgeVertexIds(lobby, tile.q, tile.r, side.q, side.r);
+    if (!vertexIds) {
       continue;
     }
     sets.push({
-      vertexIds: [edge.aVertexId, edge.bVertexId],
+      vertexIds,
       resource: HARBOR_PATTERN[i].resource,
       ratio: HARBOR_PATTERN[i].ratio,
     });
@@ -127,24 +125,42 @@ function findOuterSideDirection(q: number, r: number): { q: number; r: number } 
   return bestDir;
 }
 
-function findTileSideEdge(
+function computeOuterEdgeVertexIds(
   lobby: LobbyRuntime,
-  tileKey: string,
+  tileQ: number,
+  tileR: number,
   outwardQ: number,
   outwardR: number,
-) {
-  const [tileQRaw, tileRRaw] = tileKey.split(',');
-  const tileQ = Number(tileQRaw);
-  const tileR = Number(tileRRaw);
-  const neighborKey = makeTileKey(tileQ + outwardQ, tileR + outwardR);
-  for (const edge of lobby.edgesById.values()) {
-    if (!edge.adjacentTileKeys.includes(tileKey)) {
-      continue;
+): [string, string] | null {
+  const centerX2 = tileQ * 3;
+  const centerY2 = (-tileQ - tileR) * 3;
+  const centerZ2 = tileR * 3;
+  const dirX = outwardQ;
+  const dirY = -outwardQ - outwardR;
+  const dirZ = outwardR;
+  let bestScore = Number.NEGATIVE_INFINITY;
+  let secondScore = Number.NEGATIVE_INFINITY;
+  let bestId: string | null = null;
+  let secondId: string | null = null;
+  for (let i = 0; i < CORNER_OFFSETS.length; i += 1) {
+    const offset = CORNER_OFFSETS[i];
+    const score = offset.x2 * dirX + offset.y2 * dirY + offset.z2 * dirZ;
+    const vertexId = `${centerX2 + offset.x2},${centerY2 + offset.y2},${centerZ2 + offset.z2}`;
+    if (score > bestScore) {
+      secondScore = bestScore;
+      secondId = bestId;
+      bestScore = score;
+      bestId = vertexId;
+    } else if (score > secondScore) {
+      secondScore = score;
+      secondId = vertexId;
     }
-    if (edge.adjacentTileKeys.includes(neighborKey)) {
-      continue;
-    }
-    return edge;
   }
-  return undefined;
+  if (!bestId || !secondId) {
+    return null;
+  }
+  if (!lobby.verticesById.has(bestId) || !lobby.verticesById.has(secondId)) {
+    return null;
+  }
+  return [bestId, secondId];
 }

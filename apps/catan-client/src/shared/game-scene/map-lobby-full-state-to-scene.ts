@@ -14,6 +14,7 @@ export function mapLobbyFullStateToSceneState(payload: LobbyFullStatePayload): L
       resources: p.resources,
       totalResourceCards: p.totalResourceCards,
       devCardsInHand: p.devCardsInHand,
+      remainingPieces: p.remainingPieces,
       devCardTypes: p.isSelf ? payload.selfDevCards : null,
     });
   }

@@ -2,6 +2,7 @@ import { computed, DestroyRef, effect, inject, Injectable, signal } from '@angul
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslateService } from '@ngx-translate/core';
+import { firstValueFrom } from 'rxjs';
 import {
   ClientStorageKey,
   GamePhase,
@@ -10,6 +11,7 @@ import {
   normalizeLobbyCode,
 } from '@catan/api-interfaces';
 import { GameStateResource } from '../../core/game/game-state.resource';
+import { LobbyHttpService } from '../../core/lobby/lobby-http.service';
 import { GameSocketService } from '../../core/socket/game-socket.service';
 import { PlayerSessionService } from '../../core/session/player-session.service';
 import { GameSettingsService } from '../game-settings/game-settings.service';
@@ -34,6 +36,7 @@ export class SessionLobbyFlowService {
   private readonly spectatorCamService = inject(SpectatorCameraService);
   private readonly translate = inject(TranslateService);
   private readonly lobbyGameUi = inject(LobbyShellGameUiService);
+  private readonly lobbyHttp = inject(LobbyHttpService);
   private readonly destroyRef = inject(DestroyRef);
 
   public readonly uiStep = signal<LobbyUiStep>(LobbyUiStep.SignIn);
@@ -41,6 +44,8 @@ export class SessionLobbyFlowService {
   public readonly joinInProgress = signal<boolean>(false);
   public readonly leaveLobbyPromptOpen = signal<boolean>(false);
   public readonly lastLobbyCode = signal<string>(readStoredLastLobbyCode());
+  public readonly lastLobbyRejoinAvailable = signal<boolean>(false);
+  private lastLobbyRejoinProbeGeneration = 0;
 
   public readonly isJoinInProgress = computed<boolean>(() => this.joinInProgress());
 
@@ -69,6 +74,16 @@ export class SessionLobbyFlowService {
       if (this.uiStep() === LobbyUiStep.SignIn) {
         this.spectatorCamService.reset();
       }
+    });
+    effect(() => {
+      const step = this.uiStep();
+      const lobbyCode = this.lastLobbyCode();
+      const session = this.sessionState();
+      if (step !== LobbyUiStep.JoinLobby || lobbyCode.length === 0 || session === null) {
+        this.lastLobbyRejoinAvailable.set(false);
+        return;
+      }
+      void this.refreshLastLobbyRejoinAvailability(lobbyCode);
     });
     this.sockets.lobbyTerminated$
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -116,6 +131,7 @@ export class SessionLobbyFlowService {
 
   public forgetLastLobby(): void {
     this.lastLobbyCode.set('');
+    this.lastLobbyRejoinAvailable.set(false);
     clearStoredLastLobbyCode();
   }
 
@@ -369,6 +385,34 @@ export class SessionLobbyFlowService {
     }
     this.lastLobbyCode.set(normalized);
     writeStoredLastLobbyCode(normalized);
+  }
+
+  private async refreshLastLobbyRejoinAvailability(lobbyCode: string): Promise<void> {
+    const generation = this.lastLobbyRejoinProbeGeneration + 1;
+    this.lastLobbyRejoinProbeGeneration = generation;
+    this.lastLobbyRejoinAvailable.set(false);
+    try {
+      await this.playerSession.ensureReady();
+      if (this.playerSession.sessionId().length === 0) {
+        return;
+      }
+      const result = await firstValueFrom(this.lobbyHttp.checkRejoinAvailable(lobbyCode));
+      if (generation !== this.lastLobbyRejoinProbeGeneration) {
+        return;
+      }
+      if (!result.available) {
+        this.forgetLastLobby();
+        return;
+      }
+      if (result.lobbyCode !== undefined && result.lobbyCode.length > 0) {
+        this.rememberLastLobby(result.lobbyCode);
+      }
+      this.lastLobbyRejoinAvailable.set(true);
+    } catch {
+      if (generation === this.lastLobbyRejoinProbeGeneration) {
+        this.lastLobbyRejoinAvailable.set(false);
+      }
+    }
   }
 }
 

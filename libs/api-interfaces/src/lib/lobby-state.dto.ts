@@ -31,6 +31,12 @@ export interface PlayerHarborRatesDto {
   readonly perResource: Readonly<Record<ResourceType, number>>;
 }
 
+export interface PlayerRemainingPiecesDto {
+  readonly roads: number;
+  readonly settlements: number;
+  readonly cities: number;
+}
+
 export interface LobbyPlayerPublicDto {
   readonly seat: PlayerSeat;
   readonly displayName: string;
@@ -49,6 +55,7 @@ export interface LobbyPlayerPublicDto {
   readonly totalVictoryPoints: number;
   readonly longestRoadLength: number;
   readonly harborRates: PlayerHarborRatesDto;
+  readonly remainingPieces: PlayerRemainingPiecesDto;
   /** Epoch ms when the reconnect grace expires; null means connected or already past grace. */
   readonly disconnectGraceExpiresAt: number | null;
   /** True after grace expired without reconnect — admin may kick & replace with a bot. */

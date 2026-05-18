@@ -14,7 +14,8 @@ export function countRoadsForSeat(lobby: LobbyRuntime, seat: PlayerSeat): number
 export function countSettlementsForSeat(lobby: LobbyRuntime, seat: PlayerSeat): number {
   let count = 0;
   for (let i = 0; i < lobby.settlements.length; i += 1) {
-    if (lobby.settlements[i].seat === seat) {
+    const settlement = lobby.settlements[i];
+    if (settlement.seat === seat && !settlement.isCity) {
       count += 1;
     }
   }
@@ -48,4 +49,16 @@ export function assertCityPieceAvailable(lobby: LobbyRuntime, seat: PlayerSeat):
   if (countCitiesForSeat(lobby, seat) >= PieceBankLimit.CitiesPerPlayer) {
     throw new Error(ActionRejectCode.IllegalPlacement);
   }
+}
+
+export function countRemainingRoadsForSeat(lobby: LobbyRuntime, seat: PlayerSeat): number {
+  return Math.max(0, PieceBankLimit.RoadsPerPlayer - countRoadsForSeat(lobby, seat));
+}
+
+export function countRemainingSettlementsForSeat(lobby: LobbyRuntime, seat: PlayerSeat): number {
+  return Math.max(0, PieceBankLimit.SettlementsPerPlayer - countSettlementsForSeat(lobby, seat));
+}
+
+export function countRemainingCitiesForSeat(lobby: LobbyRuntime, seat: PlayerSeat): number {
+  return Math.max(0, PieceBankLimit.CitiesPerPlayer - countCitiesForSeat(lobby, seat));
 }

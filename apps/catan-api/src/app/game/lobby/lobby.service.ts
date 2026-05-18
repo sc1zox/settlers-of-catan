@@ -20,6 +20,11 @@ import {
 } from '../utils/public-player-resources.util';
 import { resolveHarborRates } from '../utils/harbor-rate.util';
 import { getTotalVictoryPoints } from '../utils/scoring.util';
+import {
+  countRemainingCitiesForSeat,
+  countRemainingRoadsForSeat,
+  countRemainingSettlementsForSeat,
+} from '../utils/piece-bank.util';
 
 @Injectable()
 export class LobbyService {
@@ -118,6 +123,11 @@ export class LobbyService {
         totalVictoryPoints: getTotalVictoryPoints(p),
         longestRoadLength: p.longestRoadLength,
         harborRates: resolveHarborRates(lobby, p.seat),
+        remainingPieces: {
+          roads: countRemainingRoadsForSeat(lobby, p.seat),
+          settlements: countRemainingSettlementsForSeat(lobby, p.seat),
+          cities: countRemainingCitiesForSeat(lobby, p.seat),
+        },
         disconnectGraceExpiresAt: p.disconnectGraceExpiresAt,
         awaitingAdminDecision: p.awaitingAdminDecision,
       };

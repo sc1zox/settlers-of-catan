@@ -187,7 +187,7 @@
                     | translate: { displayName: ui.lobbyFlow.sessionState()?.displayName ?? '' }
                 }}
               </p>
-              @if (ui.lobbyFlow.lastLobbyCode().length > 0) {
+              @if (ui.lobbyFlow.lastLobbyRejoinAvailable()) {
                 <div class="button-row">
                   <button
                     type="button"

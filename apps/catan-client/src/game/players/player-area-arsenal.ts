@@ -220,9 +220,9 @@ export class PlayerAreaArsenal {
     figure.scale.lerpVectors(this.flightStartScale, this.flightTargetScale, eased);
 
     if (t >= 1) {
-      figure.position.copy(this.flightTargetPos);
-      figure.quaternion.copy(this.flightTargetQuat);
-      figure.scale.copy(this.flightTargetScale);
+      figure.position.copy(this.flightStartPos);
+      figure.quaternion.copy(this.flightStartQuat);
+      figure.scale.copy(this.flightStartScale);
       figure.visible = false;
       this.flying = false;
       this.flyingFigure = null;

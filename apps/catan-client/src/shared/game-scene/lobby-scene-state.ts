@@ -17,6 +17,11 @@ export interface LobbyScenePlayerState {
   readonly resources: Readonly<Record<ResourceType, number>>;
   readonly totalResourceCards: number;
   readonly devCardsInHand: number;
+  readonly remainingPieces: {
+    readonly roads: number;
+    readonly settlements: number;
+    readonly cities: number;
+  };
   /**
    * Only populated for the viewer's own seat. Other seats receive `null`;
    * those seats show generic backs in the 3D hand, count comes from

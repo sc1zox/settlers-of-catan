@@ -18,6 +18,7 @@ import {
   BonusAwardKind,
   BuildKind,
   GamePhase,
+  PieceBankLimit,
   PlayerSeat,
   ResourceType,
   SceneUserDataKey,
@@ -425,34 +426,52 @@ export class GameEngine {
   }
 
   /**
-   * Drive every seat's arsenal visibility from the server-authoritative
-   * `settlements` / `roads` arrays. Bug-history note: arsenal counts used to be
-   * implicit local state (the figure flew away and stayed invisible), which
-   * leaked across lobbies and never reflected other players' builds.
+   * Drive every seat's arsenal visibility from server-side piece-bank numbers.
+   * This avoids client-side drift when animations overlap or when a new match
+   * starts after an old one in the same browser session.
    */
-  private syncArsenalRemainingPieces(
-    settlements: LobbySceneState['settlements'],
-    roads: LobbySceneState['roads'],
-  ): void {
-    const settlementsPlacedBySeat: number[] = [0, 0, 0, 0];
-    const citiesPlacedBySeat: number[] = [0, 0, 0, 0];
-    const roadsPlacedBySeat: number[] = [0, 0, 0, 0];
-    for (let i = 0; i < settlements.length; i += 1) {
-      const dto = settlements[i];
-      if (dto.isCity) {
-        citiesPlacedBySeat[dto.seat] += 1;
-      } else {
-        settlementsPlacedBySeat[dto.seat] += 1;
+  private syncArsenalRemainingPieces(players: LobbySceneState['players']): void {
+    const remainingBySeat: {
+      roads: number;
+      settlements: number;
+      cities: number;
+    }[] = [
+      {
+        roads: PieceBankLimit.RoadsPerPlayer,
+        settlements: PieceBankLimit.SettlementsPerPlayer,
+        cities: PieceBankLimit.CitiesPerPlayer,
+      },
+      {
+        roads: PieceBankLimit.RoadsPerPlayer,
+        settlements: PieceBankLimit.SettlementsPerPlayer,
+        cities: PieceBankLimit.CitiesPerPlayer,
+      },
+      {
+        roads: PieceBankLimit.RoadsPerPlayer,
+        settlements: PieceBankLimit.SettlementsPerPlayer,
+        cities: PieceBankLimit.CitiesPerPlayer,
+      },
+      {
+        roads: PieceBankLimit.RoadsPerPlayer,
+        settlements: PieceBankLimit.SettlementsPerPlayer,
+        cities: PieceBankLimit.CitiesPerPlayer,
+      },
+    ];
+    for (let i = 0; i < players.length; i += 1) {
+      const seat = players[i].seat;
+      if (seat < 0 || seat >= remainingBySeat.length) {
+        continue;
       }
-    }
-    for (let i = 0; i < roads.length; i += 1) {
-      roadsPlacedBySeat[roads[i].seat] += 1;
+      remainingBySeat[seat] = players[i].remainingPieces;
     }
     for (let s = 0; s < this.players.length; s += 1) {
       this.players[s].setPlacedArsenalPieces({
-        settlements: settlementsPlacedBySeat[s],
-        cities: citiesPlacedBySeat[s],
-        roads: roadsPlacedBySeat[s],
+        settlements: Math.max(
+          0,
+          PieceBankLimit.SettlementsPerPlayer - remainingBySeat[s].settlements,
+        ),
+        cities: Math.max(0, PieceBankLimit.CitiesPerPlayer - remainingBySeat[s].cities),
+        roads: Math.max(0, PieceBankLimit.RoadsPerPlayer - remainingBySeat[s].roads),
       });
     }
   }
@@ -678,7 +697,7 @@ export class GameEngine {
     }
     // Must run after startArsenalFlyIn so flyingFigure is set — the sync below
     // skips that figure to avoid teleporting it back to the arsenal mid-flight.
-    this.syncArsenalRemainingPieces(state.settlements, state.roads);
+    this.syncArsenalRemainingPieces(state.players);
     this.robberFigure.syncCoord(state.robberCoord.q, state.robberCoord.r, boardJustRebuilt);
     for (let i = 0; i < state.players.length; i += 1) {
       const playerState = state.players[i];

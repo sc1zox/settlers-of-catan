@@ -11,6 +11,7 @@ export enum HttpApiRelativePath {
   SessionBootstrap = 'session/bootstrap',
   SessionRefresh = 'session/refresh',
   LobbyCreate = 'lobby/create',
+  LobbyRejoinAvailable = 'lobby/rejoin-available',
 }
 
 export enum ProcessEnvKey {

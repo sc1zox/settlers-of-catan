@@ -34,5 +34,6 @@ export * from './lib/webcam-quality.enum';
 export * from './lib/webcam-media-scope';
 export * from './lib/scene-display-scope';
 export * from './lib/livekit.dto';
+export * from './lib/lobby-http.dto';
 export * from './lib/redis-key.enum';
 export * from './lib/lobby-id.util';

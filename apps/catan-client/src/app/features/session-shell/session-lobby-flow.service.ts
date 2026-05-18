@@ -2,7 +2,13 @@ import { computed, DestroyRef, effect, inject, Injectable, signal } from '@angul
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslateService } from '@ngx-translate/core';
-import { GamePhase, LiveKitCredentialsPayload, isLobbyCodeValid } from '@catan/api-interfaces';
+import {
+  ClientStorageKey,
+  GamePhase,
+  LiveKitCredentialsPayload,
+  isLobbyCodeValid,
+  normalizeLobbyCode,
+} from '@catan/api-interfaces';
 import { GameStateResource } from '../../core/game/game-state.resource';
 import { GameSocketService } from '../../core/socket/game-socket.service';
 import { PlayerSessionService } from '../../core/session/player-session.service';
@@ -34,6 +40,7 @@ export class SessionLobbyFlowService {
   public readonly sessionState = signal<SessionUiState | null>(null);
   public readonly joinInProgress = signal<boolean>(false);
   public readonly leaveLobbyPromptOpen = signal<boolean>(false);
+  public readonly lastLobbyCode = signal<string>(readStoredLastLobbyCode());
 
   public readonly isJoinInProgress = computed<boolean>(() => this.joinInProgress());
 
@@ -99,6 +106,19 @@ export class SessionLobbyFlowService {
     void this.runCreateLobby(sessionState, lobbyCodeInput);
   }
 
+  public submitRejoinLastLobby(): void {
+    const code = this.lastLobbyCode();
+    if (code.length === 0) {
+      return;
+    }
+    void this.runJoinLobby(this.sessionState(), code);
+  }
+
+  public forgetLastLobby(): void {
+    this.lastLobbyCode.set('');
+    clearStoredLastLobbyCode();
+  }
+
   public backToSignIn(): void {
     void this.liveKit.abandonPrimedLocalVideoCapture();
     this.joinInProgress.set(false);
@@ -130,6 +150,7 @@ export class SessionLobbyFlowService {
     this.gameState.disconnectLobby();
     this.joinInProgress.set(false);
     this.spectatorCamService.reset();
+    this.forgetLastLobby();
     this.uiStep.set(LobbyUiStep.JoinLobby);
     this.shellFeedback.setFeedback(
       UiFeedbackTone.Info,
@@ -147,6 +168,7 @@ export class SessionLobbyFlowService {
     this.joinInProgress.set(false);
     this.shellFeedback.clearFeedback();
     this.spectatorCamService.reset();
+    this.forgetLastLobby();
     this.uiStep.set(LobbyUiStep.SignIn);
   }
 
@@ -251,6 +273,7 @@ export class SessionLobbyFlowService {
       const joined = await this.gameState.joinLobby(lobbyCodeInput, session.displayName);
       this.uiStep.set(LobbyUiStep.Lobby);
       this.joinInProgress.set(false);
+      this.rememberLastLobby(joined.lobbyCode);
       const joinedKey =
         joined.lobbyIdleRecycled === true
           ? marker('shell.joinSuccessRecycledStaleLobby')
@@ -309,6 +332,7 @@ export class SessionLobbyFlowService {
       const joined = await this.gameState.createLobby(lobbyCodeInput, session.displayName);
       this.uiStep.set(LobbyUiStep.Lobby);
       this.joinInProgress.set(false);
+      this.rememberLastLobby(joined.lobbyCode);
       this.shellFeedback.setFeedback(
         UiFeedbackTone.Success,
         this.translate.instant(marker('shell.createSuccess'), {
@@ -336,5 +360,38 @@ export class SessionLobbyFlowService {
     lobbyCode: string,
   ): string {
     return resolveUserFacingErrorMessage(this.translate, error, fallbackKey, { lobbyCode });
+  }
+
+  private rememberLastLobby(lobbyCode: string): void {
+    const normalized = normalizeLobbyCode(lobbyCode);
+    if (normalized.length === 0) {
+      return;
+    }
+    this.lastLobbyCode.set(normalized);
+    writeStoredLastLobbyCode(normalized);
+  }
+}
+
+function readStoredLastLobbyCode(): string {
+  try {
+    return localStorage.getItem(ClientStorageKey.LastLobbyCode) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function writeStoredLastLobbyCode(lobbyCode: string): void {
+  try {
+    localStorage.setItem(ClientStorageKey.LastLobbyCode, lobbyCode);
+  } catch {
+    // localStorage may be unavailable (private mode / quota). Rejoin still works in-session via the signal.
+  }
+}
+
+function clearStoredLastLobbyCode(): void {
+  try {
+    localStorage.removeItem(ClientStorageKey.LastLobbyCode);
+  } catch {
+    // ignore
   }
 }

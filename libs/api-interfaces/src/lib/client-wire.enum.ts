@@ -10,6 +10,7 @@ export enum ClientStorageKey {
   WebcamEnabled = 'catan.webcamEnabled',
   WebcamQuality = 'catan.webcamQuality',
   SceneBrightness = 'catan.sceneBrightness',
+  LastLobbyCode = 'catan.lastLobbyCode',
 }
 
 export enum UiLocale {

@@ -175,7 +175,7 @@ export class LobbyService {
     }
     void this.redisLobby
       .refreshLobbyActivity(lobby.lobbyId, lobby.lobbyCode)
-      .catch((error: unknown) => {
+      .catch((_error: unknown) => {
         this.logger.debug('refreshLobbyActivity failed');
       });
   }

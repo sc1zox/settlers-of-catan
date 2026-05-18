@@ -45,7 +45,7 @@ export class LiveKitRoomService {
     }
     try {
       await this.roomClient.deleteRoom(roomName);
-    } catch (error: unknown) {
+    } catch {
       this.logger.debug('LiveKit deleteRoom failed');
     }
   }

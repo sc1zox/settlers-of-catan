@@ -186,6 +186,20 @@
                     | translate: { displayName: ui.lobbyFlow.sessionState()?.displayName ?? '' }
                 }}
               </p>
+              @if (ui.lobbyFlow.lastLobbyCode().length > 0) {
+                <div class="button-row">
+                  <button
+                    type="button"
+                    [disabled]="ui.lobbyFlow.isJoinInProgress()"
+                    (click)="ui.lobbyFlow.submitRejoinLastLobby()"
+                  >
+                    {{
+                      'shell.buttonRejoinLastLobby'
+                        | translate: { lobbyCode: ui.lobbyFlow.lastLobbyCode() }
+                    }}
+                  </button>
+                </div>
+              }
               <label for="lobbyCode">{{ 'shell.labelLobbyCode' | translate }}</label>
               <input id="lobbyCode" type="text" autocomplete="off" formControlName="lobbyCode" />
               @if (

@@ -114,6 +114,10 @@ export class PlayerAreaArsenal {
     );
   }
 
+  public hasAvailableArsenalFigure(kind: BuildKind): boolean {
+    return this.pickAvailableArsenalFigure(kind) !== null;
+  }
+
   public flyActivatedFigureToWorld(
     worldPosition: Vector3,
     worldQuaternion: Quaternion,
@@ -125,10 +129,56 @@ export class PlayerAreaArsenal {
       onArrive();
       return;
     }
-    this.flyingFigure = figure;
     this.activatedFigure = null;
     this.activatedTarget = 0;
     this.activatedT = 0;
+    this.startFlight(figure, worldPosition, worldQuaternion, worldScale, onArrive);
+  }
+
+  /**
+   * Pick any still-available arsenal figure of the requested kind and fly it
+   * to the world target. Used when a remote player places a piece so every
+   * viewer sees the figure leave that player's arsenal rather than just
+   * popping in at the destination. Returns false when the arsenal has no
+   * figure left to fly (caller should then reveal the piece immediately).
+   */
+  public flyArsenalFigureOfKindToWorld(
+    kind: BuildKind,
+    worldPosition: Vector3,
+    worldQuaternion: Quaternion,
+    worldScale: Vector3,
+    onArrive: () => void,
+  ): boolean {
+    const figure = this.pickAvailableArsenalFigure(kind);
+    if (figure === null) {
+      onArrive();
+      return false;
+    }
+    this.startFlight(figure, worldPosition, worldQuaternion, worldScale, onArrive);
+    return true;
+  }
+
+  private pickAvailableArsenalFigure(kind: BuildKind): Object3D | null {
+    const figures = this.figuresByKind[kind];
+    for (let i = 0; i < figures.length; i += 1) {
+      const figure = figures[i];
+      if (figure === this.flyingFigure) continue;
+      if (figure === this.activatedFigure) continue;
+      if (!figure.visible) continue;
+      return figure;
+    }
+    return null;
+  }
+
+  private startFlight(
+    figure: Object3D,
+    worldPosition: Vector3,
+    worldQuaternion: Quaternion,
+    worldScale: Vector3,
+    onArrive: () => void,
+  ): void {
+    this.flyingFigure = figure;
+    figure.visible = true;
 
     this.flightStartPos.copy(figure.position);
     this.flightStartQuat.copy(figure.quaternion);

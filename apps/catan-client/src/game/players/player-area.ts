@@ -158,6 +158,10 @@ export class PlayerArea {
     return this.arsenalKit.hasActivatedArsenalFigure(kind);
   }
 
+  public hasAvailableArsenalFigure(kind: BuildKind): boolean {
+    return this.arsenalKit.hasAvailableArsenalFigure(kind);
+  }
+
   public setPlacedArsenalPieces(placed: ArsenalPlacedPieces): void {
     this.arsenalKit.setPlacedPieces(placed);
   }
@@ -169,6 +173,22 @@ export class PlayerArea {
     onArrive: () => void,
   ): void {
     this.arsenalKit.flyActivatedFigureToWorld(worldPosition, worldQuaternion, worldScale, onArrive);
+  }
+
+  public flyArsenalFigureOfKindToWorld(
+    kind: BuildKind,
+    worldPosition: Vector3,
+    worldQuaternion: Quaternion,
+    worldScale: Vector3,
+    onArrive: () => void,
+  ): boolean {
+    return this.arsenalKit.flyArsenalFigureOfKindToWorld(
+      kind,
+      worldPosition,
+      worldQuaternion,
+      worldScale,
+      onArrive,
+    );
   }
 
   public setHand(

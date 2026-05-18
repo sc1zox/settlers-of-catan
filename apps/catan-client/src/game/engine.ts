@@ -412,10 +412,20 @@ export class GameEngine {
   }
 
   private canFlyInArsenalFigure(kind: BuildKind, seat: PlayerSeat): boolean {
-    if (this.selfSeat === null || seat !== this.selfSeat) {
+    if (!this.playerAreaActiveAtTable[seat]) {
       return false;
     }
-    return this.players[this.selfSeat]?.hasActivatedArsenalFigure(kind) ?? false;
+    const area = this.players[seat];
+    if (!area) {
+      return false;
+    }
+    if (seat === this.selfSeat && area.hasActivatedArsenalFigure(kind)) {
+      return true;
+    }
+    // Spectator path: any seated player's placement flies from their own
+    // arsenal so every viewer sees the figure leave the building player's
+    // pile, not just the one who clicked.
+    return area.hasAvailableArsenalFigure(kind);
   }
 
   /**
@@ -452,22 +462,31 @@ export class GameEngine {
   }
 
   private startArsenalFlyIn(piece: SpawnedBuildPiece): void {
-    if (this.selfSeat === null) {
-      return;
-    }
-    const selfArea = this.players[this.selfSeat];
-    if (!selfArea) {
+    const area = this.players[piece.seat];
+    if (!area || !this.playerAreaActiveAtTable[piece.seat]) {
+      this.buildings.revealPiece(piece.kind, piece.id);
       return;
     }
     piece.figure.updateWorldMatrix(true, false);
     piece.figure.getWorldPosition(this.flyInScratchPos);
     piece.figure.getWorldQuaternion(this.flyInScratchQuat);
     piece.figure.getWorldScale(this.flyInScratchScale);
-    selfArea.flyActivatedFigureToWorld(
+    const onArrive = () => this.buildings.revealPiece(piece.kind, piece.id);
+    if (piece.seat === this.selfSeat && area.hasActivatedArsenalFigure(piece.kind)) {
+      area.flyActivatedFigureToWorld(
+        this.flyInScratchPos,
+        this.flyInScratchQuat,
+        this.flyInScratchScale,
+        onArrive,
+      );
+      return;
+    }
+    area.flyArsenalFigureOfKindToWorld(
+      piece.kind,
       this.flyInScratchPos,
       this.flyInScratchQuat,
       this.flyInScratchScale,
-      () => this.buildings.revealPiece(piece.kind, piece.id),
+      onArrive,
     );
   }
 
@@ -631,9 +650,13 @@ export class GameEngine {
     this.legalRoadEdgeIds = state.legalRoadEdgeIds;
     this.legalCityVertexIds = state.legalCityVertexIds;
     this.legalRoadBuildingEdgeIds = state.legalRoadBuildingEdgeIds;
-    const flyIns = this.buildings.syncToState(state.settlements, state.roads, (kind, seat) =>
-      this.canFlyInArsenalFigure(kind, seat),
-    );
+    // Skip arsenal fly-in on the very first sync of a board (new lobby, page
+    // reload, viewer joining mid-game) — otherwise every pre-existing piece
+    // would fly in simultaneously from every seat's arsenal.
+    const shouldFlyIn = boardJustRebuilt
+      ? undefined
+      : (kind: BuildKind, seat: PlayerSeat) => this.canFlyInArsenalFigure(kind, seat);
+    const flyIns = this.buildings.syncToState(state.settlements, state.roads, shouldFlyIn);
     for (let i = 0; i < flyIns.length; i += 1) {
       this.startArsenalFlyIn(flyIns[i]);
     }

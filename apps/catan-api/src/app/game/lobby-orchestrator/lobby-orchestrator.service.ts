@@ -82,7 +82,7 @@ export class LobbyOrchestratorService {
     const lobbyIdleRecycled = priorCanonical !== undefined && priorCanonical !== canonicalLobbyId;
     if (lobbyIdleRecycled) {
       this.lobby.evictLobby(priorCanonical);
-      void this.liveKit.deleteRoom(priorCanonical).catch((error: unknown) => {
+      void this.liveKit.deleteRoom(priorCanonical).catch((_error: unknown) => {
         this.logger.debug('LiveKit deleteRoom stale failed');
       });
     }
@@ -204,7 +204,7 @@ export class LobbyOrchestratorService {
     if (wasAdmin) {
       lobby.adminSessionToken = pickFallbackHumanAdminSessionToken(lobby);
     }
-    void this.redisLobby.removeMember(lobby.lobbyId, oldSessionToken).catch((error: unknown) => {
+    void this.redisLobby.removeMember(lobby.lobbyId, oldSessionToken).catch((_error: unknown) => {
       this.logger.debug('Redis removeMember failed');
     });
     this.logger.log(
@@ -293,13 +293,13 @@ export class LobbyOrchestratorService {
     lobby.clearAllDisconnectTimers();
     try {
       await this.redisLobby.deleteLobby(lobby.lobbyId, lobby.lobbyCode);
-    } catch (error: unknown) {
+    } catch {
       this.logger.debug('Redis deleteLobby failed');
     }
     this.lobby.removeLobby(lobby.lobbyId, lobby.lobbyCode);
     try {
       await this.liveKit.deleteRoom(lobby.lobbyId);
-    } catch (error: unknown) {
+    } catch {
       this.logger.debug('LiveKit deleteRoom failed');
     }
   }

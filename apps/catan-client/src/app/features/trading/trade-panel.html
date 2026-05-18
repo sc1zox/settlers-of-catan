@@ -277,7 +277,7 @@
                 type="button"
                 class="accept"
                 [disabled]="
-                  mySlot.status === recipientStatusEnum.Accepted ||
+                  mySlot.status !== recipientStatusEnum.Pending ||
                   !canAcceptIncoming() ||
                   hasAnyPending()
                 "
@@ -294,7 +294,7 @@
                 type="button"
                 class="reject"
                 [disabled]="
-                  mySlot.status === recipientStatusEnum.Rejected ||
+                  mySlot.status !== recipientStatusEnum.Pending ||
                   hasAnyPending()
                 "
                 (click)="reject.emit(trade.id)"
@@ -309,7 +309,10 @@
               <button
                 type="button"
                 class="revise"
-                [disabled]="hasAnyPending()"
+                [disabled]="
+                  mySlot.status !== recipientStatusEnum.Pending ||
+                  hasAnyPending()
+                "
                 (click)="enterCounterMode()"
               >
                 {{ 'trade.revise' | translate }}

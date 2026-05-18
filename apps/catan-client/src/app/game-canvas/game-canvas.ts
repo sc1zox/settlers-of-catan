@@ -102,7 +102,9 @@ export class GameCanvas implements AfterViewInit, OnDestroy {
       return;
     }
     if (!state) {
-      this.engine.clearLobbySceneOverlay();
+      if (this.gameState.connection() === undefined) {
+        this.engine.clearLobbySceneOverlay();
+      }
       return;
     }
     const scene = mapLobbyFullStateToSceneState(state);

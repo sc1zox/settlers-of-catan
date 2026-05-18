@@ -1,4 +1,5 @@
 export * from './lib/api-bootstrap.enum';
+export * from './lib/api-log-level.enum';
 export * from './lib/avatar-kind.enum';
 export * from './lib/bonus-award.enum';
 export * from './lib/api-envelope.dto';

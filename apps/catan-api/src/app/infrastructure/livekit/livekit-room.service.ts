@@ -34,7 +34,7 @@ export class LiveKitRoomService {
     } catch (error: unknown) {
       const message = String(error);
       if (!message.toLowerCase().includes('already exists')) {
-        this.logger.debug('LiveKit createRoom failed');
+        this.logger.warn(`LiveKit createRoom failed for ${roomName}`);
       }
     }
   }

@@ -19,6 +19,7 @@ import { SessionRobberFlowService } from './session-robber-flow.service';
 import { SessionTradingPanelService } from './session-trading-panel.service';
 import { SessionDevCardOverlayService } from './session-dev-card-overlay.service';
 import { SessionShellFacadeService } from './session-shell-facade.service';
+import { SessionCleanupService } from './session-cleanup.service';
 
 @Component({
   selector: 'app-session-shell',
@@ -49,8 +50,10 @@ import { SessionShellFacadeService } from './session-shell-facade.service';
     SessionRobberFlowService,
     SessionTradingPanelService,
     SessionDevCardOverlayService,
+    SessionCleanupService,
   ],
 })
 export class SessionShell {
   public readonly ui = inject(SessionShellFacadeService);
+  private readonly cleanup = inject(SessionCleanupService);
 }

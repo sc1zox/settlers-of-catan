@@ -27,13 +27,8 @@ export class SessionRobberFlowService {
   private readonly pendingRobberCoord = signal<{ q: number; r: number } | null>(null);
   public readonly robberVictim = signal<RobberVictimModel | null>(null);
 
-  public resetForSpectatorMode(): void {
-    this.knightActiveSignal.set(false);
-    this.pendingRobberCoord.set(null);
-    this.robberVictim.set(null);
-  }
-
-  public resetForLobbyLeave(): void {
+  /** Wipe local mode state. Called by the session cleanup coordinator. */
+  public resetSession(): void {
     this.knightActiveSignal.set(false);
     this.pendingRobberCoord.set(null);
     this.robberVictim.set(null);

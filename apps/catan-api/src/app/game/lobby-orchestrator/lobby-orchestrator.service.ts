@@ -22,7 +22,7 @@ import {
   pickFallbackHumanAdminSessionToken,
 } from '../lobby/lobby-runtime';
 import { LobbyService } from '../lobby/lobby.service';
-import { TradeReconnectService } from '../trade/trade-reconnect.service';
+import { ReconnectService } from '../reconnect/reconnect.service';
 
 const PLAYER_DISCONNECT_GRACE_MS = 120_000;
 const EMPTY_LOBBY_CLEANUP_DELAY_MS = 30_000;
@@ -38,7 +38,7 @@ export class LobbyOrchestratorService {
     private readonly demoBots: DemoBotService,
     private readonly redisLobby: RedisLobbyStoreService,
     private readonly liveKit: LiveKitRoomService,
-    private readonly tradeReconnect: TradeReconnectService,
+    private readonly reconnect: ReconnectService,
   ) {}
 
   public async createLobby(
@@ -130,8 +130,7 @@ export class LobbyOrchestratorService {
     player.socketId = client.id;
     player.disconnectGraceExpiresAt = null;
     player.awaitingAdminDecision = false;
-    this.lobby.broadcastFullState(server, lobby);
-    this.tradeReconnect.resyncOpenTradesForSocket(server, lobby.lobbyId, client.id, player.seat);
+    this.reconnect.syncSocketIntoLobby(server, lobby, client.id, player.seat);
   }
 
   public onDisconnect(sessionToken: string, server: Server): void {

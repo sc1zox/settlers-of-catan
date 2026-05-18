@@ -22,6 +22,7 @@ import { LobbyOrchestratorModule } from './lobby-orchestrator/lobby-orchestrator
 import { MatchFlowModule } from './match-flow/match-flow.module';
 import { LobbySocketFacade } from './match-flow/lobby-socket.facade';
 import { TurnSocketFacade } from './match-flow/turn-socket.facade';
+import { ReconnectModule } from './reconnect/reconnect.module';
 import { RobberModule } from './robber/robber.module';
 import { RobberSocketFacade } from './robber/robber-socket.facade';
 import { SocketConnectionRegistry } from './gateway/socket-connection.registry';
@@ -34,6 +35,7 @@ import { TurnFlowModule } from './turn/turn-flow.module';
     LobbyModule,
     LobbyOrchestratorModule,
     MatchFlowModule,
+    ReconnectModule,
     RobberModule,
     DemoBotModule,
     DevCardsModule,

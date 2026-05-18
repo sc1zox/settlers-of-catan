@@ -1,7 +1,6 @@
-import { computed, DestroyRef, effect, inject, Injectable } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { computed, inject, Injectable } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
-import { DefaultDisplayName, GamePhase, ResourceType } from '@catan/api-interfaces';
+import { DefaultDisplayName, ResourceType } from '@catan/api-interfaces';
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslateService } from '@ngx-translate/core';
 import { GameStateResource } from '../../core/game/game-state.resource';
@@ -17,7 +16,6 @@ import { SessionBuildInteractionService } from './session-build-interaction.serv
 import { SessionRobberFlowService } from './session-robber-flow.service';
 import { SessionTradingPanelService } from './session-trading-panel.service';
 import { SessionDevCardOverlayService } from './session-dev-card-overlay.service';
-import { GameSocketService } from '../../core/socket/game-socket.service';
 
 @Injectable()
 export class SessionShellFacadeService {
@@ -36,8 +34,6 @@ export class SessionShellFacadeService {
   public readonly lobbyDepartedFeed = inject(LobbyDepartedFeedService);
   public readonly gameSettings = inject(GameSettingsService);
   public readonly spectatorCamService = inject(SpectatorCameraService);
-  private readonly sockets = inject(GameSocketService);
-  private readonly destroyRef = inject(DestroyRef);
 
   public readonly sessionForm = this.fb.nonNullable.group({
     displayName: this.fb.nonNullable.control<string>(DefaultDisplayName.PlayerDe, {
@@ -56,57 +52,6 @@ export class SessionShellFacadeService {
 
   public readonly lobbyUiStepEnum = LobbyUiStep;
   public readonly uiFeedbackToneEnum = UiFeedbackTone;
-
-  public constructor() {
-    effect(() => {
-      if (!this.spectatorCamService.mode()) {
-        return;
-      }
-      this.buildFlow.resetForSpectatorMode();
-      this.robberFlow.resetForSpectatorMode();
-      this.tradingPanel.resetForSpectatorMode();
-      this.devOverlay.resetForSpectatorMode();
-    });
-    // Whenever the active lobby changes (leave, hop, or kick), wipe any UI
-    // overlay state that was bound to the previous lobby. The render layer
-    // already follows the server FullState; this is the same guarantee for
-    // local mode signals (build mode, robber pick, trade panel, dev-card
-    // overlay) so a fresh lobby always starts with a clean UI.
-    let previousLobbyCode = '';
-    effect(() => {
-      const params = this.gameState.subscriptionParams();
-      const currentLobbyCode = params?.lobbyCode ?? '';
-      if (previousLobbyCode !== '' && previousLobbyCode !== currentLobbyCode) {
-        this.buildFlow.resetForLobbyLeave();
-        this.robberFlow.resetForLobbyLeave();
-        this.tradingPanel.resetForLobbyLeave();
-        this.devOverlay.resetForLobbyLeave();
-      }
-      previousLobbyCode = currentLobbyCode;
-    });
-    let previousPhase: GamePhase | undefined;
-    effect(() => {
-      const phase = this.lobbyGameUi.lobbyUiState()?.phase;
-      if (phase === undefined) {
-        previousPhase = undefined;
-        return;
-      }
-      if (previousPhase !== undefined && previousPhase !== phase) {
-        this.resetInteractionModes();
-      }
-      previousPhase = phase;
-    });
-    this.sockets.actionRejected$
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => {
-        this.resetInteractionModes();
-      });
-  }
-
-  private resetInteractionModes(): void {
-    this.buildFlow.resetForLobbyLeave();
-    this.robberFlow.resetForLobbyLeave();
-  }
 
   public lobbyCodeValue(): string {
     return this.lobbyForm.controls.lobbyCode.value;

@@ -14,14 +14,8 @@ export class SessionBuildInteractionService {
   public readonly buildConfirm = signal<BuildConfirmModel | null>(null);
   private readonly roadBuildingFirstEdgeId = signal<string | null>(null);
 
-  public resetForSpectatorMode(): void {
-    this.buildMode.set(null);
-    this.freeRoadMode.set(false);
-    this.buildConfirm.set(null);
-    this.roadBuildingFirstEdgeId.set(null);
-  }
-
-  public resetForLobbyLeave(): void {
+  /** Wipe local mode state. Called by the session cleanup coordinator. */
+  public resetSession(): void {
     this.buildMode.set(null);
     this.freeRoadMode.set(false);
     this.buildConfirm.set(null);

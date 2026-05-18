@@ -15,11 +15,8 @@ export class SessionDevCardOverlayService {
 
   public readonly devCardOpen = signal<boolean>(false);
 
-  public resetForSpectatorMode(): void {
-    this.devCardOpen.set(false);
-  }
-
-  public resetForLobbyLeave(): void {
+  /** Wipe local mode state. Called by the session cleanup coordinator. */
+  public resetSession(): void {
     this.devCardOpen.set(false);
   }
 

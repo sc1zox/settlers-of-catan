@@ -1,4 +1,4 @@
-import { computed, effect, inject, Injectable, OnDestroy, signal } from '@angular/core';
+import { computed, inject, Injectable, OnDestroy, signal } from '@angular/core';
 import {
   PlayerHarborRatesDto,
   ResourceType,
@@ -46,37 +46,27 @@ export class LobbyTradeUiService implements OnDestroy {
   });
 
   /**
-   * The single open trade involving the current viewer, or null.
+   * The single open trade thread involving the current viewer, or null.
    *
-   * Server is the only writer. FullState no longer carries trades — the
-   * board doesn't care who's haggling — so the cache is driven exclusively
-   * by `TradeUpdated`:
-   *  - action events (Created / Recipient* / etc.) only reach involved
-   *    sockets, so we apply each delta blind.
-   *  - Resync events are pushed on reconnect/join when the new socket
-   *    belongs to a seat that's already in an open thread.
-   *  - the cache is cleared when we lose the lobby binding (lobby switch
-   *    or sign-out) — without that, a stale trade from the previous lobby
-   *    would survive.
+   * Contract:
+   *  - At most ONE open trade per lobby — server enforces this by superseding
+   *    the previous thread before creating a new one (see
+   *    `TradeActionsService.proposeTrade`). Both events go out on the same
+   *    socket in order (Superseded → Created), so we can apply each delta
+   *    blind without trade-id bookkeeping.
+   *  - Server routes `TradeUpdated` only to involved sockets, so anything we
+   *    receive is by definition for our viewer.
+   *  - Resync re-emits the current thread when a socket rebinds to a lobby
+   *    it has a seat in.
+   *  - Lobby-scoped lifecycle (clearing on lobby switch / sign-out) is owned
+   *    by `SessionCleanupService` and arrives via {@link resetSession}.
    */
   private readonly currentTrade = signal<TradeOfferDto | null>(null);
   public readonly pendingTrade = this.currentTrade.asReadonly();
 
   private tradeUpdatedSubscription: Subscription | null = null;
-  private lastLobbyId: string | null = null;
 
   public constructor() {
-    effect(() => {
-      const payload = this.state.rawLobbyState();
-      const lobbyId = payload?.lobbyId ?? null;
-      if (lobbyId === this.lastLobbyId) {
-        return;
-      }
-      this.lastLobbyId = lobbyId;
-      if (this.currentTrade() !== null) {
-        this.currentTrade.set(null);
-      }
-    });
     this.tradeUpdatedSubscription = this.sockets.tradeUpdated$.subscribe((update) => {
       this.applyTradeUpdate(update);
     });
@@ -87,6 +77,11 @@ export class LobbyTradeUiService implements OnDestroy {
       this.tradeUpdatedSubscription.unsubscribe();
       this.tradeUpdatedSubscription = null;
     }
+  }
+
+  /** Drop any cached thread. Called by the session cleanup coordinator. */
+  public resetSession(): void {
+    this.currentTrade.set(null);
   }
 
   public readonly selfResources = computed<Readonly<Record<ResourceType, number>>>(
@@ -100,8 +95,6 @@ export class LobbyTradeUiService implements OnDestroy {
   public readonly selfHasOpenTrade = computed<boolean>(() => this.pendingTrade() !== null);
 
   private applyTradeUpdate(update: TradeUpdatedPayload): void {
-    // Server routes TradeUpdated only to involved sockets, so anything that
-    // reaches us is by definition for our viewer.
     switch (update.kind) {
       case TradeUpdateKind.Created:
       case TradeUpdateKind.RecipientAccepted:
@@ -109,18 +102,14 @@ export class LobbyTradeUiService implements OnDestroy {
       case TradeUpdateKind.RecipientCounterWithdrawn:
       case TradeUpdateKind.RecipientRejected:
       case TradeUpdateKind.Resync:
-        if (this.currentTrade() !== update.trade) {
-          this.currentTrade.set(update.trade);
-        }
-        break;
+        this.currentTrade.set(update.trade);
+        return;
       case TradeUpdateKind.Cancelled:
       case TradeUpdateKind.Finalized:
       case TradeUpdateKind.Superseded:
       case TradeUpdateKind.PhaseClosed:
-        if (this.currentTrade() !== null) {
-          this.currentTrade.set(null);
-        }
-        break;
+        this.currentTrade.set(null);
+        return;
     }
   }
 }

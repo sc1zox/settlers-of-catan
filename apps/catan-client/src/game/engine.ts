@@ -387,6 +387,9 @@ export class GameEngine {
     this.buildMode = kind;
     this.buildModeFreeRoad = freeRoad;
     if (kind === null) {
+      this.pendingArsenalFigure = null;
+    }
+    if (kind === null) {
       this.buildPreview.clear();
     } else {
       this.buildPreview.show(kind, this.resolveLegalIds(kind), this.selfColor());
@@ -397,15 +400,17 @@ export class GameEngine {
 
   private updateActivatedArsenalFigure(): void {
     if (this.selfSeat === null) {
-      return;
-    }
-    const selfArea = this.players[this.selfSeat];
-    if (!selfArea) {
+      this.pendingArsenalFigure = null;
+      for (let s = 0; s < this.players.length; s += 1) {
+        this.players[s].setActivatedArsenalFigure(null);
+      }
       return;
     }
     const figure =
       this.buildMode !== null && !this.buildModeFreeRoad ? this.pendingArsenalFigure : null;
-    selfArea.setActivatedArsenalFigure(figure);
+    for (let s = 0; s < this.players.length; s += 1) {
+      this.players[s].setActivatedArsenalFigure(s === this.selfSeat ? figure : null);
+    }
   }
 
   private canFlyInArsenalFigure(kind: BuildKind, seat: PlayerSeat): boolean {

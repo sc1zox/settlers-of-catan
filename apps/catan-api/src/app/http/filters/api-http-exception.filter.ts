@@ -13,7 +13,8 @@ import {
   HttpErrorCode,
   InternalApiErrorCode,
 } from '@catan/api-interfaces';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
+import { logUnexpectedError } from '../../infrastructure/logging/log-unexpected-error.util';
 
 @Catch()
 export class ApiHttpExceptionFilter implements ExceptionFilter {
@@ -23,6 +24,7 @@ export class ApiHttpExceptionFilter implements ExceptionFilter {
     if (host.getType() !== 'http') {
       throw exception;
     }
+    const req = host.switchToHttp().getRequest<Request>();
     const res = host.switchToHttp().getResponse<Response>();
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
@@ -30,7 +32,7 @@ export class ApiHttpExceptionFilter implements ExceptionFilter {
       res.status(status).json({ statusCode: status, code });
       return;
     }
-    this.logger.error(exception);
+    logUnexpectedError(this.logger, `${req.method} ${req.originalUrl}`, exception);
     res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
       statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
       code: InternalApiErrorCode.Unexpected,

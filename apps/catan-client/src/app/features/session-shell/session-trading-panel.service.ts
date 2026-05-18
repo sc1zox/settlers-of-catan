@@ -1,7 +1,6 @@
 import { computed, effect, inject, Injectable, signal } from '@angular/core';
 import {
   TradeRecipientStatus,
-  TradeStatus,
   TradeUpdateKind,
   type TradeUpdatedPayload,
 } from '@catan/api-interfaces';
@@ -76,7 +75,6 @@ export class SessionTradingPanelService {
     return this.tradeUi.selfHasOpenTrade();
   });
 
-  private lastSeenTradeId: string | null = null;
   private pendingActionTimer: ReturnType<typeof setTimeout> | null = null;
 
   public constructor() {
@@ -89,21 +87,10 @@ export class SessionTradingPanelService {
     });
   }
 
-  public resetForSpectatorMode(): void {
+  /** Wipe panel state. Called by the session cleanup coordinator. */
+  public resetSession(): void {
     this.tradeOpen.set(false);
     this.userMinimizedTradeId.set(null);
-    this.clearPendingAction();
-  }
-
-  /**
-   * Wipe everything that's lobby-scoped — the transition tracker also has to
-   * forget the previous lobby's last trade so a brand-new trade in the next
-   * lobby isn't mis-classified as a stale repeat.
-   */
-  public resetForLobbyLeave(): void {
-    this.tradeOpen.set(false);
-    this.userMinimizedTradeId.set(null);
-    this.lastSeenTradeId = null;
     this.clearPendingAction();
   }
 
@@ -165,6 +152,25 @@ export class SessionTradingPanelService {
     this.tradingState.finishTrading();
   }
 
+  /**
+   * Panel-open contract. `currentTrade` (one per lobby) is updated by
+   * {@link LobbyTradeUiService.applyTradeUpdate} *before* we run, so we only
+   * decide what to do with the panel surface:
+   *
+   *   Created / Resync          → open (new thread for this viewer)
+   *   RecipientAccepted/Countered → open (sender needs to see + finalise;
+   *                                       recipient already had it open)
+   *   Cancelled (by self)       → keep open → drops back into Composer
+   *   Cancelled / Finalized /
+   *   PhaseClosed               → close (thread terminated)
+   *   Superseded                → no-op (Created follows on the same socket)
+   *   RecipientRejected /
+   *   RecipientCounterWithdrawn → no-op (don't steal focus)
+   *
+   * The userMinimizedTradeId sticky bit suppresses re-opens only for the
+   * specific thread the user dismissed; it's cleared whenever the thread id
+   * rotates.
+   */
   private onTradeUpdated(update: TradeUpdatedPayload): void {
     const trade = update.trade;
     const seat = this.lobbyState.selfSeat();
@@ -174,77 +180,40 @@ export class SessionTradingPanelService {
 
     this.resolvePendingAction(update);
 
-    // Drop sticky minimise when this *isn't* the trade the user minimised.
-    if (
-      this.userMinimizedTradeId() !== null &&
-      this.userMinimizedTradeId() !== trade.id
-    ) {
+    if (this.userMinimizedTradeId() !== trade.id) {
       this.userMinimizedTradeId.set(null);
     }
 
-    if (trade.id !== this.lastSeenTradeId) {
-      this.lastSeenTradeId = trade.id;
+    if (!involvesSelf) {
+      return;
     }
 
     switch (update.kind) {
-      case TradeUpdateKind.Superseded:
-        // Server-internal: collision with a new propose; the replacement Open
-        // event arrives right after — don't flicker.
-        return;
       case TradeUpdateKind.Created:
-        if (involvesSelf) {
-          // A brand-new offer always re-opens — sticky was scoped to the
-          // previous trade id and has already been cleared above.
-          this.userMinimizedTradeId.set(null);
-          this.tradeOpen.set(true);
-        }
+      case TradeUpdateKind.Resync:
+        this.tradeOpen.set(true);
         return;
       case TradeUpdateKind.RecipientAccepted:
       case TradeUpdateKind.RecipientCountered:
-        if (involvesSelf && this.userMinimizedTradeId() !== trade.id) {
-          // Sender sees a response come in — open panel so they can finalise.
-          // Recipient sees their own action confirmed — already open in nearly
-          // every case; this is a no-op if it was open.
+        if (this.userMinimizedTradeId() !== trade.id) {
           this.tradeOpen.set(true);
         }
         return;
-      case TradeUpdateKind.RecipientCounterWithdrawn:
-      case TradeUpdateKind.RecipientRejected:
-        // Don't disturb the user's current focus for these.
-        return;
       case TradeUpdateKind.Cancelled:
-        if (seat !== null && trade.fromSeat === seat) {
-          // Sender withdrew their own offer — keep the panel open so they drop
-          // straight back into the composer instead of having to reopen it.
-          this.userMinimizedTradeId.set(null);
+        if (trade.fromSeat === seat) {
+          // Own withdraw: stay on the panel so the next compose is one tab away.
           return;
         }
-        if (involvesSelf) {
-          this.tradeOpen.set(false);
-          this.userMinimizedTradeId.set(null);
-        }
+        this.tradeOpen.set(false);
         return;
       case TradeUpdateKind.Finalized:
       case TradeUpdateKind.PhaseClosed:
-        if (involvesSelf) {
-          this.tradeOpen.set(false);
-          this.userMinimizedTradeId.set(null);
-        }
+        this.tradeOpen.set(false);
         return;
-      case TradeUpdateKind.Resync:
-        if (involvesSelf) {
-          // Reconnect/join landed us back in an in-flight thread; surface it
-          // immediately so the user doesn't have to hunt for the HUD button.
-          this.userMinimizedTradeId.set(null);
-          this.tradeOpen.set(true);
-        }
+      case TradeUpdateKind.Superseded:
+      case TradeUpdateKind.RecipientCounterWithdrawn:
+      case TradeUpdateKind.RecipientRejected:
         return;
-    }
-
-    // Defensive: terminal status without a recognised kind closes the panel.
-    if (trade.status !== TradeStatus.Open && involvesSelf) {
-      this.tradeOpen.set(false);
-      this.userMinimizedTradeId.set(null);
     }
   }
 

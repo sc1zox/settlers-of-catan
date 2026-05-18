@@ -16,6 +16,7 @@ export enum HttpApiRelativePath {
 
 export enum ProcessEnvKey {
   Port = 'PORT',
+  LogLevel = 'LOG_LEVEL',
   NodeEnv = 'NODE_ENV',
   CorsOrigins = 'CORS_ORIGINS',
   PlayerSessionJwtSecret = 'PLAYER_SESSION_JWT_SECRET',

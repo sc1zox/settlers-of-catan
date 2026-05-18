@@ -9,3 +9,10 @@ export function asActionRejectCode(message: string): ActionRejectCode {
   }
   return ActionRejectCode.Unknown;
 }
+
+export function isExpectedActionRejectError(exception: unknown): boolean {
+  if (!(exception instanceof Error)) {
+    return false;
+  }
+  return asActionRejectCode(exception.message) !== ActionRejectCode.Unknown;
+}

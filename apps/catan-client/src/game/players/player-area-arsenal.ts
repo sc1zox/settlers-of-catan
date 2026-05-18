@@ -312,17 +312,35 @@ export class PlayerAreaArsenal {
 
   private applyKindPlaced(kind: BuildKind, placed: number): void {
     const figures = this.figuresByKind[kind];
-    const remaining = Math.max(0, figures.length - placed);
-    let visibleSoFar = 0;
-    for (let i = 0; i < figures.length; i += 1) {
+    const total = figures.length;
+    const target = Math.max(0, total - placed);
+    // Count arsenal-resident figures (the in-flight one is already counted as
+    // placed by the server even though it's still drawn mid-arc).
+    let visible = 0;
+    for (let i = 0; i < total; i += 1) {
+      if (figures[i] === this.flyingFigure) continue;
+      if (figures[i].visible) visible += 1;
+    }
+    // Stable reconciliation: only flip figures whose state is wrong. The old
+    // "rebuild from a count" approach would reshuffle which slot held the gap
+    // every sync, so a piece the user just flew out of slot 2 would teleport
+    // back in and a different slot would empty instead. Hide extras and show
+    // returns from the highest index so the visual stays "empty from right".
+    for (let i = total - 1; i >= 0 && visible > target; i -= 1) {
       const figure = figures[i];
-      if (figure === this.flyingFigure) {
-        continue;
+      if (figure === this.flyingFigure) continue;
+      if (figure === this.activatedFigure) continue;
+      if (figure.visible) {
+        figure.visible = false;
+        visible -= 1;
       }
-      const shouldBeVisible = visibleSoFar < remaining;
-      figure.visible = shouldBeVisible;
-      if (shouldBeVisible) {
-        visibleSoFar += 1;
+    }
+    for (let i = total - 1; i >= 0 && visible < target; i -= 1) {
+      const figure = figures[i];
+      if (figure === this.flyingFigure) continue;
+      if (!figure.visible) {
+        figure.visible = true;
+        visible += 1;
       }
     }
   }

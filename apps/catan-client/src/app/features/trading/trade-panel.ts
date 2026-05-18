@@ -319,7 +319,11 @@ export class TradePanel {
     if (recipients.length === 0) {
       return;
     }
-    this.propose.emit({ recipients, offer: this.offer(), request: this.request() });
+    this.propose.emit({
+      recipients,
+      offer: this.compactTradeMap(this.offer()),
+      request: this.compactTradeMap(this.request()),
+    });
   }
 
   protected emitCounter(): void {
@@ -332,8 +336,8 @@ export class TradePanel {
     // Recipient's "I receive" (request) = sender's "I give" (offer).
     this.counter.emit({
       tradeId: trade.id,
-      offer: this.request(),
-      request: this.offer(),
+      offer: this.compactTradeMap(this.request()),
+      request: this.compactTradeMap(this.offer()),
     });
   }
 
@@ -413,6 +417,20 @@ export class TradePanel {
       const r = this.order[i];
       const want = map[r] ?? 0;
       out[r] = Math.min(want, owned[r] ?? 0);
+    }
+    return out;
+  }
+
+  private compactTradeMap(
+    map: Readonly<Record<ResourceType, number>>,
+  ): Partial<Record<ResourceType, number>> {
+    const out: Partial<Record<ResourceType, number>> = {};
+    for (let i = 0; i < this.order.length; i += 1) {
+      const resource = this.order[i];
+      const value = map[resource];
+      if (value > 0) {
+        out[resource] = value;
+      }
     }
     return out;
   }

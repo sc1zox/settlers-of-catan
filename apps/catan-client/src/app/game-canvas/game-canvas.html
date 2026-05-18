@@ -1,0 +1,21 @@
+<div #host class="game-host"></div>
+@if (!uiChromeHidden()) {
+  <app-harbor-tooltip [model]="harborTooltip()" />
+  <app-card-tooltip [model]="cardTooltip()" />
+}
+@if (cardFocused() && !uiChromeHidden()) {
+  <button
+    class="card-backdrop"
+    type="button"
+    [attr.aria-label]="'gameCanvas.closeCardAria' | translate"
+    (click)="dismissFocusedCard()"
+  ></button>
+  @if (focusedDevCard() && devCardPlayable()) {
+    <button type="button" class="card-action" (click)="openDevCardPlayModal()">
+      {{ 'gameCanvas.playDevCard' | translate }}
+    </button>
+  }
+}
+@if (!uiChromeHidden()) {
+  <app-dice-overlay [model]="diceOverlay()" (dismiss)="dismissDice()" />
+}

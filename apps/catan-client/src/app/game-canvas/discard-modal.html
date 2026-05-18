@@ -1,0 +1,40 @@
+@let m = model();
+@if (m) {
+  <div class="backdrop">
+    <div class="modal">
+      <h3>{{ 'discard.title' | translate }}</h3>
+      <p class="hint">
+        {{ 'discard.hint' | translate: { required: m.required, selected: total() } }}
+      </p>
+      <ul class="rows">
+        @for (resource of order; track resource) {
+          <li>
+            <span class="label">{{ label(resource) }}</span>
+            <span class="have">{{ m.handCounts[resource] }}</span>
+            <div class="stepper">
+              <button type="button" (click)="dec(resource)" [disabled]="count(resource) === 0">
+                −
+              </button>
+              <span class="count">{{ count(resource) }}</span>
+              <button
+                type="button"
+                (click)="inc(resource, m.handCounts[resource])"
+                [disabled]="count(resource) >= m.handCounts[resource] || total() >= m.required"
+              >
+                +
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+      <button
+        type="button"
+        class="submit"
+        [disabled]="total() !== m.required"
+        (click)="confirmed.emit(selected())"
+      >
+        {{ 'discard.submit' | translate }}
+      </button>
+    </div>
+  </div>
+}

@@ -1,0 +1,86 @@
+@if (open()) {
+  <div class="layer">
+    <button
+      type="button"
+      class="backdrop"
+      [attr.aria-label]="'devCard.closeBackdropAria' | translate"
+      (click)="closed.emit()"
+    ></button>
+    <div class="modal">
+      <h3>{{ 'devCard.title' | translate }}</h3>
+
+      @switch (view()) {
+        @case ('menu') {
+          <div class="actions">
+            <button type="button" (click)="playKnight.emit()">
+              {{ 'devCard.knight' | translate }}
+            </button>
+            <button type="button" (click)="view.set('monopoly')">
+              {{ 'devCard.monopoly' | translate }}
+            </button>
+            <button type="button" (click)="view.set('plenty')">
+              {{ 'devCard.plenty' | translate }}
+            </button>
+            <button type="button" (click)="playRoadBuilding.emit()">
+              {{ 'devCard.roadBuilding' | translate }}
+            </button>
+          </div>
+        }
+        @case ('monopoly') {
+          <p class="hint">{{ 'devCard.whichResource' | translate }}</p>
+          <div class="picker">
+            @for (resource of order; track resource) {
+              <button
+                type="button"
+                [class.active]="monopolyResource() === resource"
+                (click)="monopolyResource.set(resource)"
+              >
+                {{ label(resource) }}
+              </button>
+            }
+          </div>
+          <button type="button" class="confirm" (click)="playMonopoly.emit(monopolyResource())">
+            {{ 'devCard.playMonopoly' | translate }}
+          </button>
+        }
+        @case ('plenty') {
+          <p class="hint">{{ 'devCard.firstCard' | translate }}</p>
+          <div class="picker">
+            @for (resource of order; track resource) {
+              <button
+                type="button"
+                [class.active]="plentyFirst() === resource"
+                (click)="plentyFirst.set(resource)"
+              >
+                {{ label(resource) }}
+              </button>
+            }
+          </div>
+          <p class="hint">{{ 'devCard.secondCard' | translate }}</p>
+          <div class="picker">
+            @for (resource of order; track resource) {
+              <button
+                type="button"
+                [class.active]="plentySecond() === resource"
+                (click)="plentySecond.set(resource)"
+              >
+                {{ label(resource) }}
+              </button>
+            }
+          </div>
+          <button
+            type="button"
+            class="confirm"
+            (click)="playYearOfPlenty.emit({ first: plentyFirst(), second: plentySecond() })"
+          >
+            {{ 'devCard.playPlenty' | translate }}
+          </button>
+        }
+      }
+
+      <button type="button" class="dismiss" (click)="closed.emit()">
+        {{ 'devCard.dismiss' | translate }}
+      </button>
+    </div>
+  </div>
+}

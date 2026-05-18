@@ -31,9 +31,9 @@ import { TradingStateService } from '../features/trading/trading-state.service';
 import { mapLobbyFullStateToSceneState } from '../../shared/game-scene/map-lobby-full-state-to-scene';
 import { HoverState } from '../../game/interaction/hover';
 import { BuildConfirmModel } from './build-confirm-popover';
-import { CardTooltipComponent, CardTooltipModel } from './card-tooltip';
-import { DiceOverlayComponent, DiceOverlayModel } from './dice-overlay';
-import { HarborTooltipComponent, HarborTooltipModel } from './harbor-tooltip';
+import { CardTooltip, CardTooltipModel } from './card-tooltip';
+import { DiceOverlay, DiceOverlayModel } from './dice-overlay';
+import { HarborTooltip, HarborTooltipModel } from './harbor-tooltip';
 
 export interface RobberTilePick {
   readonly q: number;
@@ -46,28 +46,11 @@ export interface RobberTilePick {
   selector: 'app-game-canvas',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, DiceOverlayComponent, HarborTooltipComponent, CardTooltipComponent],
-  template: `
-    <div #host class="game-host"></div>
-    @if (!uiChromeHidden()) {
-      <app-harbor-tooltip [model]="harborTooltip()" />
-      <app-card-tooltip [model]="cardTooltip()" />
-    }
-    @if (cardFocused() && !uiChromeHidden()) {
-      <button
-        class="card-backdrop"
-        type="button"
-        [attr.aria-label]="'gameCanvas.closeCardAria' | translate"
-        (click)="dismissFocusedCard()"
-      ></button>
-    }
-    @if (!uiChromeHidden()) {
-      <app-dice-overlay [model]="diceOverlay()" (dismiss)="dismissDice()" />
-    }
-  `,
+  imports: [TranslatePipe, DiceOverlay, HarborTooltip, CardTooltip],
+  templateUrl: './game-canvas.html',
   styleUrl: './game-canvas.scss',
 })
-export class GameCanvasComponent implements AfterViewInit, OnDestroy {
+export class GameCanvas implements AfterViewInit, OnDestroy {
   @ViewChild('host', { static: true }) private hostRef!: ElementRef<HTMLDivElement>;
   private readonly gameState = inject(GameStateResource);
   private readonly gameSettings = inject(GameSettingsService);
@@ -84,6 +67,7 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
   readonly freeRoadMode = input<boolean>(false);
   readonly robberMode = input<boolean>(false);
   readonly diceRollClickEnabled = input<boolean>(false);
+  readonly devCardPlayable = input<boolean>(false);
   readonly uiChromeHidden = input<boolean>(false);
 
   readonly arsenalBuild = output<BuildKind>();
@@ -97,6 +81,7 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
   readonly cardTooltip = signal<CardTooltipModel | null>(null);
   readonly diceOverlay = signal<DiceOverlayModel | null>(null);
   readonly cardFocused = signal<boolean>(false);
+  readonly focusedDevCard = signal<boolean>(false);
 
   private readonly diceOverlayAutoDismiss = effect((onCleanup) => {
     const overlay = this.diceOverlay();
@@ -117,7 +102,7 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
       return;
     }
     if (!state) {
-      this.engine.clearSelfSeatHighlights();
+      this.engine.clearLobbySceneOverlay();
       return;
     }
     const scene = mapLobbyFullStateToSceneState(state);
@@ -253,6 +238,7 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
     });
     this.engine.setFocusChangeHandler((focused) => {
       this.cardFocused.set(focused);
+      this.focusedDevCard.set(focused && (this.engine?.isDevelopmentCardFocused() ?? false));
     });
     this.engine.setArsenalBuildHandler((kind) => this.arsenalBuild.emit(kind));
     this.engine.setBuildSpotPickHandler((kind, id, x, y) => {
@@ -262,7 +248,6 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
       this.robberTilePicked.emit({ q, r, x, y });
     });
     this.engine.setBuildModeCancelHandler(() => this.buildModeCancelled.emit());
-    this.engine.setDevCardClickHandler(() => this.devCardClicked.emit());
     this.engine.setDiceRollRequestHandler(() => this.rollDiceRequested.emit());
     this.engine.setShadowQuality(this.gameSettings.shadowQuality());
     this.engine.setSceneBrightness(this.gameSettings.sceneBrightness());
@@ -297,6 +282,11 @@ export class GameCanvasComponent implements AfterViewInit, OnDestroy {
 
   public dismissFocusedCard(): void {
     this.engine?.clearFocusedCard();
+    this.focusedDevCard.set(false);
+  }
+
+  public openDevCardPlayModal(): void {
+    this.devCardClicked.emit();
   }
 
   private handleHover(state: HoverState | null): void {

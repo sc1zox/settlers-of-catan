@@ -6,6 +6,6 @@ import { SessionShell } from './features/session-shell/session-shell';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [SessionShell],
-  template: `<app-session-shell />`,
+  templateUrl: './app.html',
 })
 export class App {}

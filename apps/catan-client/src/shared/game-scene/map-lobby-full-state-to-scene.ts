@@ -18,6 +18,7 @@ export function mapLobbyFullStateToSceneState(payload: LobbyFullStatePayload): L
     });
   }
   return {
+    lobbyId: payload.lobbyId,
     phase: payload.phase,
     seed: payload.seed,
     players,

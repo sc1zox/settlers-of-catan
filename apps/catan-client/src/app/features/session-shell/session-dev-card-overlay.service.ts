@@ -23,10 +23,12 @@ export class SessionDevCardOverlayService {
     this.devCardOpen.set(false);
   }
 
-  public onDevCardClicked(): void {
-    if (this.devCards.canPlayDevCard()) {
+  public onDevCardClicked(): boolean {
+    const canPlay = this.devCards.canPlayDevCard();
+    if (canPlay) {
       this.devCardOpen.set(true);
     }
+    return canPlay;
   }
 
   public closeDevCard(): void {

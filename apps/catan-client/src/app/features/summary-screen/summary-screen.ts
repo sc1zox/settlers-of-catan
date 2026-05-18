@@ -16,22 +16,7 @@ import { TranslateService } from '@ngx-translate/core';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslatePipe],
-  template: `
-    <div class="summary-screen" role="dialog" aria-modal="true">
-      <div class="summary-screen__card">
-        <h2 class="summary-screen__title">{{ 'summaryScreen.title' | translate }}</h2>
-        <p class="summary-screen__winner">{{ winnerLine() }}</p>
-        <p class="summary-screen__placeholder">{{ 'summaryScreen.statsPlaceholder' | translate }}</p>
-        <button
-          type="button"
-          class="summary-screen__back"
-          (click)="returnToMenu.emit()"
-        >
-          {{ 'summaryScreen.returnToMenu' | translate }}
-        </button>
-      </div>
-    </div>
-  `,
+  templateUrl: './summary-screen.html',
   styleUrl: './summary-screen.scss',
 })
 export class SummaryScreen {

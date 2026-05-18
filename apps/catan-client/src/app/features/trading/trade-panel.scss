@@ -1,0 +1,415 @@
+:host {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+}
+.layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  cursor: default;
+  background: rgba(8, 6, 10, 0.62);
+  backdrop-filter: blur(2px);
+}
+.modal {
+  position: relative;
+  width: min(94vw, 34rem);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: rgba(20, 16, 12, 0.97);
+  border: 1px solid rgba(255, 200, 130, 0.5);
+  border-radius: 16px;
+  padding: 1.2rem 1.3rem 1.2rem;
+  color: #f7f1e1;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.6);
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 0.9rem;
+}
+h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.tabs {
+  display: flex;
+  gap: 0.35rem;
+}
+.sub-label {
+  margin: 0.5rem 0 0.3rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(247, 241, 225, 0.55);
+}
+.incoming-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+.trade-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+}
+.trade-summary--banner {
+  background: rgba(120, 160, 220, 0.12);
+  border: 1px solid rgba(120, 160, 220, 0.3);
+}
+.trade-summary--mini {
+  padding: 0.3rem 0.5rem;
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+}
+.trade-summary__caption {
+  margin: 0 0 0.3rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(247, 241, 225, 0.55);
+}
+.trade-summary__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0;
+  padding: 0.12rem 0;
+  font-size: 0.82rem;
+}
+.trade-summary__row--empty {
+  color: rgba(247, 241, 225, 0.4);
+  font-style: italic;
+}
+.trade-summary__row--lacking {
+  color: #f7a98a;
+}
+.responses {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.response {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.response--compact {
+  padding: 0.4rem 0.6rem;
+}
+.response--pending {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.response--accepted {
+  border-color: rgba(92, 194, 122, 0.55);
+  background: rgba(92, 194, 122, 0.08);
+}
+.response--countered {
+  border-color: rgba(213, 154, 58, 0.55);
+  background: rgba(213, 154, 58, 0.08);
+}
+.response--rejected {
+  border-color: rgba(220, 90, 80, 0.45);
+  background: rgba(220, 90, 80, 0.06);
+  opacity: 0.75;
+}
+.response__head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+.response__name {
+  font-weight: 600;
+}
+.response__status {
+  font-size: 0.74rem;
+  color: rgba(247, 241, 225, 0.65);
+}
+.response__finalize {
+  margin-top: 0.2rem;
+}
+.own-status {
+  margin: 0 0 0.35rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+.own-status--pending {
+  color: rgba(247, 241, 225, 0.7);
+}
+.own-status--accepted {
+  color: #b5e9c4;
+}
+.own-status--countered {
+  color: #f3d196;
+}
+.own-status--rejected {
+  color: #f3a5a0;
+}
+.field {
+  margin-bottom: 0.7rem;
+}
+.field > span {
+  display: block;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(247, 241, 225, 0.55);
+  margin-bottom: 0.3rem;
+}
+.segmented {
+  display: inline-flex;
+  margin-bottom: 0.5rem;
+  padding: 0.18rem;
+  gap: 0.18rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.segmented button {
+  border: 0;
+  background: transparent;
+  color: rgba(247, 241, 225, 0.7);
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+}
+.segmented button.active {
+  background: linear-gradient(180deg, #4f8be0, #3563b4);
+  color: #fff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+}
+.picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.bank-pick-label {
+  margin-right: 0.3rem;
+}
+.bank-pick-rate {
+  font-size: 0.72rem;
+  opacity: 0.9;
+}
+.bank-pick-owned {
+  font-size: 0.72rem;
+  opacity: 0.6;
+  margin-left: 0.3rem;
+}
+.rate-best:not(.active) {
+  border-color: rgba(213, 154, 58, 0.55);
+  background: rgba(213, 154, 58, 0.1);
+}
+.bank-summary {
+  margin: 0.2rem 0 0.6rem;
+  font-size: 0.92rem;
+  text-align: center;
+  color: rgba(247, 241, 225, 0.9);
+}
+.trade-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.4rem 1.4rem;
+  margin: 0.4rem 0 0.6rem;
+}
+.col p {
+  margin: 0 0 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.grid-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.32rem;
+}
+.grid-row .label {
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+.grid-row .owned {
+  font-size: 0.7rem;
+  color: rgba(247, 241, 225, 0.45);
+  margin-left: 0.15rem;
+}
+.grid-row .stepper {
+  justify-self: end;
+}
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.stepper button {
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+.count {
+  min-width: 1.1rem;
+  text-align: center;
+  font-weight: 600;
+}
+button {
+  appearance: none;
+  cursor: pointer;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f7f1e1;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.32rem 0.7rem;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+button.active,
+.tabs button.active {
+  background: linear-gradient(180deg, #4f8be0, #3563b4);
+  border-color: transparent;
+  color: #fff;
+}
+.accept {
+  background: linear-gradient(180deg, #5cc27a, #3a9457);
+  border-color: transparent;
+  color: #fff;
+}
+.reject {
+  background: rgba(220, 90, 80, 0.85);
+  border-color: transparent;
+  color: #fff;
+}
+.revise {
+  background: linear-gradient(180deg, #d59a3a, #a16f1d);
+  border-color: transparent;
+  color: #1f1408;
+}
+.composer-actions {
+  display: flex;
+  gap: 0.45rem;
+  margin-top: 0.4rem;
+}
+.back {
+  flex: 0 0 auto;
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+.confirm {
+  flex: 1 1 auto;
+  background: linear-gradient(180deg, #4f8be0, #3563b4);
+  border-color: transparent;
+  color: #fff;
+  padding: 0.55rem;
+  margin-bottom: 0.5rem;
+}
+.composer-actions .confirm {
+  margin-bottom: 0;
+}
+.hint {
+  margin: 0 0 0.45rem;
+  font-size: 0.76rem;
+}
+.hint--soft {
+  color: rgba(247, 241, 225, 0.5);
+}
+.hint--warn {
+  color: #f7a98a;
+}
+.hint--info {
+  color: #f3d196;
+}
+.dismiss {
+  width: 100%;
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.18);
+  margin-top: 0.4rem;
+}
+.incoming-actions--countered {
+  grid-template-columns: 1fr 1fr;
+}
+.spinner {
+  display: inline-block;
+  width: 0.8rem;
+  height: 0.8rem;
+  margin-right: 0.4rem;
+  vertical-align: -2px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: trade-spin 0.6s linear infinite;
+}
+@keyframes trade-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* Re-keyed @for ensures these animations restart on every status flip. */
+.response--pulse.response--accepted {
+  animation: trade-pulse-accept 1.6s ease-out;
+}
+.response--pulse.response--countered {
+  animation: trade-pulse-counter 1.6s ease-out;
+}
+.response--pulse.response--rejected {
+  animation: trade-pulse-reject 1.4s ease-out;
+}
+@keyframes trade-pulse-accept {
+  0% {
+    box-shadow: 0 0 0 0 rgba(92, 194, 122, 0);
+    background: rgba(92, 194, 122, 0.28);
+  }
+  60% {
+    box-shadow: 0 0 0 8px rgba(92, 194, 122, 0);
+  }
+  100% {
+    background: rgba(92, 194, 122, 0.08);
+  }
+}
+@keyframes trade-pulse-counter {
+  0% {
+    box-shadow: 0 0 0 0 rgba(213, 154, 58, 0);
+    background: rgba(213, 154, 58, 0.32);
+  }
+  60% {
+    box-shadow: 0 0 0 8px rgba(213, 154, 58, 0);
+  }
+  100% {
+    background: rgba(213, 154, 58, 0.08);
+  }
+}
+@keyframes trade-pulse-reject {
+  0% {
+    background: rgba(220, 90, 80, 0.25);
+  }
+  100% {
+    background: rgba(220, 90, 80, 0.06);
+  }
+}

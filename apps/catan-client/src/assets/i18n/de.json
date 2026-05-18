@@ -363,6 +363,7 @@
     "lobbyCodeLabel": "Aktiver Lobby-Code"
   },
   "gameCanvas": {
-    "closeCardAria": "Karte schließen"
+    "closeCardAria": "Karte schließen",
+    "playDevCard": "Entwicklungskarte spielen"
   }
 }

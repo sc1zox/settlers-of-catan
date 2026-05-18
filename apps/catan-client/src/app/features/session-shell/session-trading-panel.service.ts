@@ -21,7 +21,7 @@ import {
 const PENDING_ACTION_TIMEOUT_MS = 6_000;
 
 /**
- * Orchestrates the trade panel for {@link SessionShellComponent}:
+ * Orchestrates the trade panel for {@link SessionShell}:
  *  - tracks whether the panel is open / sticky-minimised
  *  - relays outgoing trade actions to {@link TradingStateService}
  *  - reacts to inbound {@link TradeUpdatedPayload}s with the right open/close

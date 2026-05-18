@@ -122,6 +122,7 @@ export class GameEngine {
   private readonly tradeSwap: TradeSwapFlight;
 
   private currentSeed: number | null = null;
+  private currentLobbyId: string | null = null;
 
   private rafId: number | null = null;
   private running = false;
@@ -142,7 +143,6 @@ export class GameEngine {
   private buildSpotPickHandler: BuildSpotPickHandler | null = null;
   private robberTilePickHandler: RobberTilePickHandler | null = null;
   private buildModeCancelHandler: BuildModeCancelHandler | null = null;
-  private devCardClickHandler: (() => void) | null = null;
   private diceRollRequestHandler: (() => void) | null = null;
   private diceRollClickEnabled = false;
   private hasFramedBoardForActiveMatch = false;
@@ -350,10 +350,6 @@ export class GameEngine {
     this.buildModeCancelHandler = handler;
   }
 
-  public setDevCardClickHandler(handler: (() => void) | null): void {
-    this.devCardClickHandler = handler;
-  }
-
   public setPerformanceStatsHandler(handler: PerformanceStatsHandler | null): void {
     this.perfAggregator.setHandler(handler);
   }
@@ -526,6 +522,14 @@ export class GameEngine {
     this.focusFan.clearRest(this.focusChangeHandler);
   }
 
+  public isDevelopmentCardFocused(): boolean {
+    const focused = this.focusFan.getFocusedGroup();
+    if (focused.length === 0) {
+      return false;
+    }
+    return focused[0].getHoverInfo()?.group === CardHoverGroup.Development;
+  }
+
   /**
    * Trigger the "Längste Handelsstraße / Größte Rittermacht" presentation.
    * The card hovers in front of the recipient (for them it fills the screen;
@@ -598,7 +602,20 @@ export class GameEngine {
     }
   }
 
+  public clearLobbySceneOverlay(): void {
+    this.currentLobbyId = null;
+    this.currentSeed = null;
+    this.selfSeat = null;
+    this.buildings.resetForNewLobby();
+    this.clearSelfSeatHighlights();
+  }
+
   public applySceneState(state: LobbySceneState): void {
+    if (this.currentLobbyId !== null && state.lobbyId !== this.currentLobbyId) {
+      this.buildings.resetForNewLobby();
+      this.currentSeed = null;
+    }
+    this.currentLobbyId = state.lobbyId;
     for (let s = 0; s < this.playerAreaActiveAtTable.length; s += 1) {
       this.playerAreaActiveAtTable[s] = false;
     }
@@ -644,7 +661,6 @@ export class GameEngine {
       this.players[s].group.visible = active;
       this.players[s].setFeltVisible(active);
       this.players[s].setSelfSeatHighlight(showSelfPadOnly && s === this.selfSeat);
-      this.players[s].setPresenceDimmed(false);
     }
     this.legalSettlementVertexIds = state.legalSettlementVertexIds;
     this.legalRoadEdgeIds = state.legalRoadEdgeIds;
@@ -695,6 +711,11 @@ export class GameEngine {
           playerState.isSelf ? null : playerState.totalResourceCards,
         );
         this.handSignatureBySeat[playerState.seat] = handSignature;
+      }
+    }
+    for (let s = 0; s < this.players.length; s += 1) {
+      if (!this.playerAreaActiveAtTable[s]) {
+        this.players[s].setPresenceDimmed(false);
       }
     }
     this.syncBonusCardOwnership(state.longestRoadSeat, BonusAwardKind.LongestRoad);
@@ -855,16 +876,6 @@ export class GameEngine {
     if (!this.cardIsInspectable(card)) {
       return;
     }
-    const info = card.getHoverInfo();
-    if (
-      info?.group === CardHoverGroup.Development &&
-      this.selfSeat !== null &&
-      this.players[this.selfSeat]?.cards.includes(card)
-    ) {
-      this.devCardClickHandler?.();
-      return;
-    }
-
     const fg = this.focusFan.getFocusedGroup();
     const sameGroupAlreadyFocused =
       fg.length > 0 &&

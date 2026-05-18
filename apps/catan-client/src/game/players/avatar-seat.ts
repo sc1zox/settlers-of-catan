@@ -249,6 +249,7 @@ export class AvatarSeat {
     const gamma = this.videoDisplayGamma;
     this.screenMaterial.color.setRGB(gamma, gamma, gamma);
     this.screenMaterial.needsUpdate = true;
+    this.presenceDimmer.refreshBases([this.screenMaterial]);
   }
 
   private teardownVideoListeners(): void {

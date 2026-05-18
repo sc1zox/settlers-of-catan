@@ -36,6 +36,24 @@
   }
 }
 
+.card-action {
+  position: absolute;
+  left: 50%;
+  bottom: 2rem;
+  transform: translateX(-50%);
+  z-index: 20;
+  appearance: none;
+  border: 0;
+  border-radius: 10px;
+  padding: 0.55rem 0.95rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(180deg, #4f8be0, #3563b4);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
 @keyframes backdrop-fade {
   from {
     opacity: 0;

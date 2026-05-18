@@ -16,86 +16,10 @@ export interface BuildConfirmModel {
   standalone: true,
   imports: [TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    @let m = model();
-    @if (m) {
-      <div class="popover" [style.left.px]="m.x" [style.top.px]="m.y">
-        <p class="title">{{ titleFor(m.kind) }}</p>
-        <div class="row">
-          <button type="button" class="yes" (click)="confirm.emit()">
-            {{ 'buildConfirm.yes' | translate }}
-          </button>
-          <button type="button" class="no" (click)="dismiss.emit()">
-            {{ 'buildConfirm.no' | translate }}
-          </button>
-        </div>
-      </div>
-    }
-  `,
-  styles: [
-    `
-      :host {
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        z-index: 26;
-      }
-      .popover {
-        position: fixed;
-        transform: translate(-50%, -120%);
-        pointer-events: auto;
-        background: rgba(20, 16, 12, 0.95);
-        border: 1px solid rgba(255, 200, 130, 0.6);
-        border-radius: 12px;
-        padding: 0.7rem 0.9rem 0.8rem;
-        box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
-        backdrop-filter: blur(6px);
-        text-align: center;
-        animation: build-pop 160ms cubic-bezier(0.2, 1.3, 0.4, 1);
-      }
-      .title {
-        margin: 0 0 0.55rem;
-        font-size: 0.84rem;
-        color: #f7f1e1;
-        white-space: nowrap;
-      }
-      .row {
-        display: flex;
-        gap: 0.5rem;
-        justify-content: center;
-      }
-      button {
-        appearance: none;
-        cursor: pointer;
-        border-radius: 8px;
-        padding: 0.32rem 0.95rem;
-        font-size: 0.82rem;
-        font-weight: 600;
-        border: 1px solid transparent;
-      }
-      .yes {
-        background: linear-gradient(180deg, #4f8be0, #3563b4);
-        color: #fff;
-      }
-      .no {
-        background: rgba(255, 255, 255, 0.08);
-        color: #f7f1e1;
-        border-color: rgba(255, 255, 255, 0.18);
-      }
-      @keyframes build-pop {
-        0% {
-          opacity: 0;
-          transform: translate(-50%, -110%) scale(0.85);
-        }
-        100% {
-          opacity: 1;
-          transform: translate(-50%, -120%) scale(1);
-        }
-      }
-    `,
-  ],
+  templateUrl: './build-confirm-popover.html',
+  styleUrl: './build-confirm-popover.scss',
 })
-export class BuildConfirmPopoverComponent {
+export class BuildConfirmPopover {
   private readonly translate = inject(TranslateService);
   readonly model = input<BuildConfirmModel | null>(null);
   readonly confirm = output<void>();

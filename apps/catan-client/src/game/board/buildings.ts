@@ -1,6 +1,6 @@
 import { BufferGeometry, Group, Mesh, Vector3 } from 'three';
-import { BuildKind } from '@catan/api-interfaces';
-import type { LobbyRoadDto, LobbySettlementDto, PlayerSeat } from '@catan/api-interfaces';
+import { BuildKind, PlayerSeat } from '@catan/api-interfaces';
+import type { LobbyRoadDto, LobbySettlementDto } from '@catan/api-interfaces';
 import {
   createFigureMaterials,
   disposeFigureMaterials,
@@ -90,6 +90,13 @@ export class BoardBuildings {
         const fly = shouldFlyIn?.(kind, dto.seat) ?? false;
         const figure = this.spawnSettlement(dto, fly);
         if (fly) flyIns.push({ kind, id: dto.vertexId, seat: dto.seat, figure });
+      } else if (existing.seat !== dto.seat) {
+        this.removePiece(existing.group);
+        this.settlements.delete(dto.vertexId);
+        const kind = dto.isCity ? BuildKind.City : BuildKind.Settlement;
+        const fly = shouldFlyIn?.(kind, dto.seat) ?? false;
+        const figure = this.spawnSettlement(dto, fly);
+        if (fly) flyIns.push({ kind, id: dto.vertexId, seat: dto.seat, figure });
       } else if (dto.isCity && !existing.isCity) {
         const fly = shouldFlyIn?.(BuildKind.City, dto.seat) ?? false;
         const figure = this.upgradeToCity(dto, existing, fly);
@@ -108,7 +115,14 @@ export class BoardBuildings {
     for (let i = 0; i < roads.length; i += 1) {
       const dto = roads[i];
       presentEdgeIds.add(dto.edgeId);
-      if (!this.roads.has(dto.edgeId)) {
+      const existingRoad = this.roads.get(dto.edgeId);
+      if (existingRoad === undefined) {
+        const fly = shouldFlyIn?.(BuildKind.Road, dto.seat) ?? false;
+        const figure = this.spawnRoad(dto, fly);
+        if (fly) flyIns.push({ kind: BuildKind.Road, id: dto.edgeId, seat: dto.seat, figure });
+      } else if (existingRoad.seat !== dto.seat) {
+        this.removePiece(existingRoad.group);
+        this.roads.delete(dto.edgeId);
         const fly = shouldFlyIn?.(BuildKind.Road, dto.seat) ?? false;
         const figure = this.spawnRoad(dto, fly);
         if (fly) flyIns.push({ kind: BuildKind.Road, id: dto.edgeId, seat: dto.seat, figure });
@@ -174,21 +188,41 @@ export class BoardBuildings {
     }
   }
 
-  dispose(): void {
-    for (let i = 0; i < this.animations.length; i += 1) {
+  /**
+   * Drop every placed piece and material cache without tearing down the group.
+   * Used when the canonical lobby changes so a reused board seed cannot keep
+   * stale owner colours from the previous match.
+   */
+  public resetForNewLobby(): void {
+    for (let i = this.animations.length - 1; i >= 0; i -= 1) {
       this.animations[i].dispose();
+      this.animations.splice(i, 1);
     }
-    this.animations.length = 0;
-    for (let i = 0; i < this.trackedGeometries.length; i += 1) {
-      this.trackedGeometries[i].dispose();
+    for (const placed of this.settlements.values()) {
+      this.group.remove(placed.group);
+      this.releaseGeometries(placed.group);
     }
-    this.trackedGeometries.length = 0;
+    for (const placed of this.roads.values()) {
+      this.group.remove(placed.group);
+      this.releaseGeometries(placed.group);
+    }
+    this.settlements.clear();
+    this.roads.clear();
     for (const materials of this.materialsBySeat.values()) {
       disposeFigureMaterials(materials);
     }
     this.materialsBySeat.clear();
-    this.settlements.clear();
-    this.roads.clear();
+    for (let i = 0; i < this.lobbySeatMask.length; i += 1) {
+      this.lobbySeatMask[i] = false;
+    }
+  }
+
+  dispose(): void {
+    this.resetForNewLobby();
+    for (let i = 0; i < this.trackedGeometries.length; i += 1) {
+      this.trackedGeometries[i].dispose();
+    }
+    this.trackedGeometries.length = 0;
     this.group.clear();
   }
 
@@ -271,13 +305,22 @@ export class BoardBuildings {
   }
 
   private materialsForSeat(seat: PlayerSeat): PlayerFigureMaterials {
-    let materials = this.materialsBySeat.get(seat);
+    const normalizedSeat = BoardBuildings.normalizeSeat(seat);
+    let materials = this.materialsBySeat.get(normalizedSeat);
     if (!materials) {
-      const color = PLAYER_SEAT_ORDER[seat] ?? PLAYER_SEAT_ORDER[0];
+      const color = PLAYER_SEAT_ORDER[normalizedSeat] ?? PLAYER_SEAT_ORDER[0];
       materials = createFigureMaterials(color);
-      this.materialsBySeat.set(seat, materials);
+      this.materialsBySeat.set(normalizedSeat, materials);
     }
     return materials;
+  }
+
+  private static normalizeSeat(seat: PlayerSeat): PlayerSeat {
+    const index = Number(seat);
+    if (index >= PlayerSeat.North && index <= PlayerSeat.West) {
+      return index as PlayerSeat;
+    }
+    return PlayerSeat.North;
   }
 
   private trackGeometries(figure: Group): void {

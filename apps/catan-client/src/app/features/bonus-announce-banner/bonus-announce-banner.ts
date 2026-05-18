@@ -26,13 +26,7 @@ const DISMISS_AFTER_MS = 4000;
   selector: 'app-bonus-announce-banner',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    @if (announcement(); as entry) {
-      <aside class="bonus-announce" role="status" aria-live="polite">
-        <p class="bonus-announce__text">{{ entry.text }}</p>
-      </aside>
-    }
-  `,
+  templateUrl: './bonus-announce-banner.html',
   styleUrl: './bonus-announce-banner.scss',
 })
 export class BonusAnnounceBanner {

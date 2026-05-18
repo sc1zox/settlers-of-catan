@@ -8,31 +8,7 @@ import { SpectatorCameraService } from './spectator-camera.service';
   selector: 'app-spectator-camera-toggle',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    @if (visible()) {
-      <button
-        type="button"
-        class="spectator-cam-toggle"
-        [class.spectator-cam-toggle--active]="camera.mode()"
-        [attr.aria-pressed]="camera.mode()"
-        [attr.title]="camera.mode() ? titleOn() : titleOff()"
-        (click)="camera.toggle()"
-        [attr.aria-label]="ariaLabel()"
-      >
-        <svg
-          class="spectator-cam-toggle__icon"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-          focusable="false"
-        >
-          <path
-            fill="currentColor"
-            d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"
-          />
-        </svg>
-      </button>
-    }
-  `,
+  templateUrl: './spectator-camera-toggle.html',
   styleUrl: './spectator-camera-toggle.scss',
 })
 export class SpectatorCameraToggle {

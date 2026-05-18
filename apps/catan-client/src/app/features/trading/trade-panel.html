@@ -1,0 +1,664 @@
+@if (open()) {
+  <div class="layer">
+    <button
+      type="button"
+      class="backdrop"
+      [attr.aria-label]="'trade.closeBackdropAria' | translate"
+      (click)="closed.emit()"
+    ></button>
+    <div class="modal">
+      <header>
+        <h3>{{ headerLabel() }}</h3>
+        @if (mode() === modeEnum.Composer) {
+          <div class="tabs">
+            <button type="button" [class.active]="view() === viewEnum.Bank" (click)="view.set(viewEnum.Bank)">
+              {{ 'trade.tabBank' | translate }}
+            </button>
+            <button
+              type="button"
+              [class.active]="view() === viewEnum.Player"
+              (click)="view.set(viewEnum.Player)"
+            >
+              {{ 'trade.tabPlayers' | translate }}
+            </button>
+          </div>
+        }
+      </header>
+
+      @switch (mode()) {
+        @case (modeEnum.Sender) {
+          @let trade = pendingTrade()!;
+          <p class="sub-label">{{ 'trade.youOfferLabel' | translate }}</p>
+          <div class="trade-summary trade-summary--banner">
+            <div class="trade-summary__col">
+              <p class="trade-summary__caption">{{ 'trade.youOffer' | translate }}</p>
+              @if (isMapEmpty(trade.offer)) {
+                <p class="trade-summary__row trade-summary__row--empty">
+                  {{ 'trade.nothing' | translate }}
+                </p>
+              }
+              @for (resource of order; track resource) {
+                @let c = readMap(trade.offer, resource);
+                @if (c > 0) {
+                  <p class="trade-summary__row">
+                    <span>{{ label(resource) }}</span>
+                    <strong>{{ c }}</strong>
+                  </p>
+                }
+              }
+            </div>
+            <div class="trade-summary__col">
+              <p class="trade-summary__caption">{{ 'trade.youAsk' | translate }}</p>
+              @if (isMapEmpty(trade.request)) {
+                <p class="trade-summary__row trade-summary__row--empty">
+                  {{ 'trade.nothing' | translate }}
+                </p>
+              }
+              @for (resource of order; track resource) {
+                @let c = readMap(trade.request, resource);
+                @if (c > 0) {
+                  <p class="trade-summary__row">
+                    <span>{{ label(resource) }}</span>
+                    <strong>{{ c }}</strong>
+                  </p>
+                }
+              }
+            </div>
+          </div>
+
+          <p class="sub-label">{{ 'trade.responsesLabel' | translate }}</p>
+          <ul class="responses">
+            @for (resp of trade.recipients; track slotKey(resp)) {
+              <li
+                class="response response--pulse"
+                [class.response--pending]="resp.status === recipientStatusEnum.Pending"
+                [class.response--accepted]="resp.status === recipientStatusEnum.Accepted"
+                [class.response--countered]="resp.status === recipientStatusEnum.Countered"
+                [class.response--rejected]="resp.status === recipientStatusEnum.Rejected"
+              >
+                <div class="response__head">
+                  <span class="response__name">{{ partnerName(resp.seat) }}</span>
+                  <span class="response__status">{{ statusLabel(resp.status) }}</span>
+                </div>
+                @if (
+                  resp.status === recipientStatusEnum.Countered &&
+                  resp.counter !== undefined
+                ) {
+                  <div class="trade-summary">
+                    <div class="trade-summary__col">
+                      <p class="trade-summary__caption">
+                        {{ 'trade.youWouldGive' | translate }}
+                      </p>
+                      @for (resource of order; track resource) {
+                        @let c = readMap(resp.counter.offer, resource);
+                        @if (c > 0) {
+                          <p class="trade-summary__row">
+                            <span>{{ label(resource) }}</span>
+                            <strong>{{ c }}</strong>
+                          </p>
+                        }
+                      }
+                    </div>
+                    <div class="trade-summary__col">
+                      <p class="trade-summary__caption">
+                        {{ 'trade.youWouldGet' | translate }}
+                      </p>
+                      @for (resource of order; track resource) {
+                        @let c = readMap(resp.counter.request, resource);
+                        @if (c > 0) {
+                          <p class="trade-summary__row">
+                            <span>{{ label(resource) }}</span>
+                            <strong>{{ c }}</strong>
+                          </p>
+                        }
+                      }
+                    </div>
+                  </div>
+                }
+                @if (
+                  resp.status === recipientStatusEnum.Accepted ||
+                  resp.status === recipientStatusEnum.Countered
+                ) {
+                  <button
+                    type="button"
+                    class="accept response__finalize"
+                    [disabled]="!canFinalizeWith(resp) || hasAnyPending()"
+                    (click)="
+                      finalize.emit({ tradeId: trade.id, recipientSeat: resp.seat })
+                    "
+                  >
+                    @if (isPendingKind(pendingKindEnum.Finalize, trade.id)) {
+                      <span class="spinner" aria-hidden="true"></span>
+                      {{ 'trade.processing' | translate }}
+                    } @else {
+                      {{ 'trade.finalizeWith' | translate: { name: partnerName(resp.seat) } }}
+                    }
+                  </button>
+                }
+              </li>
+            }
+          </ul>
+
+          <div class="composer-actions">
+            <button
+              type="button"
+              class="reject"
+              [disabled]="hasAnyPending()"
+              (click)="reject.emit(trade.id)"
+            >
+              @if (isPendingKind(pendingKindEnum.Reject, trade.id)) {
+                <span class="spinner" aria-hidden="true"></span>
+                {{ 'trade.processing' | translate }}
+              } @else {
+                {{ 'trade.withdrawOffer' | translate }}
+              }
+            </button>
+          </div>
+        }
+
+        @case (modeEnum.Recipient) {
+          @let trade = pendingTrade()!;
+          @let mySlot = recipientSlot(trade)!;
+          <p class="sub-label">
+            {{
+              'trade.incomingFrom'
+                | translate: { name: partnerName(trade.fromSeat) }
+            }}
+          </p>
+          <div class="trade-summary trade-summary--banner">
+            <div class="trade-summary__col">
+              <p class="trade-summary__caption">{{ 'trade.theyOffer' | translate }}</p>
+              @if (isMapEmpty(trade.offer)) {
+                <p class="trade-summary__row trade-summary__row--empty">
+                  {{ 'trade.nothing' | translate }}
+                </p>
+              }
+              @for (resource of order; track resource) {
+                @let c = readMap(trade.offer, resource);
+                @if (c > 0) {
+                  <p class="trade-summary__row">
+                    <span>{{ label(resource) }}</span>
+                    <strong>{{ c }}</strong>
+                  </p>
+                }
+              }
+            </div>
+            <div class="trade-summary__col">
+              <p class="trade-summary__caption">{{ 'trade.theyAsk' | translate }}</p>
+              @if (isMapEmpty(trade.request)) {
+                <p class="trade-summary__row trade-summary__row--empty">
+                  {{ 'trade.nothing' | translate }}
+                </p>
+              }
+              @for (resource of order; track resource) {
+                @let c = readMap(trade.request, resource);
+                @let owned = ownedFor(resource);
+                @if (c > 0) {
+                  <p
+                    class="trade-summary__row"
+                    [class.trade-summary__row--lacking]="owned < c"
+                  >
+                    <span>{{ label(resource) }}</span>
+                    <strong>{{ c }} / {{ owned }}</strong>
+                  </p>
+                }
+              }
+            </div>
+          </div>
+
+          <p class="sub-label">{{ 'trade.yourResponse' | translate }}</p>
+          <p class="own-status own-status--{{ mySlot.status }}">
+            {{ statusLabel(mySlot.status) }}
+          </p>
+          @if (mySlot.status === recipientStatusEnum.Countered && mySlot.counter !== undefined) {
+            <div class="trade-summary">
+              <div class="trade-summary__col">
+                <p class="trade-summary__caption">{{ 'trade.youWouldGive' | translate }}</p>
+                @for (resource of order; track resource) {
+                  @let c = readMap(mySlot.counter.request, resource);
+                  @if (c > 0) {
+                    <p class="trade-summary__row">
+                      <span>{{ label(resource) }}</span>
+                      <strong>{{ c }}</strong>
+                    </p>
+                  }
+                }
+              </div>
+              <div class="trade-summary__col">
+                <p class="trade-summary__caption">{{ 'trade.youWouldGet' | translate }}</p>
+                @for (resource of order; track resource) {
+                  @let c = readMap(mySlot.counter.offer, resource);
+                  @if (c > 0) {
+                    <p class="trade-summary__row">
+                      <span>{{ label(resource) }}</span>
+                      <strong>{{ c }}</strong>
+                    </p>
+                  }
+                }
+              </div>
+            </div>
+          }
+          @if (mySlot.status === recipientStatusEnum.Pending && !canAcceptIncoming()) {
+            <p class="hint hint--warn">{{ 'trade.cannotAfford' | translate }}</p>
+          }
+          @if (mySlot.status === recipientStatusEnum.Countered) {
+            <p class="hint hint--info">
+              {{
+                'trade.youCounteredHint'
+                  | translate: { name: partnerName(trade.fromSeat) }
+              }}
+            </p>
+            <div class="incoming-actions incoming-actions--countered">
+              <button
+                type="button"
+                class="revise"
+                [disabled]="hasAnyPending()"
+                (click)="enterCounterMode()"
+              >
+                {{ 'trade.revise' | translate }}
+              </button>
+              <button
+                type="button"
+                class="reject"
+                [disabled]="hasAnyPending()"
+                (click)="emitWithdrawCounter()"
+              >
+                @if (isPendingKind(pendingKindEnum.WithdrawCounter, trade.id)) {
+                  <span class="spinner" aria-hidden="true"></span>
+                  {{ 'trade.processing' | translate }}
+                } @else {
+                  {{ 'trade.withdrawCounter' | translate }}
+                }
+              </button>
+            </div>
+          } @else {
+            <div class="incoming-actions">
+              <button
+                type="button"
+                class="accept"
+                [disabled]="
+                  mySlot.status === recipientStatusEnum.Accepted ||
+                  !canAcceptIncoming() ||
+                  hasAnyPending()
+                "
+                (click)="accept.emit(trade.id)"
+              >
+                @if (isPendingKind(pendingKindEnum.Accept, trade.id)) {
+                  <span class="spinner" aria-hidden="true"></span>
+                  {{ 'trade.processing' | translate }}
+                } @else {
+                  {{ 'trade.accept' | translate }}
+                }
+              </button>
+              <button
+                type="button"
+                class="reject"
+                [disabled]="
+                  mySlot.status === recipientStatusEnum.Rejected ||
+                  hasAnyPending()
+                "
+                (click)="reject.emit(trade.id)"
+              >
+                @if (isPendingKind(pendingKindEnum.Reject, trade.id)) {
+                  <span class="spinner" aria-hidden="true"></span>
+                  {{ 'trade.processing' | translate }}
+                } @else {
+                  {{ 'trade.reject' | translate }}
+                }
+              </button>
+              <button
+                type="button"
+                class="revise"
+                [disabled]="hasAnyPending()"
+                (click)="enterCounterMode()"
+              >
+                {{ 'trade.revise' | translate }}
+              </button>
+            </div>
+          }
+
+          @if (otherRecipients(trade).length > 0) {
+            <p class="sub-label">{{ 'trade.otherResponses' | translate }}</p>
+            <ul class="responses responses--compact">
+              @for (resp of otherRecipients(trade); track slotKey(resp)) {
+                <li
+                  class="response response--compact response--pulse"
+                  [class.response--pending]="resp.status === recipientStatusEnum.Pending"
+                  [class.response--accepted]="resp.status === recipientStatusEnum.Accepted"
+                  [class.response--countered]="resp.status === recipientStatusEnum.Countered"
+                  [class.response--rejected]="resp.status === recipientStatusEnum.Rejected"
+                >
+                  <div class="response__head">
+                    <span class="response__name">{{ partnerName(resp.seat) }}</span>
+                    <span class="response__status">{{ statusLabel(resp.status) }}</span>
+                  </div>
+                  @if (
+                    resp.status === recipientStatusEnum.Countered &&
+                    resp.counter !== undefined
+                  ) {
+                    <div class="trade-summary trade-summary--mini">
+                      <div class="trade-summary__col">
+                        <p class="trade-summary__caption">
+                          {{ 'trade.senderWouldGive' | translate }}
+                        </p>
+                        @for (resource of order; track resource) {
+                          @let c = readMap(resp.counter.offer, resource);
+                          @if (c > 0) {
+                            <p class="trade-summary__row">
+                              <span>{{ label(resource) }}</span>
+                              <strong>{{ c }}</strong>
+                            </p>
+                          }
+                        }
+                      </div>
+                      <div class="trade-summary__col">
+                        <p class="trade-summary__caption">
+                          {{ 'trade.senderWouldGet' | translate }}
+                        </p>
+                        @for (resource of order; track resource) {
+                          @let c = readMap(resp.counter.request, resource);
+                          @if (c > 0) {
+                            <p class="trade-summary__row">
+                              <span>{{ label(resource) }}</span>
+                              <strong>{{ c }}</strong>
+                            </p>
+                          }
+                        }
+                      </div>
+                    </div>
+                  }
+                </li>
+              }
+            </ul>
+          }
+        }
+
+        @case (modeEnum.Counter) {
+          @let trade = pendingTrade()!;
+          <p class="hint hint--info">
+            {{ 'trade.counterHint' | translate: { name: partnerName(trade.fromSeat) } }}
+          </p>
+          <div class="trade-grid">
+            <div class="col">
+              <p>{{ 'trade.youGive' | translate }}</p>
+              @for (resource of order; track resource) {
+                @let offerCount = offer()[resource];
+                @let owned = ownedFor(resource);
+                <div class="grid-row">
+                  <span class="label"
+                    >{{ label(resource) }}
+                    <span class="owned" aria-hidden="true">· {{ owned }}</span>
+                  </span>
+                  <div class="stepper">
+                    <button
+                      type="button"
+                      [disabled]="offerCount <= 0"
+                      (click)="adjust(sideOffer, resource, -1)"
+                    >
+                      −
+                    </button>
+                    <span class="count">{{ offerCount }}</span>
+                    <button
+                      type="button"
+                      [disabled]="offerCount >= owned"
+                      (click)="adjust(sideOffer, resource, 1)"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+            <div class="col">
+              <p>{{ 'trade.youWant' | translate }}</p>
+              @for (resource of order; track resource) {
+                @let requestCount = request()[resource];
+                <div class="grid-row">
+                  <span class="label">{{ label(resource) }}</span>
+                  <div class="stepper">
+                    <button
+                      type="button"
+                      [disabled]="requestCount <= 0"
+                      (click)="adjust(sideRequest, resource, -1)"
+                    >
+                      −
+                    </button>
+                    <span class="count">{{ requestCount }}</span>
+                    <button
+                      type="button"
+                      (click)="adjust(sideRequest, resource, 1)"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+          @if (!canSubmitCounter()) {
+            <p class="hint hint--soft">{{ 'trade.proposeHint' | translate }}</p>
+          }
+          <div class="composer-actions">
+            <button
+              type="button"
+              class="back"
+              [disabled]="hasAnyPending()"
+              (click)="exitCounterMode()"
+            >
+              {{ 'trade.cancelRevise' | translate }}
+            </button>
+            <button
+              type="button"
+              class="confirm"
+              [disabled]="!canSubmitCounter() || hasAnyPending()"
+              (click)="emitCounter()"
+            >
+              @if (isPendingKind(pendingKindEnum.Counter, trade.id)) {
+                <span class="spinner" aria-hidden="true"></span>
+                {{ 'trade.sending' | translate }}
+              } @else {
+                {{ 'trade.sendCounter' | translate }}
+              }
+            </button>
+          </div>
+        }
+
+        @case (modeEnum.Composer) {
+          @switch (view()) {
+            @case (viewEnum.Bank) {
+              <div class="bank">
+                <div class="field">
+                  <span>{{ 'trade.give' | translate }}</span>
+                  <div class="picker">
+                    @for (resource of order; track resource) {
+                      @let rate = ratesFor(resource);
+                      @let owned = ownedFor(resource);
+                      <button
+                        type="button"
+                        [class.active]="bankGive() === resource"
+                        [class.rate-best]="rate < 4"
+                        [disabled]="owned < rate"
+                        (click)="bankGive.set(resource)"
+                      >
+                        <span class="bank-pick-label">{{ label(resource) }}</span>
+                        <span class="bank-pick-rate">{{ rate }}:1</span>
+                        <span class="bank-pick-owned">· {{ owned }}</span>
+                      </button>
+                    }
+                  </div>
+                </div>
+                <div class="field">
+                  <span>{{ 'trade.take' | translate }}</span>
+                  <div class="picker">
+                    @for (resource of order; track resource) {
+                      <button
+                        type="button"
+                        [class.active]="bankReceive() === resource"
+                        [disabled]="resource === bankGive()"
+                        (click)="bankReceive.set(resource)"
+                      >
+                        {{ label(resource) }}
+                      </button>
+                    }
+                  </div>
+                </div>
+                <p class="bank-summary">
+                  {{
+                    'trade.bankSummary'
+                      | translate
+                        : {
+                            amount: bankRate(),
+                            give: label(bankGive()),
+                            receive: label(bankReceive())
+                          }
+                  }}
+                </p>
+                <button
+                  type="button"
+                  class="confirm"
+                  [disabled]="!canSubmitBank() || hasAnyPending()"
+                  (click)="
+                    bankTrade.emit({
+                      give: bankGive(),
+                      amount: bankRate(),
+                      receive: bankReceive(),
+                    })
+                  "
+                >
+                  @if (isPendingKind(pendingKindEnum.Bank)) {
+                    <span class="spinner" aria-hidden="true"></span>
+                    {{ 'trade.sending' | translate }}
+                  } @else {
+                    {{ 'trade.bankExecute' | translate }}
+                  }
+                </button>
+              </div>
+            }
+            @case (viewEnum.Player) {
+              <div class="player">
+                <div class="field">
+                  <span>{{ 'trade.recipients' | translate }}</span>
+                  <div class="segmented" role="radiogroup">
+                    <button
+                      type="button"
+                      role="radio"
+                      [attr.aria-checked]="broadcastMode()"
+                      [class.active]="broadcastMode()"
+                      (click)="setBroadcastMode(true)"
+                    >
+                      {{ 'trade.targetBroadcast' | translate }}
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      [attr.aria-checked]="!broadcastMode()"
+                      [class.active]="!broadcastMode()"
+                      (click)="setBroadcastMode(false)"
+                    >
+                      {{ 'trade.targetSingle' | translate }}
+                    </button>
+                  </div>
+                  @if (!broadcastMode()) {
+                    <div class="picker">
+                      @for (partner of partners(); track partner.seat) {
+                        <button
+                          type="button"
+                          [class.active]="targetSeat() === partner.seat"
+                          (click)="targetSeat.set(partner.seat)"
+                        >
+                          {{ partner.name }}
+                        </button>
+                      }
+                    </div>
+                  } @else {
+                    <p class="hint hint--soft">
+                      {{
+                        'trade.broadcastHint'
+                          | translate: { count: partners().length }
+                      }}
+                    </p>
+                  }
+                </div>
+                <div class="trade-grid">
+                  <div class="col">
+                    <p>{{ 'trade.youGive' | translate }}</p>
+                    @for (resource of order; track resource) {
+                      @let offerCount = offer()[resource];
+                      @let owned = ownedFor(resource);
+                      <div class="grid-row">
+                        <span class="label">{{ label(resource) }}</span>
+                        <span class="owned" aria-hidden="true">/ {{ owned }}</span>
+                        <div class="stepper">
+                          <button
+                            type="button"
+                            [disabled]="offerCount <= 0"
+                            (click)="adjust(sideOffer, resource, -1)"
+                          >
+                            −
+                          </button>
+                          <span class="count">{{ offerCount }}</span>
+                          <button
+                            type="button"
+                            [disabled]="offerCount >= owned"
+                            (click)="adjust(sideOffer, resource, 1)"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                  <div class="col">
+                    <p>{{ 'trade.youWant' | translate }}</p>
+                    @for (resource of order; track resource) {
+                      @let requestCount = request()[resource];
+                      <div class="grid-row">
+                        <span class="label">{{ label(resource) }}</span>
+                        <div class="stepper">
+                          <button
+                            type="button"
+                            [disabled]="requestCount <= 0"
+                            (click)="adjust(sideRequest, resource, -1)"
+                          >
+                            −
+                          </button>
+                          <span class="count">{{ requestCount }}</span>
+                          <button
+                            type="button"
+                            (click)="adjust(sideRequest, resource, 1)"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+                @if (!canSubmitPropose()) {
+                  <p class="hint hint--soft">{{ 'trade.proposeHint' | translate }}</p>
+                }
+                <button
+                  type="button"
+                  class="confirm"
+                  [disabled]="!canSubmitPropose() || hasAnyPending()"
+                  (click)="emitPropose()"
+                >
+                  @if (isPendingKind(pendingKindEnum.Propose)) {
+                    <span class="spinner" aria-hidden="true"></span>
+                    {{ 'trade.sending' | translate }}
+                  } @else {
+                    {{ 'trade.sendOffer' | translate }}
+                  }
+                </button>
+              </div>
+            }
+          }
+        }
+      }
+
+      <button type="button" class="dismiss" (click)="closed.emit()">
+        {{ 'trade.dismiss' | translate }}
+      </button>
+    </div>
+  </div>
+}

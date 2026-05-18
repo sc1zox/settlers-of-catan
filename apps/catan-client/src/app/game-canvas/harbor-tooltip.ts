@@ -15,19 +15,10 @@ export interface HarborTooltipModel {
   standalone: true,
   imports: [TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    @let m = model();
-    @if (m) {
-      <div class="tooltip" [style.left.px]="m.x + 14" [style.top.px]="m.y + 14">
-        <div class="ratio">{{ m.harbor.ratioFrom }} : {{ m.harbor.ratioTo }}</div>
-        <div class="title">{{ 'harbor.title' | translate }}</div>
-        <div class="detail">{{ detail() }}</div>
-      </div>
-    }
-  `,
+  templateUrl: './harbor-tooltip.html',
   styleUrl: './harbor-tooltip.scss',
 })
-export class HarborTooltipComponent {
+export class HarborTooltip {
   private readonly translate = inject(TranslateService);
   readonly model = input<HarborTooltipModel | null>(null);
 

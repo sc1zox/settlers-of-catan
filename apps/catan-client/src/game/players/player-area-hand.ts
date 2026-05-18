@@ -66,7 +66,6 @@ export class PlayerAreaHand {
 
     const cards: Card[] = [];
     const resourceGroupKey = `res-${this.seat}`;
-    const devGroupKey = `dev-${this.seat}`;
     const handStartX = -2.4;
     let slot = 0;
     if (hiddenResourceCount !== null) {
@@ -110,7 +109,7 @@ export class PlayerAreaHand {
       // see what they hold.
       const kind = devKinds !== null && i < devKinds.length ? devKinds[i] : null;
       const card = this.buildDevCard(kind);
-      card.setGroupKey(devGroupKey);
+      card.setGroupKey(`dev-${this.seat}-${i}`);
       const x = devStartX + i * (CARD_SHORT + HAND_GAP);
       this.placeCard(card, x, this.cardRowZ, this.tableY);
       if (i >= this.devCount) {

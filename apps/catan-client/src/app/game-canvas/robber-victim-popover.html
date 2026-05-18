@@ -1,0 +1,16 @@
+@let m = model();
+@if (m) {
+  <div class="popover" [style.left.px]="m.x" [style.top.px]="m.y">
+    <p class="title">{{ 'robberVictim.title' | translate }}</p>
+    <div class="list">
+      @for (candidate of m.candidates; track candidate.seat) {
+        <button type="button" (click)="pick.emit(candidate.seat)">{{ candidate.name }}</button>
+      }
+      @if (m.candidates.length === 0) {
+        <button type="button" class="none" (click)="pick.emit(null)">
+          {{ 'robberVictim.none' | translate }}
+        </button>
+      }
+    </div>
+  </div>
+}

@@ -1,0 +1,26 @@
+@if (rows().length > 0) {
+  <aside class="disconnect-banner" role="status" aria-live="polite">
+    @for (row of rows(); track row.seat) {
+      <div class="disconnect-banner__row">
+        <span class="disconnect-banner__dot" aria-hidden="true"></span>
+        <div class="disconnect-banner__text">
+          <strong class="disconnect-banner__name">{{ row.displayName }}</strong>
+          @if (row.awaitingAdminDecision) {
+            <span>{{ awaitingText() }}</span>
+          } @else if (row.remainingMs !== null) {
+            <span>{{ countdownText(row.remainingMs) }}</span>
+          }
+        </div>
+        @if (row.awaitingAdminDecision && isAdmin()) {
+          <button
+            type="button"
+            class="disconnect-banner__kick"
+            (click)="kick(row.seat)"
+          >
+            {{ kickButtonText() }}
+          </button>
+        }
+      </div>
+    }
+  </aside>
+}

@@ -26,6 +26,7 @@ export interface LobbyScenePlayerState {
 }
 
 export interface LobbySceneState {
+  readonly lobbyId: string;
   readonly phase: GamePhase;
   readonly seed: number;
   readonly players: readonly LobbyScenePlayerState[];

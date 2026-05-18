@@ -1,12 +1,12 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { TranslatePipe } from '@ngx-translate/core';
-import { BuildConfirmPopoverComponent } from '../../game-canvas/build-confirm-popover';
-import { DiscardModalComponent } from '../../game-canvas/discard-modal';
-import { DevCardModalComponent } from '../dev-cards/dev-card-modal';
-import { GameCanvasComponent } from '../../game-canvas/game-canvas';
-import { RobberVictimPopoverComponent } from '../../game-canvas/robber-victim-popover';
-import { TradePanelComponent } from '../trading/trade-panel.component';
+import { BuildConfirmPopover } from '../../game-canvas/build-confirm-popover';
+import { DiscardModal } from '../../game-canvas/discard-modal';
+import { DevCardModal } from '../dev-cards/dev-card-modal';
+import { GameCanvas } from '../../game-canvas/game-canvas';
+import { RobberVictimPopover } from '../../game-canvas/robber-victim-popover';
+import { TradePanel } from '../trading/trade-panel';
 import { DisconnectBanner } from '../disconnect-banner/disconnect-banner';
 import { SummaryScreen } from '../summary-screen/summary-screen';
 import { GameSettingsToggle } from '../game-settings/game-settings-toggle';
@@ -25,13 +25,13 @@ import { SessionShellFacadeService } from './session-shell-facade.service';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    GameCanvasComponent,
+    GameCanvas,
     ReactiveFormsModule,
-    BuildConfirmPopoverComponent,
-    DiscardModalComponent,
-    DevCardModalComponent,
-    TradePanelComponent,
-    RobberVictimPopoverComponent,
+    BuildConfirmPopover,
+    DiscardModal,
+    DevCardModal,
+    TradePanel,
+    RobberVictimPopover,
     SpectatorCameraToggle,
     GameSettingsToggle,
     DisconnectBanner,

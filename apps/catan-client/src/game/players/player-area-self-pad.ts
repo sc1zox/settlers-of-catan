@@ -97,11 +97,12 @@ export class PlayerAreaSelfPad {
       this.mainMaterial.color.setRGB(1.06, 1.06, 1.06);
       this.mainMaterial.roughness = 0.92;
       this.mainMaterial.emissiveIntensity = 0.045;
-      return;
+    } else {
+      this.mainMaterial.color.setRGB(1, 1, 1);
+      this.mainMaterial.roughness = 0.96;
+      this.mainMaterial.emissiveIntensity = 0;
     }
-    this.mainMaterial.color.setRGB(1, 1, 1);
-    this.mainMaterial.roughness = 0.96;
-    this.mainMaterial.emissiveIntensity = 0;
+    this.presenceDimmer.refreshBases([this.mainMaterial]);
   }
 
   private static feltBaseColor(color: PlayerColor): Color {

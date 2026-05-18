@@ -14,6 +14,7 @@ import {
 } from '@catan/api-interfaces';
 import { GameService } from '../core/game.service';
 import { LobbySocketFacade } from '../match-flow/lobby-socket.facade';
+import { TradeReconnectService } from '../trade/trade-reconnect.service';
 import { GatewaySocketSessionService } from './gateway-common.services';
 
 @Injectable()
@@ -22,6 +23,7 @@ export class GatewayLobbyHandlers {
     private readonly gameService: GameService,
     private readonly sessions: GatewaySocketSessionService,
     private readonly lobbySocket: LobbySocketFacade,
+    private readonly tradeReconnect: TradeReconnectService,
   ) {}
 
   public async joinLobby(server: Server, client: Socket, payload: JoinLobbyPayload): Promise<void> {
@@ -38,6 +40,7 @@ export class GatewayLobbyHandlers {
     const joinedPayload: LobbyJoinedPayload = joined;
     client.emit(GameSocketServerEvent.LobbyJoined, joinedPayload);
     this.gameService.broadcastFullState(server, lobby);
+    this.tradeReconnect.resyncOpenTradesForSocket(server, lobby.lobbyId, client.id, joined.seat);
   }
 
   public async createLobby(

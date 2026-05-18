@@ -231,6 +231,14 @@ export class SessionTradingPanelService {
           this.userMinimizedTradeId.set(null);
         }
         return;
+      case TradeUpdateKind.Resync:
+        if (involvesSelf) {
+          // Reconnect/join landed us back in an in-flight thread; surface it
+          // immediately so the user doesn't have to hunt for the HUD button.
+          this.userMinimizedTradeId.set(null);
+          this.tradeOpen.set(true);
+        }
+        return;
     }
 
     // Defensive: terminal status without a recognised kind closes the panel.

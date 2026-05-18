@@ -1,10 +1,13 @@
-import { computed, inject, Injectable } from '@angular/core';
+import { computed, effect, inject, Injectable, OnDestroy, signal } from '@angular/core';
 import {
   PlayerHarborRatesDto,
   ResourceType,
   TradeOfferDto,
-  TradeStatus,
+  TradeUpdateKind,
+  type TradeUpdatedPayload,
 } from '@catan/api-interfaces';
+import type { Subscription } from 'rxjs';
+import { GameSocketService } from '../../core/socket/game-socket.service';
 import type { TradePartner } from '../trading/trading-ui.types';
 import { LobbyGameUiStateService } from './lobby-game-ui-state.service';
 
@@ -28,8 +31,9 @@ const DEFAULT_HARBOR_RATES: PlayerHarborRatesDto = {
 };
 
 @Injectable({ providedIn: 'root' })
-export class LobbyTradeUiService {
+export class LobbyTradeUiService implements OnDestroy {
   private readonly state = inject(LobbyGameUiStateService);
+  private readonly sockets = inject(GameSocketService);
 
   public readonly tradePartners = computed<readonly TradePartner[]>(() => {
     const payload = this.state.rawLobbyState();
@@ -42,33 +46,48 @@ export class LobbyTradeUiService {
   });
 
   /**
-   * Pull the player-relevant open trade straight from the server-authoritative
-   * FullState. A reconnecting client sees the same active offer as everyone
-   * else; the transient `TradeUpdated` event is no longer the source of truth
-   * (it stays around as an animation/UX-transition hint).
+   * The single open trade involving the current viewer, or null.
+   *
+   * Server is the only writer. FullState no longer carries trades — the
+   * board doesn't care who's haggling — so the cache is driven exclusively
+   * by `TradeUpdated`:
+   *  - action events (Created / Recipient* / etc.) only reach involved
+   *    sockets, so we apply each delta blind.
+   *  - Resync events are pushed on reconnect/join when the new socket
+   *    belongs to a seat that's already in an open thread.
+   *  - the cache is cleared when we lose the lobby binding (lobby switch
+   *    or sign-out) — without that, a stale trade from the previous lobby
+   *    would survive.
    */
-  public readonly pendingTrade = computed<TradeOfferDto | null>(() => {
-    const payload = this.state.rawLobbyState();
-    const seat = this.state.selfSeat();
-    if (payload === undefined || seat === null) {
-      return null;
+  private readonly currentTrade = signal<TradeOfferDto | null>(null);
+  public readonly pendingTrade = this.currentTrade.asReadonly();
+
+  private tradeUpdatedSubscription: Subscription | null = null;
+  private lastLobbyId: string | null = null;
+
+  public constructor() {
+    effect(() => {
+      const payload = this.state.rawLobbyState();
+      const lobbyId = payload?.lobbyId ?? null;
+      if (lobbyId === this.lastLobbyId) {
+        return;
+      }
+      this.lastLobbyId = lobbyId;
+      if (this.currentTrade() !== null) {
+        this.currentTrade.set(null);
+      }
+    });
+    this.tradeUpdatedSubscription = this.sockets.tradeUpdated$.subscribe((update) => {
+      this.applyTradeUpdate(update);
+    });
+  }
+
+  public ngOnDestroy(): void {
+    if (this.tradeUpdatedSubscription !== null) {
+      this.tradeUpdatedSubscription.unsubscribe();
+      this.tradeUpdatedSubscription = null;
     }
-    for (let i = 0; i < payload.activeTrades.length; i += 1) {
-      const trade = payload.activeTrades[i];
-      if (trade.status !== TradeStatus.Open) {
-        continue;
-      }
-      if (trade.fromSeat === seat) {
-        return trade;
-      }
-      for (let j = 0; j < trade.recipients.length; j += 1) {
-        if (trade.recipients[j].seat === seat) {
-          return trade;
-        }
-      }
-    }
-    return null;
-  });
+  }
 
   public readonly selfResources = computed<Readonly<Record<ResourceType, number>>>(
     () => this.state.selfPlayer()?.resources ?? ZERO_RESOURCES,
@@ -78,20 +97,30 @@ export class LobbyTradeUiService {
     () => this.state.selfPlayer()?.harborRates ?? DEFAULT_HARBOR_RATES,
   );
 
-  public readonly selfHasOpenTrade = computed<boolean>(() => {
-    const trade = this.pendingTrade();
-    const seat = this.state.selfSeat();
-    if (trade === null || seat === null) {
-      return false;
+  public readonly selfHasOpenTrade = computed<boolean>(() => this.pendingTrade() !== null);
+
+  private applyTradeUpdate(update: TradeUpdatedPayload): void {
+    // Server routes TradeUpdated only to involved sockets, so anything that
+    // reaches us is by definition for our viewer.
+    switch (update.kind) {
+      case TradeUpdateKind.Created:
+      case TradeUpdateKind.RecipientAccepted:
+      case TradeUpdateKind.RecipientCountered:
+      case TradeUpdateKind.RecipientCounterWithdrawn:
+      case TradeUpdateKind.RecipientRejected:
+      case TradeUpdateKind.Resync:
+        if (this.currentTrade() !== update.trade) {
+          this.currentTrade.set(update.trade);
+        }
+        break;
+      case TradeUpdateKind.Cancelled:
+      case TradeUpdateKind.Finalized:
+      case TradeUpdateKind.Superseded:
+      case TradeUpdateKind.PhaseClosed:
+        if (this.currentTrade() !== null) {
+          this.currentTrade.set(null);
+        }
+        break;
     }
-    if (trade.fromSeat === seat) {
-      return true;
-    }
-    for (let i = 0; i < trade.recipients.length; i += 1) {
-      if (trade.recipients[i].seat === seat) {
-        return true;
-      }
-    }
-    return false;
-  });
+  }
 }

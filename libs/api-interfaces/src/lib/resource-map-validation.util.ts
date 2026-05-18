@@ -19,6 +19,13 @@ export function assertResourceType(value: unknown): ResourceType {
   return value;
 }
 
+/**
+ * Per-side validation: each entry must be a positive integer keyed by a
+ * known resource. The map MAY be empty — a one-sided trade is legal (e.g.
+ * "I want 1 wood, you tell me what you'd take" sends `offer: {}`).
+ * Pair-level emptiness is checked separately via
+ * {@link assertResourceTradePairHasContent}.
+ */
 export function assertValidResourceTradeMap(
   map: Readonly<Partial<Record<ResourceType, number>>> | undefined,
 ): void {
@@ -26,9 +33,6 @@ export function assertValidResourceTradeMap(
     throw new Error(ActionRejectCode.InvalidPayload);
   }
   const keys = Object.keys(map);
-  if (keys.length === 0) {
-    throw new Error(ActionRejectCode.InvalidPayload);
-  }
   for (let i = 0; i < keys.length; i += 1) {
     const key = keys[i];
     if (!isResourceType(key)) {
@@ -38,6 +42,19 @@ export function assertValidResourceTradeMap(
     if (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0) {
       throw new Error(ActionRejectCode.InvalidPayload);
     }
+  }
+}
+
+/**
+ * A trade with nothing on either side is a no-op — reject it at the action
+ * layer. One side may be empty (beg or gift); both empty cannot be.
+ */
+export function assertResourceTradePairHasContent(
+  offer: Readonly<Partial<Record<ResourceType, number>>>,
+  request: Readonly<Partial<Record<ResourceType, number>>>,
+): void {
+  if (Object.keys(offer).length === 0 && Object.keys(request).length === 0) {
+    throw new Error(ActionRejectCode.InvalidPayload);
   }
 }
 

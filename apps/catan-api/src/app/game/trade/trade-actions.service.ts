@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   ActionRejectCode,
+  assertResourceTradePairHasContent,
   assertValidResourceTradeMap,
   GamePhase,
   PlayerSeat,
@@ -50,6 +51,7 @@ export class TradeActionsService {
     const recipients = this.normalizeRecipients(lobby, from.seat, payload.recipients);
     assertValidResourceTradeMap(payload.offer);
     assertValidResourceTradeMap(payload.request);
+    assertResourceTradePairHasContent(payload.offer, payload.request);
     this.assertCanPayMap(from, payload.offer);
     // Supersede previous open offers FIRST so order on the wire is
     // Superseded→Open (Socket.IO preserves order). Superseded is distinct
@@ -122,6 +124,7 @@ export class TradeActionsService {
     // → recipient must own counter.request.
     assertValidResourceTradeMap(payload.offer);
     assertValidResourceTradeMap(payload.request);
+    assertResourceTradePairHasContent(payload.offer, payload.request);
     this.assertCanPayMap(actor, payload.request);
     const updated = this.tradeService.updateRecipient(offer.id, actor.seat, {
       status: nextStatus,
@@ -239,6 +242,7 @@ export class TradeActionsService {
     this.applyResourceDelta(recipient, takeMap, -1);
     this.applyResourceDelta(recipient, giveMap, 1);
     const updated = this.tradeService.finalize(offer.id, payload.recipientSeat);
+    // Resources just moved between players → board-level delta.
     context.broadcastLobby(lobby);
     if (!updated) {
       return { cancelled: [], updates: [], lobbyId: lobby.lobbyId };

@@ -3,7 +3,6 @@ import { DevCardType } from './dev-card-type.enum';
 import { GamePhase } from './game-phase.enum';
 import { PlayerSeat } from './player-seat.enum';
 import { ResourceType } from './resource-type.enum';
-import type { TradeOfferDto } from './trade.dto';
 import { AxialCoordDto, DiceRollDto } from './turn-flow.dto';
 
 export enum GameDeltaType {
@@ -107,10 +106,4 @@ export interface LobbyFullStatePayload {
    */
   readonly selfDevCards: readonly DevCardType[];
   readonly players: readonly LobbyPlayerPublicDto[];
-  /**
-   * Currently open trade offers in this lobby (status === Open). Source of
-   * truth for trade UI — a reconnecting client sees the same active offers
-   * as everyone else without depending on the transient `TradeUpdated` event.
-   */
-  readonly activeTrades: readonly TradeOfferDto[];
 }

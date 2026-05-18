@@ -7,16 +7,14 @@ import {
   TradeFinalizePayload,
   TradeProposePayload,
   TradeRejectPayload,
-  TradeUpdatedPayload,
   TradeWithdrawCounterPayload,
-  formatSocketIoLobbyRoomId,
-  GameSocketServerEvent,
 } from '@catan/api-interfaces';
 import { Server } from 'socket.io';
 import { GameService } from '../core/game.service';
 import { DemoBotService } from '../demo-bot/demo-bot.service';
 import type { LobbyRuntime } from '../lobby/lobby-runtime';
 import { TradeActionsService, type TradeActionResult } from './trade-actions.service';
+import { emitTradeUpdatedToInvolvedSockets } from './trade-emit.util';
 
 @Injectable()
 export class TradeSocketFacade {
@@ -130,17 +128,23 @@ export class TradeSocketFacade {
   }
 
   private broadcastResult(server: Server, result: TradeActionResult): void {
-    const roomId = formatSocketIoLobbyRoomId(result.lobbyId);
+    // Trade deltas only — FullState stays out of this path. The board hasn't
+    // changed; only the trade graph has. Client mirrors `activeTrades` from
+    // these TradeUpdated events. Actions that ALSO move resources (e.g.
+    // finalize) push a FullState themselves alongside.
+    if (result.cancelled.length === 0 && result.updates.length === 0) {
+      return;
+    }
+    const lobby = this.gameService.getLobby(result.lobbyId);
+    if (lobby === undefined) {
+      return;
+    }
     for (let i = 0; i < result.cancelled.length; i += 1) {
-      this.emitTradeUpdated(server, roomId, result.cancelled[i]);
+      emitTradeUpdatedToInvolvedSockets(server, lobby, result.cancelled[i]);
     }
     for (let i = 0; i < result.updates.length; i += 1) {
-      this.emitTradeUpdated(server, roomId, result.updates[i]);
+      emitTradeUpdatedToInvolvedSockets(server, lobby, result.updates[i]);
     }
-  }
-
-  private emitTradeUpdated(server: Server, roomId: string, payload: TradeUpdatedPayload): void {
-    server.to(roomId).emit(GameSocketServerEvent.TradeUpdated, payload);
   }
 
   private tradeActionContext(server: Server): {

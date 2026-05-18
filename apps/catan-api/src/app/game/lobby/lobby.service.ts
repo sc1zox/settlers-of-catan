@@ -12,7 +12,6 @@ import {
 } from '@catan/api-interfaces';
 import { Server } from 'socket.io';
 import { RedisLobbyStoreService } from '../../infrastructure/redis/redis-lobby-store.service';
-import { TradeService } from '../trade/trade.service';
 import { GameActionValidationService } from '../validation/game-action-validation.service';
 import { LobbyPlayerSlot, LobbyRuntime, pickFallbackHumanAdminSessionToken } from './lobby-runtime';
 import {
@@ -31,7 +30,6 @@ export class LobbyService {
   public constructor(
     private readonly validation: GameActionValidationService,
     private readonly redisLobby: RedisLobbyStoreService,
-    private readonly trades: TradeService,
   ) {}
 
   public getOrCreateLobby(canonicalLobbyId: string, lobbyCode: string): LobbyRuntime {
@@ -156,7 +154,6 @@ export class LobbyService {
       devDeckCount: lobby.devDeck.length,
       selfDevCards,
       players,
-      activeTrades: this.trades.findOpenOffersForLobby(lobby.lobbyId),
     };
   }
 

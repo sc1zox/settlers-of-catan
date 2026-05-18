@@ -3,12 +3,10 @@ import {
   ActionRejectCode,
   DiceRolledPayload,
   GamePhase,
-  GameSocketServerEvent,
   PlayerSeat,
   TradeStatus,
   TradeUpdateKind,
   TradeUpdatedPayload,
-  formatSocketIoLobbyRoomId,
 } from '@catan/api-interfaces';
 import { Server } from 'socket.io';
 import { EconomyService } from '../economy/economy.service';
@@ -16,6 +14,7 @@ import { resetTurnDevCardState } from '../dev-cards/dev-cards.runtime';
 import { GameActionValidationService } from '../validation/game-action-validation.service';
 import { LobbyRuntime } from '../lobby/lobby-runtime';
 import { TradeService } from '../trade/trade.service';
+import { emitTradeUpdatedToInvolvedSockets } from '../trade/trade-emit.util';
 import { getMinimumPlayerCountToStartLobby } from './match-start-rules';
 import { TurnFlowService } from '../turn/turn-flow.service';
 
@@ -75,7 +74,7 @@ export class MatchFlowService {
   ): void {
     const actorSeat = this.assertMayCompleteTradingPhase(lobby, sessionToken);
     this.transitionFromTradingToBuilding(lobby);
-    this.emitExpiredTradeOffers(lobbyId, actorSeat, server);
+    this.emitExpiredTradeOffers(lobby, lobbyId, actorSeat, server);
   }
 
   private assertMayCompleteTradingPhase(
@@ -91,15 +90,12 @@ export class MatchFlowService {
   }
 
   private emitExpiredTradeOffers(
+    lobby: LobbyRuntime,
     lobbyId: string,
     actorSeat: PlayerSeat,
     server: Server,
   ): void {
     const expired = this.tradeService.closeOpenOffersForLobby(lobbyId, TradeStatus.Rejected);
-    if (expired.length === 0) {
-      return;
-    }
-    const room = formatSocketIoLobbyRoomId(lobbyId);
     for (let i = 0; i < expired.length; i += 1) {
       const payload: TradeUpdatedPayload = {
         lobbyId,
@@ -107,7 +103,7 @@ export class MatchFlowService {
         kind: TradeUpdateKind.PhaseClosed,
         actorSeat,
       };
-      server.to(room).emit(GameSocketServerEvent.TradeUpdated, payload);
+      emitTradeUpdatedToInvolvedSockets(server, lobby, payload);
     }
   }
 }

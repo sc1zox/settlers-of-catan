@@ -111,6 +111,13 @@ export enum TradeUpdateKind {
   Superseded = 'superseded',
   /** Trading phase ended; any still-open trades got auto-rejected. */
   PhaseClosed = 'phase_closed',
+  /**
+   * Server-initiated resync after a reconnect or lobby (re)join: same DTO
+   * the involved seat would have learned about via `Created` originally,
+   * just without the "this just happened" semantics. Clients treat it as
+   * authoritative cache-fill.
+   */
+  Resync = 'resync',
 }
 
 export interface TradeUpdatedPayload {

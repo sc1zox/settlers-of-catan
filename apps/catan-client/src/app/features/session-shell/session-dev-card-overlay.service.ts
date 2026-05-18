@@ -1,11 +1,27 @@
 import { inject, Injectable, signal } from '@angular/core';
-import { ResourceType } from '@catan/api-interfaces';
+import { DevCardType, ResourceType } from '@catan/api-interfaces';
 import { GameStateResource } from '../../core/game/game-state.resource';
-import { YearOfPlentyPick } from '../dev-cards/dev-card-modal';
+import {
+  DevCardPlayPickerModel,
+  YearOfPlentyPick,
+} from '../dev-cards/dev-card-play-picker';
 import { DevCardsService } from '../dev-cards/dev-cards.service';
 import { SessionBuildInteractionService } from './session-build-interaction.service';
 import { SessionRobberFlowService } from './session-robber-flow.service';
 
+/**
+ * Routes a "play this specific dev card" intent (from the focused-card overlay
+ * in game-canvas) to the right follow-up:
+ *  - Knight        → enter robber mode (server play happens after tile/victim picked)
+ *  - Monopoly      → open resource picker → server PlayMonopoly
+ *  - YearOfPlenty  → open two-resource picker → server PlayYearOfPlenty
+ *  - RoadBuilding  → enter free-road mode (server play happens after edge picked)
+ *  - VictoryPoint  → not playable (filtered upstream)
+ *
+ * The server is the source of truth: every action calls a GameStateResource
+ * method that emits the matching socket event; the canPlay gate is just an
+ * optimistic UI hint to keep an unplayable card from opening a picker.
+ */
 @Injectable()
 export class SessionDevCardOverlayService {
   private readonly gameState = inject(GameStateResource);
@@ -13,42 +29,52 @@ export class SessionDevCardOverlayService {
   private readonly build = inject(SessionBuildInteractionService);
   private readonly robberFlow = inject(SessionRobberFlowService);
 
-  public readonly devCardOpen = signal<boolean>(false);
+  public readonly pickerModel = signal<DevCardPlayPickerModel>(null);
 
-  /** Wipe local mode state. Called by the session cleanup coordinator. */
+  /** Wipe local picker state. Called by the session cleanup coordinator. */
   public resetSession(): void {
-    this.devCardOpen.set(false);
+    this.pickerModel.set(null);
   }
 
-  public onDevCardClicked(): boolean {
-    const canPlay = this.devCards.canPlayDevCard();
-    if (canPlay) {
-      this.devCardOpen.set(true);
+  public onPlayDevCard(type: DevCardType): void {
+    if (!this.devCards.canPlayDevCard()) {
+      return;
     }
-    return canPlay;
+    switch (type) {
+      case DevCardType.Knight:
+        this.robberFlow.setKnightActive(true);
+        return;
+      case DevCardType.RoadBuilding:
+        this.build.onPlayRoadBuilding();
+        return;
+      case DevCardType.Monopoly:
+        this.pickerModel.set({ kind: 'monopoly' });
+        return;
+      case DevCardType.YearOfPlenty:
+        this.pickerModel.set({ kind: 'yearOfPlenty' });
+        return;
+      case DevCardType.VictoryPoint:
+        return;
+    }
   }
 
-  public closeDevCard(): void {
-    this.devCardOpen.set(false);
+  public closePicker(): void {
+    this.pickerModel.set(null);
   }
 
-  public onPlayKnight(): void {
-    this.devCardOpen.set(false);
-    this.robberFlow.setKnightActive(true);
-  }
-
-  public onPlayMonopoly(resource: ResourceType): void {
+  public onMonopolyPicked(resource: ResourceType): void {
+    if (!this.devCards.canPlayDevCard()) {
+      return;
+    }
     this.gameState.playMonopoly(resource);
-    this.devCardOpen.set(false);
+    this.pickerModel.set(null);
   }
 
-  public onPlayYearOfPlenty(pick: YearOfPlentyPick): void {
+  public onPlentyPicked(pick: YearOfPlentyPick): void {
+    if (!this.devCards.canPlayDevCard()) {
+      return;
+    }
     this.gameState.playYearOfPlenty(pick.first, pick.second);
-    this.devCardOpen.set(false);
-  }
-
-  public onPlayRoadBuilding(): void {
-    this.devCardOpen.set(false);
-    this.build.onPlayRoadBuilding();
+    this.pickerModel.set(null);
   }
 }

@@ -97,14 +97,21 @@ export class GameActionValidationService {
   }
 
   public assertDevCardCost(player: LobbyPlayerSlot): void {
+    if (!this.canAffordDevCardCost(player)) {
+      throw new Error(ActionRejectCode.InsufficientResources);
+    }
+  }
+
+  public canAffordDevCardCost(player: LobbyPlayerSlot): boolean {
     const keys = Object.keys(DEV_CARD_COST) as ResourceType[];
     for (let i = 0; i < keys.length; i += 1) {
       const resource = keys[i];
       const need = DEV_CARD_COST[resource] ?? 0;
       if ((player.resources[resource] ?? 0) < need) {
-        throw new Error(ActionRejectCode.InsufficientResources);
+        return false;
       }
     }
+    return true;
   }
 
   public assertLegalRoadEdge(

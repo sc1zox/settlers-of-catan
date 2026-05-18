@@ -11,6 +11,7 @@ import {
   type LobbyFullStatePayload,
 } from '@catan/api-interfaces';
 import { Server } from 'socket.io';
+import { LiveKitRoomService } from '../../infrastructure/livekit/livekit-room.service';
 import { RedisLobbyStoreService } from '../../infrastructure/redis/redis-lobby-store.service';
 import { GameActionValidationService } from '../validation/game-action-validation.service';
 import { LobbyPlayerSlot, LobbyRuntime, pickFallbackHumanAdminSessionToken } from './lobby-runtime';
@@ -35,6 +36,7 @@ export class LobbyService {
   public constructor(
     private readonly validation: GameActionValidationService,
     private readonly redisLobby: RedisLobbyStoreService,
+    private readonly liveKit: LiveKitRoomService,
   ) {}
 
   public getOrCreateLobby(canonicalLobbyId: string, lobbyCode: string): LobbyRuntime {
@@ -137,6 +139,7 @@ export class LobbyService {
       ? this.validation.computeLegalMoves(lobby, viewer.seat)
       : { settlements: [], roads: [], cities: [], roadBuilding: [] };
     const selfDevCards = viewer ? viewer.devCards.slice() : [];
+    const canAffordDevCard = viewer !== undefined && this.validation.canAffordDevCardCost(viewer);
     return {
       lobbyId: lobby.lobbyId,
       lobbyCode: lobby.lobbyCode,
@@ -163,6 +166,7 @@ export class LobbyService {
       winnerSeat: lobby.winnerSeat,
       devDeckCount: lobby.devDeck.length,
       selfDevCards,
+      canAffordDevCard,
       players,
     };
   }
@@ -185,6 +189,64 @@ export class LobbyService {
       .catch((_error: unknown) => {
         this.logger.debug('refreshLobbyActivity failed');
       });
+  }
+
+  /**
+   * Removes a player slot from the lobby, fixes admin succession, and rebroadcasts
+   * FullState. Does NOT trigger empty-lobby cleanup — the caller decides whether
+   * to follow up with `ReconnectService.maybeCloseVideoLobby(lobby)`, so this
+   * service does not depend on reconnect (which would create a cycle).
+   */
+  public async removePlayerFromLobby(
+    lobby: LobbyRuntime,
+    player: LobbyPlayerSlot,
+    server: Server,
+    reason: string,
+  ): Promise<void> {
+    this.logger.log(`removing ${player.sessionToken} from ${lobby.lobbyCode} (${reason})`);
+    const wasAdmin = lobby.adminSessionToken === player.sessionToken;
+    await this.redisLobby.removeMember(lobby.lobbyId, player.sessionToken);
+    lobby.removePlayer(player.sessionToken);
+    if (wasAdmin) {
+      lobby.adminSessionToken = pickFallbackHumanAdminSessionToken(lobby);
+    }
+    this.broadcastFullState(server, lobby);
+  }
+
+  /**
+   * Atomic teardown sequence. Order matters: flag (joins reject immediately),
+   * release the Redis alias (so future joiners get UnknownLobby), then drop
+   * in-memory state and LiveKit. Idempotent — safe to call twice.
+   */
+  public async tearDownLobby(lobby: LobbyRuntime, reason: string): Promise<void> {
+    if (lobby.isTearingDown) {
+      return;
+    }
+    lobby.isTearingDown = true;
+    this.logger.log(`tearing down lobby ${lobby.lobbyCode} (${lobby.lobbyId}): ${reason}`);
+    lobby.clearAllDisconnectTimers();
+    try {
+      await this.redisLobby.deleteLobby(lobby.lobbyId, lobby.lobbyCode);
+    } catch {
+      this.logger.debug('Redis deleteLobby failed');
+    }
+    this.removeLobby(lobby.lobbyId, lobby.lobbyCode);
+    try {
+      await this.liveKit.deleteRoom(lobby.lobbyId);
+    } catch {
+      this.logger.debug('LiveKit deleteRoom failed');
+    }
+  }
+
+  public countConnectedHumans(lobby: LobbyRuntime): number {
+    let connected = 0;
+    for (let i = 0; i < lobby.players.length; i += 1) {
+      const p = lobby.players[i];
+      if (!p.isBot && p.socketId !== null) {
+        connected += 1;
+      }
+    }
+    return connected;
   }
 
   public ensureLobbyAdminConsistent(lobby: LobbyRuntime): void {

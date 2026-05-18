@@ -51,3 +51,11 @@ export const DEV_CARD_TYPE_TO_KIND: Readonly<Record<DevCardType, DevKind>> = {
   [DevCardType.Monopoly]: DevKind.Monopoly,
   [DevCardType.VictoryPoint]: DevKind.VictoryPoint,
 };
+
+export const DEV_KIND_TO_CARD_TYPE: Readonly<Record<DevKind, DevCardType>> = {
+  [DevKind.Knight]: DevCardType.Knight,
+  [DevKind.RoadBuilding]: DevCardType.RoadBuilding,
+  [DevKind.YearOfPlenty]: DevCardType.YearOfPlenty,
+  [DevKind.Monopoly]: DevCardType.Monopoly,
+  [DevKind.VictoryPoint]: DevCardType.VictoryPoint,
+};

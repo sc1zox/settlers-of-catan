@@ -2,12 +2,14 @@ import { inject, Injectable, signal } from '@angular/core';
 import { BuildKind } from '@catan/api-interfaces';
 import { GameStateResource } from '../../core/game/game-state.resource';
 import { BuildConfirmModel } from '../../game-canvas/build-confirm-popover';
+import { DevCardsService } from '../dev-cards/dev-cards.service';
 import { LobbyShellGameUiService } from '../lobby-game-ui/lobby-shell-game-ui.service';
 
 @Injectable()
 export class SessionBuildInteractionService {
   private readonly gameState = inject(GameStateResource);
   private readonly lobbyGameUi = inject(LobbyShellGameUiService);
+  private readonly devCards = inject(DevCardsService);
 
   public readonly buildMode = signal<BuildKind | null>(null);
   public readonly freeRoadMode = signal<boolean>(false);
@@ -48,15 +50,27 @@ export class SessionBuildInteractionService {
         this.roadBuildingFirstEdgeId.set(pending.id);
         return;
       }
+      if (!this.devCards.canPlayDevCard()) {
+        return;
+      }
       this.gameState.playRoadBuilding(firstEdgeId, pending.id);
       this.exitBuildMode();
       return;
     }
     if (pending.kind === BuildKind.Settlement) {
+      if (!this.lobbyGameUi.canBuildSettlement()) {
+        return;
+      }
       this.gameState.buildSettlement(pending.id);
     } else if (pending.kind === BuildKind.Road) {
+      if (!this.lobbyGameUi.canBuildRoad()) {
+        return;
+      }
       this.gameState.buildRoad(pending.id);
     } else {
+      if (!this.lobbyGameUi.canBuildCity()) {
+        return;
+      }
       this.gameState.buildCity(pending.id);
     }
     this.exitBuildMode();

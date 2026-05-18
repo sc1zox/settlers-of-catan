@@ -13,21 +13,16 @@ import {
 } from '@angular/core';
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import {
-  BuildKind,
-  PlayerSeat,
-  ResourceType,
-  SceneObjectKind,
-  TradeRecipientStatus,
-  TradeUpdateKind,
-} from '@catan/api-interfaces';
+import { BuildKind, DevCardType, SceneObjectKind } from '@catan/api-interfaces';
 import { GameEngine } from '../../game/engine';
+import { DEV_KIND_TO_CARD_TYPE } from '../../game/engine-runtime/constants';
+import { DevKind } from '../../game/cards/textures';
 import { setGameTranslateFn } from '../../game/i18n-bridge';
 import { GameStateResource } from '../core/game/game-state.resource';
 import { GameSettingsService } from '../features/game-settings/game-settings.service';
 import { HeadVideoSyncService } from '../features/webcam-head/head-video-sync.service';
 import { SpectatorCameraService } from '../features/spectator-camera/spectator-camera.service';
-import { TradingStateService } from '../features/trading/trading-state.service';
+import { TradeFinalizeAnimationService } from '../features/trading/trade-finalize-animation.service';
 import { mapLobbyFullStateToSceneState } from '../../shared/game-scene/map-lobby-full-state-to-scene';
 import { HoverState } from '../../game/interaction/hover';
 import { BuildConfirmModel } from './build-confirm-popover';
@@ -57,11 +52,9 @@ export class GameCanvas implements AfterViewInit, OnDestroy {
   private readonly headVideoSync = inject(HeadVideoSyncService);
   private readonly spectatorCam = inject(SpectatorCameraService);
   private readonly translate = inject(TranslateService);
-  private readonly tradingState = inject(TradingStateService);
+  private readonly tradeFinalizeAnimation = inject(TradeFinalizeAnimationService);
   private engine: GameEngine | null = null;
   private diceNonce = 0;
-  /** Last finalised trade id we already animated — dedupe against rxResource snapshot replays. */
-  private lastAnimatedFinalizedTradeId: string | null = null;
 
   readonly buildMode = input<BuildKind | null>(null);
   readonly freeRoadMode = input<boolean>(false);
@@ -74,14 +67,15 @@ export class GameCanvas implements AfterViewInit, OnDestroy {
   readonly buildSpotPicked = output<BuildConfirmModel>();
   readonly robberTilePicked = output<RobberTilePick>();
   readonly buildModeCancelled = output<void>();
-  readonly devCardClicked = output<void>();
+  readonly playDevCard = output<DevCardType>();
   readonly rollDiceRequested = output<void>();
 
   readonly harborTooltip = signal<HarborTooltipModel | null>(null);
   readonly cardTooltip = signal<CardTooltipModel | null>(null);
   readonly diceOverlay = signal<DiceOverlayModel | null>(null);
   readonly cardFocused = signal<boolean>(false);
-  readonly focusedDevCard = signal<boolean>(false);
+  readonly focusedDevCardType = signal<DevCardType | null>(null);
+  protected readonly devCardTypeEnum = DevCardType;
 
   private readonly diceOverlayAutoDismiss = effect((onCleanup) => {
     const overlay = this.diceOverlay();
@@ -198,33 +192,18 @@ export class GameCanvas implements AfterViewInit, OnDestroy {
     }
   });
 
-  /**
-   * Finalised-trade animation trigger. Dedupes by tradeId so reconnect snapshots
-   * (if any) don't replay the swap. Derives the giveMap/takeMap from the
-   * finalised slot's counter when present, falling back to the original offer.
-   */
   private readonly tradeSwapSync = effect(() => {
-    const update = this.tradingState.tradeUpdated.value();
-    if (!update || !this.engine) {
+    const request = this.tradeFinalizeAnimation.swapRequest();
+    if (request === null || !this.engine) {
       return;
     }
-    if (update.kind !== TradeUpdateKind.Finalized) {
-      return;
-    }
-    const trade = update.trade;
-    if (trade.id === this.lastAnimatedFinalizedTradeId) {
-      return;
-    }
-    const recipientSeat = trade.finalizedWithSeat;
-    if (recipientSeat === undefined) {
-      return;
-    }
-    const swap = resolveFinalizedSwap(trade.recipients, recipientSeat, trade.offer, trade.request);
-    if (swap === null) {
-      return;
-    }
-    this.lastAnimatedFinalizedTradeId = trade.id;
-    this.engine.playTradeSwap(trade.fromSeat, recipientSeat, swap.give, swap.take);
+    this.engine.playTradeSwap(
+      request.fromSeat,
+      request.recipientSeat,
+      request.give,
+      request.take,
+    );
+    this.tradeFinalizeAnimation.consumePendingSwap();
   });
 
   public ngAfterViewInit(): void {
@@ -240,7 +219,8 @@ export class GameCanvas implements AfterViewInit, OnDestroy {
     });
     this.engine.setFocusChangeHandler((focused) => {
       this.cardFocused.set(focused);
-      this.focusedDevCard.set(focused && (this.engine?.isDevelopmentCardFocused() ?? false));
+      const devKind: DevKind | null = focused ? (this.engine?.focusedDevKind() ?? null) : null;
+      this.focusedDevCardType.set(devKind === null ? null : DEV_KIND_TO_CARD_TYPE[devKind]);
     });
     this.engine.setArsenalBuildHandler((kind) => this.arsenalBuild.emit(kind));
     this.engine.setBuildSpotPickHandler((kind, id, x, y) => {
@@ -284,11 +264,19 @@ export class GameCanvas implements AfterViewInit, OnDestroy {
 
   public dismissFocusedCard(): void {
     this.engine?.clearFocusedCard();
-    this.focusedDevCard.set(false);
+    this.focusedDevCardType.set(null);
   }
 
-  public openDevCardPlayModal(): void {
-    this.devCardClicked.emit();
+  public confirmPlayFocusedDevCard(): void {
+    const type = this.focusedDevCardType();
+    if (type === null || type === DevCardType.VictoryPoint) {
+      return;
+    }
+    // Clear focus first — otherwise the full-screen card-backdrop swallows the
+    // next click (the tile pick for Knight, the edge pick for RoadBuilding).
+    this.engine?.clearFocusedCard();
+    this.focusedDevCardType.set(null);
+    this.playDevCard.emit(type);
   }
 
   private handleHover(state: HoverState | null): void {
@@ -317,29 +305,4 @@ export class GameCanvas implements AfterViewInit, OnDestroy {
     this.harborTooltip.set(null);
     this.cardTooltip.set(null);
   }
-}
-
-/**
- * Mirror the server's finalise-trade resource accounting: the recipient slot's
- * counter wins when present; otherwise we use the original offer. Returns the
- * resource maps in *sender* perspective (give = sender → recipient, take =
- * recipient → sender) so the engine can drive both flight directions.
- */
-function resolveFinalizedSwap(
-  recipients: readonly { readonly seat: PlayerSeat; readonly status: TradeRecipientStatus; readonly counter?: { readonly offer: Readonly<Partial<Record<ResourceType, number>>>; readonly request: Readonly<Partial<Record<ResourceType, number>>> } }[],
-  recipientSeat: PlayerSeat,
-  originalOffer: Readonly<Partial<Record<ResourceType, number>>>,
-  originalRequest: Readonly<Partial<Record<ResourceType, number>>>,
-): { give: Readonly<Partial<Record<ResourceType, number>>>; take: Readonly<Partial<Record<ResourceType, number>>> } | null {
-  for (let i = 0; i < recipients.length; i += 1) {
-    const slot = recipients[i];
-    if (slot.seat !== recipientSeat) {
-      continue;
-    }
-    if (slot.counter !== undefined) {
-      return { give: slot.counter.offer, take: slot.counter.request };
-    }
-    return { give: originalOffer, take: originalRequest };
-  }
-  return null;
 }

@@ -1,0 +1,70 @@
+@let m = model();
+@if (m !== null) {
+  <div class="layer">
+    <button
+      type="button"
+      class="backdrop"
+      [attr.aria-label]="'devCardPicker.closeBackdropAria' | translate"
+      (click)="cancelled.emit()"
+    ></button>
+    <div class="picker-modal">
+      @switch (m.kind) {
+        @case ('monopoly') {
+          <h3>{{ 'devCardPicker.monopolyTitle' | translate }}</h3>
+          <p class="hint">{{ 'devCardPicker.monopolyHint' | translate }}</p>
+          <div class="picker">
+            @for (resource of order; track resource) {
+              <button
+                type="button"
+                [class.active]="monopolyResource() === resource"
+                (click)="monopolyResource.set(resource)"
+              >
+                {{ label(resource) }}
+              </button>
+            }
+          </div>
+          <button type="button" class="confirm" (click)="monopolyPicked.emit(monopolyResource())">
+            {{ 'devCardPicker.confirmMonopoly' | translate }}
+          </button>
+        }
+        @case ('yearOfPlenty') {
+          <h3>{{ 'devCardPicker.plentyTitle' | translate }}</h3>
+          <p class="hint">{{ 'devCardPicker.firstCard' | translate }}</p>
+          <div class="picker">
+            @for (resource of order; track resource) {
+              <button
+                type="button"
+                [class.active]="plentyFirst() === resource"
+                (click)="plentyFirst.set(resource)"
+              >
+                {{ label(resource) }}
+              </button>
+            }
+          </div>
+          <p class="hint">{{ 'devCardPicker.secondCard' | translate }}</p>
+          <div class="picker">
+            @for (resource of order; track resource) {
+              <button
+                type="button"
+                [class.active]="plentySecond() === resource"
+                (click)="plentySecond.set(resource)"
+              >
+                {{ label(resource) }}
+              </button>
+            }
+          </div>
+          <button
+            type="button"
+            class="confirm"
+            (click)="plentyPicked.emit({ first: plentyFirst(), second: plentySecond() })"
+          >
+            {{ 'devCardPicker.confirmPlenty' | translate }}
+          </button>
+        }
+      }
+      <button type="button" class="dismiss" (click)="cancelled.emit()">
+        {{ 'devCardPicker.dismiss' | translate }}
+      </button>
+    </div>
+  </div>
+}

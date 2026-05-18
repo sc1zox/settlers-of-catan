@@ -4,7 +4,8 @@ import { GamePhase } from '@catan/api-interfaces';
 import { GameStateResource } from '../../core/game/game-state.resource';
 import { GameSocketService } from '../../core/socket/game-socket.service';
 import { LobbyShellGameUiService } from '../lobby-game-ui/lobby-shell-game-ui.service';
-import { LobbyTradeUiService } from '../lobby-game-ui/lobby-trade-ui.service';
+import { TradeFinalizeAnimationService } from '../trading/trade-finalize-animation.service';
+import { TradeSessionService } from '../trading/trade-session.service';
 import { SpectatorCameraService } from '../spectator-camera/spectator-camera.service';
 import { SessionBuildInteractionService } from './session-build-interaction.service';
 import { SessionDevCardOverlayService } from './session-dev-card-overlay.service';
@@ -33,7 +34,8 @@ export class SessionCleanupService {
   private readonly sockets = inject(GameSocketService);
   private readonly lobbyGameUi = inject(LobbyShellGameUiService);
   private readonly spectator = inject(SpectatorCameraService);
-  private readonly tradeUi = inject(LobbyTradeUiService);
+  private readonly tradeSession = inject(TradeSessionService);
+  private readonly tradeFinalizeAnimation = inject(TradeFinalizeAnimationService);
   private readonly tradingPanel = inject(SessionTradingPanelService);
   private readonly buildFlow = inject(SessionBuildInteractionService);
   private readonly robberFlow = inject(SessionRobberFlowService);
@@ -72,11 +74,15 @@ export class SessionCleanupService {
 
     this.sockets.actionRejected$
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.resetInteractionModes());
+      .subscribe(() => {
+        this.resetInteractionModes();
+        this.tradingPanel.clearInflightAction();
+      });
   }
 
   private resetAll(): void {
-    this.tradeUi.resetSession();
+    this.tradeSession.resetSession();
+    this.tradeFinalizeAnimation.resetSession();
     this.tradingPanel.resetSession();
     this.buildFlow.resetSession();
     this.robberFlow.resetSession();

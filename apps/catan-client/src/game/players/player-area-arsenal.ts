@@ -59,7 +59,14 @@ export class PlayerAreaArsenal {
   private readonly flightTargetPos = new Vector3();
   private readonly flightTargetQuat = new Quaternion();
   private readonly flightTargetScale = new Vector3();
+  // Pose to snap the figure back to once the flight ends invisible. Defaults to
+  // the start pose, but is overridden to the arsenal slot pose when flying an
+  // activated figure (whose start pose is mid-lift/sway above the slot).
+  private readonly flightRestPos = new Vector3();
+  private readonly flightRestQuat = new Quaternion();
+  private readonly flightRestScale = new Vector3();
   private readonly flightScratchQuat = new Quaternion();
+  private readonly flightScratchEuler = new Euler();
   private flightOnArrive: (() => void) | null = null;
 
   public constructor(private readonly options: PlayerAreaArsenalOptions) {
@@ -133,6 +140,12 @@ export class PlayerAreaArsenal {
     this.activatedTarget = 0;
     this.activatedT = 0;
     this.startFlight(figure, worldPosition, worldQuaternion, worldScale, onArrive);
+    // Override the rest pose so the figure lands back at its arsenal slot, not
+    // at the lifted/swayed activation pose where startFlight captured it from.
+    this.flightRestPos.copy(this.activatedBasePos);
+    this.flightScratchEuler.copy(this.activatedBaseRot);
+    this.flightRestQuat.setFromEuler(this.flightScratchEuler);
+    this.flightRestScale.copy(this.activatedBaseScale);
   }
 
   /**
@@ -183,6 +196,9 @@ export class PlayerAreaArsenal {
     this.flightStartPos.copy(figure.position);
     this.flightStartQuat.copy(figure.quaternion);
     this.flightStartScale.copy(figure.scale);
+    this.flightRestPos.copy(figure.position);
+    this.flightRestQuat.copy(figure.quaternion);
+    this.flightRestScale.copy(figure.scale);
 
     const group = this.options.group;
     group.updateWorldMatrix(true, false);
@@ -220,9 +236,9 @@ export class PlayerAreaArsenal {
     figure.scale.lerpVectors(this.flightStartScale, this.flightTargetScale, eased);
 
     if (t >= 1) {
-      figure.position.copy(this.flightStartPos);
-      figure.quaternion.copy(this.flightStartQuat);
-      figure.scale.copy(this.flightStartScale);
+      figure.position.copy(this.flightRestPos);
+      figure.quaternion.copy(this.flightRestQuat);
+      figure.scale.copy(this.flightRestScale);
       figure.visible = false;
       this.flying = false;
       this.flyingFigure = null;

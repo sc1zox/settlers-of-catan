@@ -298,19 +298,16 @@
     "responsesBadge": "{{count}} Antworten",
     "dismiss": "Schließen"
   },
-  "devCard": {
-    "closeBackdropAria": "Modal schließen",
-    "title": "Entwicklungskarte spielen",
-    "knight": "Ritter",
-    "monopoly": "Monopol",
-    "plenty": "Erfindung",
-    "roadBuilding": "Straßenbau",
-    "whichResource": "Welcher Rohstoff?",
-    "playMonopoly": "Monopol spielen",
+  "devCardPicker": {
+    "closeBackdropAria": "Auswahl schließen",
+    "monopolyTitle": "Monopol — welcher Rohstoff?",
+    "monopolyHint": "Alle Mitspieler geben dir ihren gewählten Rohstoff.",
+    "confirmMonopoly": "Monopol spielen",
+    "plentyTitle": "Erfindung — zwei Karten ziehen",
     "firstCard": "Erste Karte",
     "secondCard": "Zweite Karte",
-    "playPlenty": "Erfindung spielen",
-    "dismiss": "Schließen"
+    "confirmPlenty": "Erfindung spielen",
+    "dismiss": "Abbrechen"
   },
   "discard": {
     "title": "Räuber: Karten abwerfen",
@@ -364,6 +361,11 @@
   },
   "gameCanvas": {
     "closeCardAria": "Karte schließen",
-    "playDevCard": "Entwicklungskarte spielen"
+    "playDevCardForType": {
+      "knight": "Ritter spielen",
+      "monopoly": "Monopol spielen",
+      "year_of_plenty": "Erfindung spielen",
+      "road_building": "Straßenbau spielen"
+    }
   }
 }

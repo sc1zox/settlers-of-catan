@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
 import {
   ActionRejectCode,
   formatSocketIoLobbyRoomId,
@@ -8,24 +7,17 @@ import {
   isLobbyCodeValid,
   LobbyTerminationReason,
   normalizeLobbyCode,
-  PlayerSeat,
   type LobbyJoinedPayload,
   type LobbyTerminatedPayload,
 } from '@catan/api-interfaces';
-import { Server, Socket } from 'socket.io';
+import { Server } from 'socket.io';
 import { LiveKitRoomService } from '../../infrastructure/livekit/livekit-room.service';
 import { RedisLobbyStoreService } from '../../infrastructure/redis/redis-lobby-store.service';
 import { DemoBotService } from '../demo-bot/demo-bot.service';
-import {
-  LobbyPlayerSlot,
-  LobbyRuntime,
-  pickFallbackHumanAdminSessionToken,
-} from '../lobby/lobby-runtime';
+import { LobbyRuntime } from '../lobby/lobby-runtime';
 import { LobbyService } from '../lobby/lobby.service';
 import { ReconnectService } from '../reconnect/reconnect.service';
 
-const PLAYER_DISCONNECT_GRACE_MS = 120_000;
-const EMPTY_LOBBY_CLEANUP_DELAY_MS = 30_000;
 const SUMMARY_ENTRY_DELAY_MS = 15_000;
 const SUMMARY_HARD_END_DELAY_MS = 5 * 60_000;
 
@@ -112,109 +104,6 @@ export class LobbyOrchestratorService {
     return lobby;
   }
 
-  public async resumeSessionSocket(
-    sessionToken: string,
-    client: Socket,
-    server: Server,
-  ): Promise<void> {
-    const found = this.lobby.findLobbyByPlayerToken(sessionToken);
-    if (found === undefined) {
-      return;
-    }
-    const { lobby, player } = found;
-    if (player.isBot || lobby.isTearingDown) {
-      return;
-    }
-    await client.join(formatSocketIoLobbyRoomId(lobby.lobbyId));
-    lobby.clearDisconnectTimer(player);
-    player.socketId = client.id;
-    player.disconnectGraceExpiresAt = null;
-    player.awaitingAdminDecision = false;
-    this.reconnect.syncSocketIntoLobby(server, lobby, client.id, player.seat);
-  }
-
-  public onDisconnect(sessionToken: string, server: Server): void {
-    const found = this.lobby.findLobbyByPlayerToken(sessionToken);
-    if (found === undefined) {
-      return;
-    }
-    const { lobby, player } = found;
-    player.socketId = null;
-    if (lobby.fsm.getPhase() === GamePhase.LobbyWaiting) {
-      void this.removePlayerFromLobby(lobby, player, server, 'disconnect in lobby waiting');
-      return;
-    }
-    player.disconnectGraceExpiresAt = Date.now() + PLAYER_DISCONNECT_GRACE_MS;
-    player.awaitingAdminDecision = false;
-    lobby.startDisconnectHold(player, PLAYER_DISCONNECT_GRACE_MS, () => {
-      this.onDisconnectGraceExpired(lobby, player, server);
-    });
-    this.lobby.broadcastFullState(server, lobby);
-    void this.maybeCloseVideoLobby(lobby);
-  }
-
-  private onDisconnectGraceExpired(
-    lobby: LobbyRuntime,
-    player: LobbyPlayerSlot,
-    server: Server,
-  ): void {
-    // Player slot lives on as `awaitingAdminDecision` — admin (or anyone reconnecting on
-    // the same session token) decides next. The 30s no-connected-humans timer in
-    // maybeCloseVideoLobby is the safety net if nobody is around to make that call.
-    player.disconnectGraceExpiresAt = null;
-    player.awaitingAdminDecision = true;
-    this.logger.log(
-      `grace expired for ${player.sessionToken} in ${lobby.lobbyCode}; awaiting admin decision`,
-    );
-    this.lobby.broadcastFullState(server, lobby);
-    void this.maybeCloseVideoLobby(lobby);
-  }
-
-  /**
-   * Mutates the disconnected slot into a bot slot in place. Does NOT broadcast —
-   * GameService.kickAndReplaceWithBot owns the broadcast + bot-autoplay drain so
-   * the new bot actually takes its turn.
-   */
-  public kickAndReplaceWithBot(
-    lobbyId: string,
-    requesterSessionToken: string,
-    seat: PlayerSeat,
-  ): LobbyRuntime {
-    const lobby = this.lobby.requireLobby(lobbyId);
-    this.lobby.assertLobbyOpen(lobby);
-    this.lobby.ensureLobbyAdminConsistent(lobby);
-    if (lobby.adminSessionToken !== requesterSessionToken) {
-      throw new Error(ActionRejectCode.LobbyHostOnly);
-    }
-    const target = lobby.findPlayerBySeat(seat);
-    if (!target || target.isBot) {
-      throw new Error(ActionRejectCode.InvalidPayload);
-    }
-    if (!target.awaitingAdminDecision) {
-      throw new Error(ActionRejectCode.WrongPhase);
-    }
-    const oldSessionToken = target.sessionToken;
-    const wasAdmin = lobby.adminSessionToken === oldSessionToken;
-    // Mutate the slot in place — slot identity carries the player's pieces, resources, devs.
-    target.sessionToken = `bot-${randomUUID()}`;
-    target.displayName = this.demoBots.getDemoBotDisplayName(seat);
-    target.isBot = true;
-    target.socketId = null;
-    target.disconnectGraceExpiresAt = null;
-    target.awaitingAdminDecision = false;
-    lobby.clearDisconnectTimer(target);
-    if (wasAdmin) {
-      lobby.adminSessionToken = pickFallbackHumanAdminSessionToken(lobby);
-    }
-    void this.redisLobby.removeMember(lobby.lobbyId, oldSessionToken).catch((_error: unknown) => {
-      this.logger.debug('Redis removeMember failed');
-    });
-    this.logger.log(
-      `admin ${requesterSessionToken} kicked seat ${seat} (${oldSessionToken}) in ${lobby.lobbyCode}, replaced with bot`,
-    );
-    return lobby;
-  }
-
   public async leaveLobby(lobbyId: string, sessionToken: string, server: Server): Promise<void> {
     const lobby = this.lobby.getLobby(lobbyId);
     if (!lobby) {
@@ -231,79 +120,8 @@ export class LobbyOrchestratorService {
     if (socketId !== null) {
       void server.in(socketId).socketsLeave(formatSocketIoLobbyRoomId(lobby.lobbyId));
     }
-    await this.removePlayerFromLobby(lobby, player, server, 'explicit leave');
-  }
-
-  private async removePlayerFromLobby(
-    lobby: LobbyRuntime,
-    player: LobbyPlayerSlot,
-    server: Server,
-    reason: string,
-  ): Promise<void> {
-    this.logger.log(`removing ${player.sessionToken} from ${lobby.lobbyCode} (${reason})`);
-    const wasAdmin = lobby.adminSessionToken === player.sessionToken;
-    await this.redisLobby.removeMember(lobby.lobbyId, player.sessionToken);
-    lobby.removePlayer(player.sessionToken);
-    if (wasAdmin) {
-      lobby.adminSessionToken = pickFallbackHumanAdminSessionToken(lobby);
-    }
-    this.lobby.broadcastFullState(server, lobby);
-    await this.maybeCloseVideoLobby(lobby);
-  }
-
-  private async maybeCloseVideoLobby(lobby: LobbyRuntime): Promise<void> {
-    if (this.countConnectedHumans(lobby) > 0) {
-      lobby.clearEmptyLobbyCleanupTimer();
-      return;
-    }
-    if (lobby.emptyLobbyCleanupTimer !== null || lobby.isTearingDown) {
-      return;
-    }
-    this.logger.log(
-      `lobby ${lobby.lobbyCode} has no connected humans, scheduling cleanup in ${EMPTY_LOBBY_CLEANUP_DELAY_MS}ms`,
-    );
-    lobby.startEmptyLobbyCleanupHold(EMPTY_LOBBY_CLEANUP_DELAY_MS, () => {
-      void this.finalizeEmptyLobbyCleanup(lobby);
-    });
-  }
-
-  private async finalizeEmptyLobbyCleanup(lobby: LobbyRuntime): Promise<void> {
-    lobby.emptyLobbyCleanupTimer = null;
-    if (this.countConnectedHumans(lobby) > 0) {
-      return;
-    }
-    if (lobby.isTearingDown) {
-      return;
-    }
-    if (this.lobby.getLobby(lobby.lobbyId) !== lobby) {
-      return;
-    }
-    await this.tearDownLobby(lobby, 'no connected humans');
-  }
-
-  /**
-   * Atomic teardown sequence used by both empty-lobby cleanup and summary hard-end.
-   * Order matters: set the flag (joins reject immediately), release the Redis alias
-   * (so future joiners get UnknownLobby), then drop in-memory state and LiveKit.
-   */
-  private async tearDownLobby(lobby: LobbyRuntime, reason: string): Promise<void> {
-    if (lobby.isTearingDown) {
-      return;
-    }
-    lobby.isTearingDown = true;
-    this.logger.log(`tearing down lobby ${lobby.lobbyCode} (${lobby.lobbyId}): ${reason}`);
-    lobby.clearAllDisconnectTimers();
-    try {
-      await this.redisLobby.deleteLobby(lobby.lobbyId, lobby.lobbyCode);
-    } catch {
-      this.logger.debug('Redis deleteLobby failed');
-    }
-    this.lobby.removeLobby(lobby.lobbyId, lobby.lobbyCode);
-    try {
-      await this.liveKit.deleteRoom(lobby.lobbyId);
-    } catch {
-      this.logger.debug('LiveKit deleteRoom failed');
-    }
+    await this.lobby.removePlayerFromLobby(lobby, player, server, 'explicit leave');
+    await this.reconnect.maybeCloseVideoLobby(lobby);
   }
 
   /**
@@ -351,18 +169,7 @@ export class LobbyOrchestratorService {
       reason: LobbyTerminationReason.SummaryTimeout,
     };
     server.to(formatSocketIoLobbyRoomId(lobby.lobbyId)).emit(GameSocketServerEvent.LobbyTerminated, payload);
-    await this.tearDownLobby(lobby, 'summary hard end');
-  }
-
-  private countConnectedHumans(lobby: LobbyRuntime): number {
-    let connected = 0;
-    for (let i = 0; i < lobby.players.length; i += 1) {
-      const p = lobby.players[i];
-      if (!p.isBot && p.socketId !== null) {
-        connected += 1;
-      }
-    }
-    return connected;
+    await this.lobby.tearDownLobby(lobby, 'summary hard end');
   }
 
   private async joinLobbyCore(
@@ -377,7 +184,7 @@ export class LobbyOrchestratorService {
     lobby.clearEmptyLobbyCleanupTimer();
     const player = lobby.findPlayerByToken(sessionToken);
     if (!player) {
-      let seat: PlayerSeat;
+      let seat;
       try {
         seat = lobby.addPlayer(sessionToken, displayName, socketId, false);
         if (lobby.adminSessionToken === null) {

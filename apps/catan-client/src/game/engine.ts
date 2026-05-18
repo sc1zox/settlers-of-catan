@@ -546,12 +546,21 @@ export class GameEngine {
     this.focusFan.clearRest(this.focusChangeHandler);
   }
 
-  public isDevelopmentCardFocused(): boolean {
+  /**
+   * Returns the DevKind of the currently focused dev card, or null when nothing
+   * is focused or the focused group isn't a development card. The Angular layer
+   * uses this to drive the per-kind play overlay.
+   */
+  public focusedDevKind(): DevKind | null {
     const focused = this.focusFan.getFocusedGroup();
     if (focused.length === 0) {
-      return false;
+      return null;
     }
-    return focused[0].getHoverInfo()?.group === CardHoverGroup.Development;
+    const info = focused[0].getHoverInfo();
+    if (info === null || info.group !== CardHoverGroup.Development) {
+      return null;
+    }
+    return info.devKind ?? null;
   }
 
   /**

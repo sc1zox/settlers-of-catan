@@ -5,25 +5,6 @@ import { PlayerSeat } from './player-seat.enum';
 import { ResourceType } from './resource-type.enum';
 import { AxialCoordDto, DiceRollDto } from './turn-flow.dto';
 
-export enum GameDeltaType {
-  SettlementBuilt = 'SETTLEMENT_BUILT',
-  RoadBuilt = 'ROAD_BUILT',
-}
-
-export interface SettlementBuiltDelta {
-  readonly type: GameDeltaType.SettlementBuilt;
-  readonly seat: PlayerSeat;
-  readonly vertexId: string;
-}
-
-export interface RoadBuiltDelta {
-  readonly type: GameDeltaType.RoadBuilt;
-  readonly seat: PlayerSeat;
-  readonly edgeId: string;
-}
-
-export type GameDeltaPayload = SettlementBuiltDelta | RoadBuiltDelta;
-
 export interface PlayerHarborRatesDto {
   /** Best generic (3:1 or 4:1) rate available to this player. */
   readonly generic: number;
@@ -112,5 +93,10 @@ export interface LobbyFullStatePayload {
    * seat.
    */
   readonly selfDevCards: readonly DevCardType[];
+  /**
+   * True when the viewer can pay the resource cost to buy a dev card right now.
+   * Phase, turn, and deck availability are separate client gates.
+   */
+  readonly canAffordDevCard: boolean;
   readonly players: readonly LobbyPlayerPublicDto[];
 }

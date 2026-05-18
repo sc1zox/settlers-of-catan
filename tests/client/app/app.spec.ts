@@ -1,9 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { TranslateLoader, type TranslationObject } from '@ngx-translate/core';
 import { Observable, of } from 'rxjs';
-import de from '../assets/i18n/de.json';
-import { App } from './app';
-import { appConfig } from './app.config';
+import { App } from '@catan/client/app/app';
+import { appConfig } from '@catan/client/app/app.config';
+import de from '@catan/client/assets/i18n/de.json';
 
 class DeJsonTranslateLoader implements TranslateLoader {
   public getTranslation(_lang: string): Observable<TranslationObject> {
@@ -25,7 +25,6 @@ describe('App', () => {
 
   it('should create the app', () => {
     const fixture = TestBed.createComponent(App);
-    const app = fixture.componentInstance;
-    expect(app).toBeTruthy();
+    expect(fixture.componentInstance).toBeTruthy();
   });
 });

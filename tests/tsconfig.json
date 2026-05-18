@@ -1,0 +1,15 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["vitest/globals", "node"],
+    "resolveJsonModule": true,
+    "paths": {
+      "@catan/api-interfaces": ["../libs/api-interfaces/src/index.ts"],
+      "@catan/shared-game-field": ["../libs/shared/game-field/src/index.ts"],
+      "@catan/client/*": ["../apps/catan-client/src/*"],
+      "@catan/api-app/*": ["../apps/catan-api/src/*"],
+      "@catan/tests/*": ["./*"]
+    }
+  },
+  "include": ["**/*.ts"]
+}

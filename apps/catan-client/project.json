@@ -73,7 +73,12 @@
       "defaultConfiguration": "development"
     },
     "test": {
-      "executor": "@angular/build:unit-test"
+      "executor": "@angular/build:unit-test",
+      "options": {
+        "tsConfig": "apps/catan-client/tsconfig.spec.json",
+        "setupFiles": ["tests/setup/install-test-local-storage.ts"],
+        "include": ["../../../tests/client/**/*.spec.ts"]
+      }
     },
     "lint": {
       "executor": "@nx/eslint:lint",

@@ -4,14 +4,14 @@ import { LobbyActionCapabilitiesUiService } from './lobby-action-capabilities-ui
 import { LobbyDiscardUiService } from './lobby-discard-ui.service';
 import { LobbyGameUiStateService } from './lobby-game-ui-state.service';
 import { LobbyHudUiService } from './lobby-hud-ui.service';
-import { LobbyTradeUiService } from './lobby-trade-ui.service';
+import { TradeSessionService } from '../trading/trade-session.service';
 
 @Injectable({ providedIn: 'root' })
 export class LobbyShellGameUiService {
   private readonly core = inject(LobbyGameUiStateService);
   private readonly hud = inject(LobbyHudUiService);
   private readonly capabilities = inject(LobbyActionCapabilitiesUiService);
-  private readonly tradeUi = inject(LobbyTradeUiService);
+  private readonly tradeSession = inject(TradeSessionService);
   private readonly discardUi = inject(LobbyDiscardUiService);
 
   public attachUiStep(uiStep: Signal<LobbyUiStep>): void {
@@ -41,6 +41,7 @@ export class LobbyShellGameUiService {
   public readonly canFillLobbyWithBots = this.capabilities.canFillLobbyWithBots;
   public readonly canRollDice = this.capabilities.canRollDice;
   public readonly canFinishTrading = this.capabilities.canFinishTrading;
+  public readonly canComposeNewTrade = this.capabilities.canComposeNewTrade;
   public readonly canEndTurn = this.capabilities.canEndTurn;
   public readonly canOpenTrade = this.capabilities.canOpenTrade;
   public readonly canMoveRobber = this.capabilities.canMoveRobber;
@@ -49,9 +50,9 @@ export class LobbyShellGameUiService {
   public readonly canBuildCity = this.capabilities.canBuildCity;
 
   public readonly discardModel = this.discardUi.discardModel;
-  public readonly tradePartners = this.tradeUi.tradePartners;
-  public readonly pendingTrade = this.tradeUi.pendingTrade;
-  public readonly selfTradeResources = this.tradeUi.selfResources;
-  public readonly selfHarborRates = this.tradeUi.selfHarborRates;
-  public readonly selfHasOpenTrade = this.tradeUi.selfHasOpenTrade;
+  public readonly tradePartners = this.tradeSession.tradePartners;
+  public readonly pendingTrade = this.tradeSession.pendingTrade;
+  public readonly selfTradeResources = this.tradeSession.selfResources;
+  public readonly selfHarborRates = this.tradeSession.selfHarborRates;
+  public readonly selfHasOpenTrade = this.tradeSession.selfHasOpenTrade;
 }

@@ -84,6 +84,9 @@ export class SessionRobberFlowService {
         this.gameState.playKnight(coord.q, coord.r, victimSeat ?? undefined);
         this.knightActiveSignal.set(false);
       } else {
+        if (!this.lobbyGameUi.canMoveRobber()) {
+          return;
+        }
         this.gameState.moveRobber(coord.q, coord.r, victimSeat ?? undefined);
       }
     }

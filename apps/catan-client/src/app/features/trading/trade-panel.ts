@@ -19,6 +19,7 @@ import {
   type TradeRecipientResponse,
 } from '@catan/api-interfaces';
 import { TranslateInstantFn } from '../../../shared/i18n/translate-instant-fn';
+import { canPayResourceMap } from './trading-can-pay.util';
 import {
   TradeComposerView,
   TradePanelMode,
@@ -127,32 +128,46 @@ export class TradePanel {
   });
 
   protected readonly offer = linkedSignal<string, Record<ResourceType, number>>({
-    source: () => `${this.mode()}|${this.pendingTrade()?.id ?? ''}`,
+    source: () => this.counterComposerSourceKey(),
     computation: () => {
-      if (this.mode() === TradePanelMode.Counter) {
-        const trade = this.pendingTrade();
-        if (trade !== null) {
-          // Recipient perspective: prefill "Du gibst" with what the sender
-          // originally requested from me — clamped to what I own.
-          return this.fromMap(trade.request);
-        }
+      if (this.mode() !== TradePanelMode.Counter) {
+        return this.zeroCounts();
       }
-      return this.zeroCounts();
+      const trade = this.pendingTrade();
+      if (trade === null) {
+        return this.zeroCounts();
+      }
+      const slot = this.recipientSlot(trade);
+      if (
+        slot?.status === TradeRecipientStatus.Countered &&
+        slot.counter !== undefined &&
+        this.counterRequested()
+      ) {
+        return this.fromMap(slot.counter.request);
+      }
+      return this.fromMap(trade.request);
     },
   });
 
   protected readonly request = linkedSignal<string, Record<ResourceType, number>>({
-    source: () => `${this.mode()}|${this.pendingTrade()?.id ?? ''}`,
+    source: () => this.counterComposerSourceKey(),
     computation: () => {
-      if (this.mode() === TradePanelMode.Counter) {
-        const trade = this.pendingTrade();
-        if (trade !== null) {
-          // Recipient perspective: prefill "Du erhältst" with what the sender
-          // originally offered.
-          return this.fromMap(trade.offer);
-        }
+      if (this.mode() !== TradePanelMode.Counter) {
+        return this.zeroCounts();
       }
-      return this.zeroCounts();
+      const trade = this.pendingTrade();
+      if (trade === null) {
+        return this.zeroCounts();
+      }
+      const slot = this.recipientSlot(trade);
+      if (
+        slot?.status === TradeRecipientStatus.Countered &&
+        slot.counter !== undefined &&
+        this.counterRequested()
+      ) {
+        return this.fromMap(slot.counter.offer);
+      }
+      return this.fromMap(trade.offer);
     },
   });
 
@@ -161,7 +176,7 @@ export class TradePanel {
     if (trade === null) {
       return false;
     }
-    return this.canPay(trade.request);
+    return canPayResourceMap(this.selfResources(), trade.request);
   });
 
   protected readonly canSubmitPropose = computed<boolean>(() => {
@@ -172,10 +187,12 @@ export class TradePanel {
     } else if (this.targetSeat() === null) {
       return false;
     }
-    return this.hasAnyMovementInComposer();
+    return this.hasAnyMovementInComposer() && canPayResourceMap(this.selfResources(), this.offer());
   });
 
-  protected readonly canSubmitCounter = computed<boolean>(() => this.hasAnyMovementInComposer());
+  protected readonly canSubmitCounter = computed<boolean>(
+    () => this.hasAnyMovementInComposer() && canPayResourceMap(this.selfResources(), this.offer()),
+  );
 
   protected readonly canSubmitBank = computed<boolean>(() => {
     if (this.bankGive() === this.bankReceive()) {
@@ -278,10 +295,10 @@ export class TradePanel {
     if (slot.status === TradeRecipientStatus.Accepted) {
       // sender must own offer.offer, recipient must own offer.request — sender
       // can only check own side; recipient side server-validated.
-      return this.canPay(trade.offer);
+      return canPayResourceMap(this.selfResources(), trade.offer);
     }
     if (slot.status === TradeRecipientStatus.Countered && slot.counter !== undefined) {
-      return this.canPay(slot.counter.offer);
+      return canPayResourceMap(this.selfResources(), slot.counter.offer);
     }
     return false;
   }
@@ -339,6 +356,16 @@ export class TradePanel {
       offer: this.compactTradeMap(this.request()),
       request: this.compactTradeMap(this.offer()),
     });
+    this.exitCounterMode();
+  }
+
+  private counterComposerSourceKey(): string {
+    const trade = this.pendingTrade();
+    if (trade === null) {
+      return `${this.mode()}|`;
+    }
+    const slot = this.recipientSlot(trade);
+    return `${this.mode()}|${trade.id}|${slot?.status ?? ''}|${this.counterRequested()}`;
   }
 
   protected emitWithdrawCounter(): void {
@@ -386,19 +413,6 @@ export class TradePanel {
       anyRequest += request[r];
     }
     return anyOffer + anyRequest > 0;
-  }
-
-  private canPay(cost: Readonly<Partial<Record<ResourceType, number>>>): boolean {
-    const owned = this.selfResources();
-    const keys = Object.keys(cost) as ResourceType[];
-    for (let i = 0; i < keys.length; i += 1) {
-      const key = keys[i];
-      const need = cost[key] ?? 0;
-      if ((owned[key] ?? 0) < need) {
-        return false;
-      }
-    }
-    return true;
   }
 
   private isRecipient(trade: TradeOfferDto, seat: PlayerSeat): boolean {

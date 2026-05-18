@@ -3,7 +3,7 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { TranslatePipe } from '@ngx-translate/core';
 import { BuildConfirmPopover } from '../../game-canvas/build-confirm-popover';
 import { DiscardModal } from '../../game-canvas/discard-modal';
-import { DevCardModal } from '../dev-cards/dev-card-modal';
+import { DevCardPlayPicker } from '../dev-cards/dev-card-play-picker';
 import { GameCanvas } from '../../game-canvas/game-canvas';
 import { RobberVictimPopover } from '../../game-canvas/robber-victim-popover';
 import { TradePanel } from '../trading/trade-panel';
@@ -30,7 +30,7 @@ import { SessionCleanupService } from './session-cleanup.service';
     ReactiveFormsModule,
     BuildConfirmPopover,
     DiscardModal,
-    DevCardModal,
+    DevCardPlayPicker,
     TradePanel,
     RobberVictimPopover,
     SpectatorCameraToggle,

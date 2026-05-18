@@ -92,7 +92,7 @@ export class OrbitCameraAid {
   }
 
   public clampOrbitTarget(camera: PerspectiveCamera, controls: OrbitControls): void {
-    const ORBIT_TARGET_XZ = 9;
+    const ORBIT_TARGET_XZ = 26;
     const ORBIT_TARGET_Y_MIN = -2;
     const ORBIT_TARGET_Y_MAX = 8;
     const target = controls.target;

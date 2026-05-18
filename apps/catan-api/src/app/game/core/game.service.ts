@@ -7,7 +7,6 @@ import {
   PlayerSeat,
   ResourceType,
   formatSocketIoLobbyRoomId,
-  type GameDeltaPayload,
   type LobbyFullStatePayload,
   type LobbyJoinedPayload,
 } from '@catan/api-interfaces';
@@ -20,6 +19,7 @@ import { LobbyRuntime } from '../lobby/lobby-runtime';
 import { LobbyService } from '../lobby/lobby.service';
 import { LobbyOrchestratorService } from '../lobby-orchestrator/lobby-orchestrator.service';
 import { MatchFlowService } from '../match-flow/match-flow.service';
+import { ReconnectService } from '../reconnect/reconnect.service';
 import { RobberService } from '../robber/robber.service';
 
 function extractBadRequestMessage(response: string | object): string {
@@ -45,6 +45,7 @@ export class GameService {
   public constructor(
     private readonly lobby: LobbyService,
     private readonly lobbyOrchestrator: LobbyOrchestratorService,
+    private readonly reconnect: ReconnectService,
     private readonly matchFlow: MatchFlowService,
     private readonly buildActions: BuildActionService,
     private readonly economy: EconomyService,
@@ -117,11 +118,11 @@ export class GameService {
     client: Socket,
     server: Server,
   ): Promise<void> {
-    await this.lobbyOrchestrator.resumeSessionSocket(sessionToken, client, server);
+    await this.reconnect.resumeSessionSocket(sessionToken, client, server);
   }
 
   public onDisconnect(sessionToken: string, server: Server): void {
-    this.lobbyOrchestrator.onDisconnect(sessionToken, server);
+    this.reconnect.onDisconnect(sessionToken, server);
   }
 
   public async leaveLobby(lobbyId: string, sessionToken: string, server: Server): Promise<void> {
@@ -134,7 +135,7 @@ export class GameService {
     seat: PlayerSeat,
     server: Server,
   ): void {
-    const lobby = this.lobbyOrchestrator.kickAndReplaceWithBot(lobbyId, sessionToken, seat);
+    const lobby = this.reconnect.kickAndReplaceWithBot(lobbyId, sessionToken, seat);
     this.broadcastFullState(server, lobby);
     // Setup phase needs its own autoplay drain hook (broadcastFullState only kicks the main-game drain).
     this.demoBots.runDemoSetupAutoplay(lobby.lobbyId, server, {
@@ -153,25 +154,17 @@ export class GameService {
     sessionToken: string,
     vertexId: string,
     server: Server,
-  ): GameDeltaPayload {
+  ): void {
     const lobby = this.lobby.requireLobby(lobbyId);
     this.lobby.assertLobbyOpen(lobby);
-    const delta = this.buildActions.buildSettlement(lobby, sessionToken, vertexId);
-    server.to(formatSocketIoLobbyRoomId(lobbyId)).emit(GameSocketServerEvent.GameDelta, delta);
+    this.buildActions.buildSettlement(lobby, sessionToken, vertexId);
     this.broadcastFullState(server, lobby);
-    return delta;
   }
 
-  public buildRoad(
-    lobbyId: string,
-    sessionToken: string,
-    edgeId: string,
-    server: Server,
-  ): GameDeltaPayload {
+  public buildRoad(lobbyId: string, sessionToken: string, edgeId: string, server: Server): void {
     const lobby = this.lobby.requireLobby(lobbyId);
     this.lobby.assertLobbyOpen(lobby);
-    const delta = this.buildActions.buildRoad(lobby, sessionToken, edgeId);
-    server.to(formatSocketIoLobbyRoomId(lobbyId)).emit(GameSocketServerEvent.GameDelta, delta);
+    this.buildActions.buildRoad(lobby, sessionToken, edgeId);
     this.broadcastFullState(server, lobby);
     this.demoBots.runDemoSetupAutoplay(lobbyId, server, {
       getLobby: (requestedLobbyId: string) => this.lobby.getLobby(requestedLobbyId),
@@ -192,7 +185,6 @@ export class GameService {
         this.buildRoad(requestedLobbyId, botSessionToken, eId, requestedServer);
       },
     });
-    return delta;
   }
 
   public startLobby(lobbyId: string, sessionToken: string, server: Server): void {

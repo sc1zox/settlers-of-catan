@@ -23,10 +23,6 @@ export interface BonusAwardedPayload {
   readonly recipientSeat: PlayerSeat;
 }
 
-export interface SessionBoundPayload {
-  readonly sessionToken: string;
-}
-
 export interface JoinLobbyPayload {
   readonly lobbyCode: string;
   readonly displayName: string;
@@ -151,10 +147,8 @@ export enum GameSocketClientEvent {
 }
 
 export enum GameSocketServerEvent {
-  SessionBound = 'game:sessionBound',
   LobbyJoined = 'game:lobbyJoined',
   FullState = 'game:fullState',
-  GameDelta = 'game:gameDelta',
   DiceRolled = 'game:diceRolled',
   TradeUpdated = 'game:tradeUpdated',
   BonusAwarded = 'game:bonusAwarded',

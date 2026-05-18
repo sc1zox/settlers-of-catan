@@ -20,9 +20,15 @@ export class DevCardsService {
     () => this.gameState.lobby.value()?.devDeckCount ?? 0,
   );
 
-  public readonly canBuyDevCard = computed<boolean>(
-    () => this.lobbyUi.canEndTurn() && this.devDeckCount() > 0,
-  );
+  public readonly canBuyDevCard = computed<boolean>(() => {
+    const lobby = this.gameState.lobby.value();
+    return (
+      this.lobbyUi.canEndTurn() &&
+      this.devDeckCount() > 0 &&
+      lobby !== undefined &&
+      lobby.canAffordDevCard
+    );
+  });
 
   public readonly canPlayDevCard = computed<boolean>(() => {
     if (!this.lobbyUi.isSelfTurn()) {

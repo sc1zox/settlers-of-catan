@@ -9,7 +9,7 @@ Run from the repo root. The workspace is Nx 21; scripts in `package.json` wrap `
 - `npm start` — runs both apps concurrently (Nest API on :3000 + Angular client on :4200) via `concurrently`. `npm run start:client` / `start:api` run them individually.
 - `npm run build` — Nx `run-many -t build` over `catan-client,catan-api`.
 - `npm run watch` — incremental dev build of the client only.
-- `npm test` — Vitest via Angular's `@angular/build:unit-test` (jsdom env). Only the client has tests today. To filter: `npx nx test catan-client --test-name-pattern="App"`.
+- `npm test` — all specs under `tests/` (client jsdom via `catan-client:test`, API/libs node via `catan-api:test`). `npm run test:client` / `npm run test:node` run each runner alone. Filter: `npx nx test catan-client --test-name-pattern="TradeSession"`.
 - `npm run lint` — ESLint across all four projects (`catan-client`, `catan-api`, `shared-game-field`, `api-interfaces`); `@nx/enforce-module-boundaries` enforces tags from each `project.json` (Nx 21.6 expects **ESLint 9.x**, not 10 — the `@nx/eslint` executor uses `eslint/use-at-your-own-risk`, which breaks on ESLint 10). Scripts set `NX_WORKSPACE_DATA_DIRECTORY=node_modules/.cache/nx-workspace-data` so the project graph lock lives under `node_modules` (writable); if `.nx/` was ever created as root, fix ownership with `sudo chown -R "$(whoami)" .nx` or remove it. Prefer `npm run lint` over raw `npx eslint …` on the whole repo so Nx supplies the project graph to module-boundary rules.
 - `npm run format` / `format:check` — Prettier across `apps/**` and `libs/**`.
 - `docker compose up` — brings up `api` (port 3000) and `web` (port 4200) containers; both mount the repo and invoke `nx serve` inside. `NX_DAEMON=false` and `CHOKIDAR_USEPOLLING=1` are required for the watcher to work over the bind mount.
@@ -77,7 +77,7 @@ When adding a server action, extend the matching feature service (or add a new m
 
 The resolved `sessionId` becomes the player's stable identity (`LobbyPlayerSlot.sessionToken`) and is mapped to the current `socket.id` in `SocketConnectionRegistry` (`game/gateway/socket-connection.registry.ts`). Disconnects start a grace timer in `LobbyRuntime`; reconnecting with the same sessionId re-binds without losing the seat.
 
-Client→server events are `GameSocketClientEvent.*`, server→client are `GameSocketServerEvent.*` (both in `libs/api-interfaces/src/lib/socket-events.ts`). After any state-changing handler, the gateway broadcasts `GameSocketServerEvent.FullState` to all sockets in `formatSocketIoLobbyRoomId(lobbyId)` — the client treats `FullState` as the source of truth; `GameDelta` is informational only.
+Client→server events are `GameSocketClientEvent.*`, server→client are `GameSocketServerEvent.*` (both in `libs/api-interfaces/src/lib/socket-events.ts`). After any state-changing handler, the gateway broadcasts `GameSocketServerEvent.FullState` to all sockets in `formatSocketIoLobbyRoomId(lobbyId)` — the client treats `FullState` as the source of truth.
 
 `LobbyFullStatePayload` is computed *per viewer*: alongside the static `vertexIds` / `edgeIds`, it carries `legalSettlementVertexIds`, `legalRoadEdgeIds`, `legalCityVertexIds`, and `legalRoadBuildingEdgeIds` — the moves *that recipient* may legally make right now (empty when it isn't their turn / wrong phase). The client renders ghost build-spots straight from these arrays; it does not re-derive legality.
 

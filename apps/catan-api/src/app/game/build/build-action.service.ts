@@ -1,10 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  ActionRejectCode,
-  GameDeltaType,
-  GamePhase,
-  type GameDeltaPayload,
-} from '@catan/api-interfaces';
+import { ActionRejectCode, GamePhase } from '@catan/api-interfaces';
 import { EconomyService } from '../economy/economy.service';
 import { ResourceCostService } from '../economy/resource-cost.service';
 import { GameActionValidationService } from '../validation/game-action-validation.service';
@@ -26,11 +21,7 @@ export class BuildActionService {
     private readonly resourceCost: ResourceCostService,
   ) {}
 
-  public buildSettlement(
-    lobby: LobbyRuntime,
-    sessionToken: string,
-    vertexId: string,
-  ): GameDeltaPayload {
+  public buildSettlement(lobby: LobbyRuntime, sessionToken: string, vertexId: string): void {
     this.validation.assertPhase(lobby, [
       GamePhase.SetupForward,
       GamePhase.SetupBackward,
@@ -58,16 +49,10 @@ export class BuildActionService {
       lobby.pendingSetupRoadSeat = player.seat;
       lobby.pendingSetupRoadFromVertexId = vertexId;
     }
-    const delta: GameDeltaPayload = {
-      type: GameDeltaType.SettlementBuilt,
-      seat: player.seat,
-      vertexId,
-    };
     applyPostActionScoring(lobby);
-    return delta;
   }
 
-  public buildRoad(lobby: LobbyRuntime, sessionToken: string, edgeId: string): GameDeltaPayload {
+  public buildRoad(lobby: LobbyRuntime, sessionToken: string, edgeId: string): void {
     this.validation.assertPhase(lobby, [
       GamePhase.SetupForward,
       GamePhase.SetupBackward,
@@ -118,13 +103,7 @@ export class BuildActionService {
         this.turnFlow.applySetupBackwardTransition(lobby, player.seat);
       }
     }
-    const delta: GameDeltaPayload = {
-      type: GameDeltaType.RoadBuilt,
-      seat: player.seat,
-      edgeId,
-    };
     applyPostActionScoring(lobby);
-    return delta;
   }
 
   public buildCity(lobby: LobbyRuntime, sessionToken: string, vertexId: string): void {

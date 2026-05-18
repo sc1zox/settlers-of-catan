@@ -19,7 +19,6 @@ import {
   DiceRolledPayload,
   EndTurnPayload,
   FinishTradingPayload,
-  GameDeltaPayload,
   GameSocketClientEvent,
   GameSocketServerEvent,
   JoinLobbyPayload,
@@ -53,7 +52,6 @@ export class GameSocketService implements OnDestroy {
   private readonly session = inject(PlayerSessionService);
 
   private readonly fullStateSubject = new Subject<LobbyFullStatePayload>();
-  private readonly gameDeltaSubject = new Subject<GameDeltaPayload>();
   private readonly diceRolledSubject = new Subject<DiceRolledPayload>();
   private readonly tradeUpdatedSubject = new Subject<TradeUpdatedPayload>();
   private readonly actionRejectedSubject = new Subject<ActionRejectedPayload>();
@@ -63,7 +61,6 @@ export class GameSocketService implements OnDestroy {
 
   public readonly fullState$ = this.fullStateSubject.asObservable();
   public readonly lobbyJoined$ = this.lobbyJoinedSubject.asObservable();
-  public readonly gameDelta$ = this.gameDeltaSubject.asObservable();
   public readonly diceRolled$ = this.diceRolledSubject.asObservable();
   public readonly tradeUpdated$ = this.tradeUpdatedSubject.asObservable();
   public readonly actionRejected$ = this.actionRejectedSubject.asObservable();
@@ -278,7 +275,6 @@ export class GameSocketService implements OnDestroy {
 
   private attachGamePayloadHandlers(s: Socket): void {
     s.off(GameSocketServerEvent.FullState);
-    s.off(GameSocketServerEvent.GameDelta);
     s.off(GameSocketServerEvent.DiceRolled);
     s.off(GameSocketServerEvent.TradeUpdated);
     s.off(GameSocketServerEvent.ActionRejected);
@@ -293,9 +289,6 @@ export class GameSocketService implements OnDestroy {
     });
     s.on(GameSocketServerEvent.FullState, (payload: LobbyFullStatePayload) => {
       this.fullStateSubject.next(payload);
-    });
-    s.on(GameSocketServerEvent.GameDelta, (payload: GameDeltaPayload) => {
-      this.gameDeltaSubject.next(payload);
     });
     s.on(GameSocketServerEvent.DiceRolled, (payload: DiceRolledPayload) => {
       this.diceRolledSubject.next(payload);

@@ -1,12 +1,12 @@
 import { computed, inject, Injectable } from '@angular/core';
 import { GamePhase } from '@catan/api-interfaces';
 import { LobbyGameUiStateService } from './lobby-game-ui-state.service';
-import { LobbyTradeUiService } from './lobby-trade-ui.service';
+import { TradeSessionService } from '../trading/trade-session.service';
 
 @Injectable({ providedIn: 'root' })
 export class LobbyActionCapabilitiesUiService {
   private readonly state = inject(LobbyGameUiStateService);
-  private readonly tradeUi = inject(LobbyTradeUiService);
+  private readonly tradeSession = inject(TradeSessionService);
 
   private readonly setupPendingRoadVertexId = computed<string | null>(() => {
     const lobbyUi = this.state.lobbyUiState();
@@ -52,7 +52,7 @@ export class LobbyActionCapabilitiesUiService {
    * an open offer so they can re-open the panel after dismissing it.
    */
   public readonly canOpenTrade = computed<boolean>(
-    () => this.canComposeNewTrade() || this.tradeUi.selfHasOpenTrade(),
+    () => this.canComposeNewTrade() || this.tradeSession.selfHasOpenTrade(),
   );
 
   public readonly canMoveRobber = computed<boolean>(

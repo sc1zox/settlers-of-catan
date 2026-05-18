@@ -11,7 +11,7 @@
     (buildSpotPicked)="ui.buildFlow.onBuildSpotPicked($event)"
     (robberTilePicked)="ui.robberFlow.onRobberTilePicked($event)"
     (buildModeCancelled)="ui.buildFlow.onBuildModeCancelled()"
-    (devCardClicked)="ui.devOverlay.onDevCardClicked()"
+    (playDevCard)="ui.devOverlay.onPlayDevCard($event)"
     (rollDiceRequested)="ui.rollDice()"
   />
   <section class="ui-layer">
@@ -473,13 +473,11 @@
       (finalize)="ui.tradingPanel.onFinalizeTrade($event)"
       (closed)="ui.tradingPanel.closeTrade()"
     />
-    <app-dev-card-modal
-      [open]="ui.devOverlay.devCardOpen()"
-      (playKnight)="ui.devOverlay.onPlayKnight()"
-      (playMonopoly)="ui.devOverlay.onPlayMonopoly($event)"
-      (playYearOfPlenty)="ui.devOverlay.onPlayYearOfPlenty($event)"
-      (playRoadBuilding)="ui.devOverlay.onPlayRoadBuilding()"
-      (closed)="ui.devOverlay.closeDevCard()"
+    <app-dev-card-play-picker
+      [model]="ui.devOverlay.pickerModel()"
+      (monopolyPicked)="ui.devOverlay.onMonopolyPicked($event)"
+      (plentyPicked)="ui.devOverlay.onPlentyPicked($event)"
+      (cancelled)="ui.devOverlay.closePicker()"
     />
   }
 </main>

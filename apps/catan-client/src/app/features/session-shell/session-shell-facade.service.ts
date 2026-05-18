@@ -105,10 +105,16 @@ export class SessionShellFacadeService {
   }
 
   public startLobby(): void {
+    if (!this.lobbyGameUi.canStartLobby()) {
+      return;
+    }
     this.gameState.startLobby();
   }
 
   public fillLobbyWithBots(): void {
+    if (!this.lobbyGameUi.canFillLobbyWithBots()) {
+      return;
+    }
     this.gameState.fillLobbyWithBots();
   }
 
@@ -120,14 +126,23 @@ export class SessionShellFacadeService {
   }
 
   public finishTrading(): void {
+    if (!this.lobbyGameUi.canFinishTrading()) {
+      return;
+    }
     this.tradingPanel.finishTrading();
   }
 
   public endTurn(): void {
+    if (!this.lobbyGameUi.canEndTurn()) {
+      return;
+    }
     this.gameState.endTurn();
   }
 
   public buyDevCard(): void {
+    if (!this.devCards.canBuyDevCard()) {
+      return;
+    }
     this.gameState.buyDevCard();
   }
 

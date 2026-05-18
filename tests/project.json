@@ -1,0 +1,26 @@
+{
+  "name": "tests",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "tests",
+  "tags": ["scope:shared", "type:test"],
+  "targets": {
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "nx test catan-client",
+          "nx test catan-api"
+        ],
+        "parallel": false
+      }
+    },
+    "test:node": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --config tests/vitest.node.config.ts",
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  }
+}

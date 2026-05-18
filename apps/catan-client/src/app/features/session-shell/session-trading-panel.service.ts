@@ -5,8 +5,9 @@ import {
   type TradeUpdatedPayload,
 } from '@catan/api-interfaces';
 import { LobbyGameUiStateService } from '../lobby-game-ui/lobby-game-ui-state.service';
-import { LobbyTradeUiService } from '../lobby-game-ui/lobby-trade-ui.service';
-import { TradingStateService } from '../trading/trading-state.service';
+import { LobbyShellGameUiService } from '../lobby-game-ui/lobby-shell-game-ui.service';
+import { canPayResourceMap } from '../trading/trading-can-pay.util';
+import { TradeSessionService } from '../trading/trade-session.service';
 import {
   TradePendingActionKind,
   type BankTradeRequest,
@@ -22,7 +23,7 @@ const PENDING_ACTION_TIMEOUT_MS = 6_000;
 /**
  * Orchestrates the trade panel for {@link SessionShell}:
  *  - tracks whether the panel is open / sticky-minimised
- *  - relays outgoing trade actions to {@link TradingStateService}
+ *  - relays outgoing trade actions to {@link TradeSessionService}
  *  - reacts to inbound {@link TradeUpdatedPayload}s with the right open/close
  *    behaviour driven by {@link TradeUpdateKind}, so the user gets a
  *    predictable popup model without losing their place when they manually
@@ -30,9 +31,9 @@ const PENDING_ACTION_TIMEOUT_MS = 6_000;
  */
 @Injectable()
 export class SessionTradingPanelService {
-  private readonly tradingState = inject(TradingStateService);
+  private readonly tradeSession = inject(TradeSessionService);
   private readonly lobbyState = inject(LobbyGameUiStateService);
-  private readonly tradeUi = inject(LobbyTradeUiService);
+  private readonly lobbyGameUi = inject(LobbyShellGameUiService);
 
   public readonly tradeOpen = signal<boolean>(false);
 
@@ -49,7 +50,7 @@ export class SessionTradingPanelService {
 
   /** Number of recipient slots on my own open trade that have responded but not been finalised yet. */
   public readonly unseenResponseCount = computed<number>(() => {
-    const trade = this.tradeUi.pendingTrade();
+    const trade = this.tradeSession.pendingTrade();
     const seat = this.lobbyState.selfSeat();
     if (trade === null || seat === null || trade.fromSeat !== seat) {
       return 0;
@@ -72,14 +73,14 @@ export class SessionTradingPanelService {
     if (this.tradeOpen()) {
       return false;
     }
-    return this.tradeUi.selfHasOpenTrade();
+    return this.tradeSession.selfHasOpenTrade();
   });
 
   private pendingActionTimer: ReturnType<typeof setTimeout> | null = null;
 
   public constructor() {
     effect(() => {
-      const update = this.tradingState.tradeUpdated.value();
+      const update = this.tradeSession.lastTradeUpdate();
       if (update === undefined) {
         return;
       }
@@ -91,6 +92,11 @@ export class SessionTradingPanelService {
   public resetSession(): void {
     this.tradeOpen.set(false);
     this.userMinimizedTradeId.set(null);
+    this.clearPendingAction();
+  }
+
+  /** Clear inflight button spinners without closing the panel. */
+  public clearInflightAction(): void {
     this.clearPendingAction();
   }
 
@@ -114,47 +120,58 @@ export class SessionTradingPanelService {
 
   public onBankTrade(request: BankTradeRequest): void {
     this.markPending({ kind: TradePendingActionKind.Bank, tradeId: null });
-    this.tradingState.bankTrade(request.give, request.amount, request.receive);
+    this.tradeSession.bankTrade(request.give, request.amount, request.receive);
     this.tradeOpen.set(false);
   }
 
   public onProposeTrade(request: ProposeTradeRequest): void {
+    if (!this.lobbyGameUi.canComposeNewTrade()) {
+      return;
+    }
+    const self = this.lobbyState.selfPlayer();
+    if (self === undefined || !canPayResourceMap(self.resources, request.offer)) {
+      return;
+    }
     this.markPending({ kind: TradePendingActionKind.Propose, tradeId: null });
-    this.tradingState.proposeTrade(request.recipients, request.offer, request.request);
+    this.tradeSession.proposeTrade(request.recipients, request.offer, request.request);
   }
 
   public onAcceptTrade(tradeId: string): void {
     this.markPending({ kind: TradePendingActionKind.Accept, tradeId });
-    this.tradingState.acceptTrade(tradeId);
+    this.tradeSession.acceptTrade(tradeId);
   }
 
   public onRejectTrade(tradeId: string): void {
     this.markPending({ kind: TradePendingActionKind.Reject, tradeId });
-    this.tradingState.rejectTrade(tradeId);
+    this.tradeSession.rejectTrade(tradeId);
   }
 
   public onCounterTrade(request: CounterTradeRequest): void {
+    const self = this.lobbyState.selfPlayer();
+    if (self === undefined || !canPayResourceMap(self.resources, request.request)) {
+      return;
+    }
     this.markPending({ kind: TradePendingActionKind.Counter, tradeId: request.tradeId });
-    this.tradingState.counterTrade(request.tradeId, request.offer, request.request);
+    this.tradeSession.counterTrade(request.tradeId, request.offer, request.request);
   }
 
   public onWithdrawCounter(tradeId: string): void {
     this.markPending({ kind: TradePendingActionKind.WithdrawCounter, tradeId });
-    this.tradingState.withdrawCounterTrade(tradeId);
+    this.tradeSession.withdrawCounterTrade(tradeId);
   }
 
   public onFinalizeTrade(request: FinalizeTradeRequest): void {
     this.markPending({ kind: TradePendingActionKind.Finalize, tradeId: request.tradeId });
-    this.tradingState.finalizeTrade(request.tradeId, request.recipientSeat);
+    this.tradeSession.finalizeTrade(request.tradeId, request.recipientSeat);
   }
 
   public finishTrading(): void {
-    this.tradingState.finishTrading();
+    this.tradeSession.finishTrading();
   }
 
   /**
    * Panel-open contract. `currentTrade` (one per lobby) is updated by
-   * {@link LobbyTradeUiService.applyTradeUpdate} *before* we run, so we only
+   * {@link TradeSessionService} cache updates *before* we run, so we only
    * decide what to do with the panel surface:
    *
    *   Created / Resync          → open (new thread for this viewer)
@@ -218,7 +235,7 @@ export class SessionTradingPanelService {
   }
 
   private minimiseCurrentTrade(): void {
-    const current = this.tradeUi.pendingTrade();
+    const current = this.tradeSession.pendingTrade();
     this.userMinimizedTradeId.set(current?.id ?? null);
     this.tradeOpen.set(false);
   }

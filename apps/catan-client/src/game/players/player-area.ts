@@ -243,6 +243,16 @@ export class PlayerArea {
   }
 
   /**
+   * World-space anchor at the middle of this seat's hand row — used as the
+   * spawn / arrival point for inter-seat card flights (e.g. trade-swap).
+   */
+  public getHandRowWorldPosition(out: Vector3): Vector3 {
+    out.set(-3.8, this.tableY + 0.05, this.cardRowZ);
+    this.group.updateWorldMatrix(true, false);
+    return out.applyMatrix4(this.group.matrixWorld);
+  }
+
+  /**
    * Layout slots between the cost card (X ≈ -5.2) and the hand (X ≈ -2.7) so
    * both award cards fit without overlapping either neighbour, and rotate with
    * the seat group.

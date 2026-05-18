@@ -289,6 +289,40 @@
   font-size: 0.87rem;
 }
 
+.hud__trade-button {
+  position: relative;
+}
+
+.hud__trade-button--alert {
+  border-color: rgba(255, 200, 130, 0.7) !important;
+  box-shadow: 0 0 0 0 rgba(255, 200, 130, 0.55);
+  animation: hud-trade-pulse 1.6s ease-out infinite;
+}
+
+@keyframes hud-trade-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 200, 130, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 200, 130, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 200, 130, 0);
+  }
+}
+
+.hud__trade-badge {
+  display: inline-block;
+  margin-left: 0.45rem;
+  padding: 0.05rem 0.42rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #1f1408;
+  background: linear-gradient(180deg, #f5c97a, #d59a3a);
+  border-radius: 999px;
+}
+
 .hud__hint {
   margin: 0;
   font-size: 0.76rem;

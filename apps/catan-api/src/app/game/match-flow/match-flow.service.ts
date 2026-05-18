@@ -4,7 +4,9 @@ import {
   DiceRolledPayload,
   GamePhase,
   GameSocketServerEvent,
+  PlayerSeat,
   TradeStatus,
+  TradeUpdateKind,
   TradeUpdatedPayload,
   formatSocketIoLobbyRoomId,
 } from '@catan/api-interfaces';
@@ -71,28 +73,40 @@ export class MatchFlowService {
     lobbyId: string,
     server: Server,
   ): void {
-    this.assertMayCompleteTradingPhase(lobby, sessionToken);
+    const actorSeat = this.assertMayCompleteTradingPhase(lobby, sessionToken);
     this.transitionFromTradingToBuilding(lobby);
-    this.emitExpiredTradeOffers(lobbyId, server);
+    this.emitExpiredTradeOffers(lobbyId, actorSeat, server);
   }
 
-  private assertMayCompleteTradingPhase(lobby: LobbyRuntime, sessionToken: string): void {
+  private assertMayCompleteTradingPhase(
+    lobby: LobbyRuntime,
+    sessionToken: string,
+  ): PlayerSeat {
     this.validation.assertPhase(lobby, [GamePhase.Trading]);
-    this.validation.assertCurrentPlayer(lobby, sessionToken);
+    return this.validation.assertCurrentPlayer(lobby, sessionToken).seat;
   }
 
   private transitionFromTradingToBuilding(lobby: LobbyRuntime): void {
     lobby.fsm.onTradingFinished();
   }
 
-  private emitExpiredTradeOffers(lobbyId: string, server: Server): void {
+  private emitExpiredTradeOffers(
+    lobbyId: string,
+    actorSeat: PlayerSeat,
+    server: Server,
+  ): void {
     const expired = this.tradeService.closeOpenOffersForLobby(lobbyId, TradeStatus.Rejected);
     if (expired.length === 0) {
       return;
     }
     const room = formatSocketIoLobbyRoomId(lobbyId);
     for (let i = 0; i < expired.length; i += 1) {
-      const payload: TradeUpdatedPayload = { lobbyId, trade: expired[i] };
+      const payload: TradeUpdatedPayload = {
+        lobbyId,
+        trade: expired[i],
+        kind: TradeUpdateKind.PhaseClosed,
+        actorSeat,
+      };
       server.to(room).emit(GameSocketServerEvent.TradeUpdated, payload);
     }
   }

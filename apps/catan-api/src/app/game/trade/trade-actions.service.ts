@@ -7,15 +7,19 @@ import {
   ResourceType,
   TradeRecipientStatus,
   TradeStatus,
+  TradeUpdateKind,
   type TradeAcceptPayload,
   type TradeCounterPayload,
   type TradeFinalizePayload,
+  type TradeOfferDto,
   type TradeProposePayload,
   type TradeRejectPayload,
   type TradeUpdatedPayload,
+  type TradeWithdrawCounterPayload,
 } from '@catan/api-interfaces';
 import type { LobbyPlayerSlot, LobbyRuntime } from '../lobby/lobby-runtime';
 import { TradeService } from './trade.service';
+import { TradeRecipientSlotMachine } from './trade-recipient-slot.state-machine';
 
 export interface TradeActionContext {
   getLobby(lobbyId: string): LobbyRuntime | undefined;
@@ -50,7 +54,7 @@ export class TradeActionsService {
     // Supersede previous open offers FIRST so order on the wire is
     // Superseded→Open (Socket.IO preserves order). Superseded is distinct
     // from Cancelled so receivers don't briefly close the panel.
-    const cancelledOffers = this.tradeService.closeOpenOffersForLobby(
+    const supersededOffers = this.tradeService.closeOpenOffersForLobby(
       lobby.lobbyId,
       TradeStatus.Superseded,
     );
@@ -61,13 +65,12 @@ export class TradeActionsService {
       payload.offer,
       payload.request,
     );
-    const cancelled: TradeUpdatedPayload[] = cancelledOffers.map((offer) => ({
-      lobbyId: lobby.lobbyId,
-      trade: offer,
-    }));
+    const cancelled: TradeUpdatedPayload[] = supersededOffers.map((offer) =>
+      this.makePayload(offer, TradeUpdateKind.Superseded, from.seat),
+    );
     return {
       cancelled,
-      updates: [{ lobbyId: lobby.lobbyId, trade }],
+      updates: [this.makePayload(trade, TradeUpdateKind.Created, from.seat)],
       lobbyId: lobby.lobbyId,
     };
   }
@@ -86,11 +89,12 @@ export class TradeActionsService {
       // No-op idempotency.
       return { cancelled: [], updates: [], lobbyId: lobby.lobbyId };
     }
+    const nextStatus = TradeRecipientSlotMachine.accept(slot.status);
     // Accept-as-recipient just records intent; resources move on finalize.
     assertValidResourceTradeMap(offer.request);
     this.assertCanPayMap(actor, offer.request);
     const updated = this.tradeService.updateRecipient(offer.id, actor.seat, {
-      status: TradeRecipientStatus.Accepted,
+      status: nextStatus,
       counter: undefined,
     });
     if (!updated) {
@@ -98,7 +102,7 @@ export class TradeActionsService {
     }
     return {
       cancelled: [],
-      updates: [{ lobbyId: lobby.lobbyId, trade: updated }],
+      updates: [this.makePayload(updated, TradeUpdateKind.RecipientAccepted, actor.seat)],
       lobbyId: lobby.lobbyId,
     };
   }
@@ -112,14 +116,15 @@ export class TradeActionsService {
     const actor = this.requirePlayer(lobby, sessionToken);
     this.requireTradingPhase(lobby);
     const offer = this.requireOpenOffer(payload.tradeId);
-    this.requireRecipientSlot(offer, actor.seat);
+    const slot = this.requireRecipientSlot(offer, actor.seat);
+    const nextStatus = TradeRecipientSlotMachine.counter(slot.status);
     // counter.offer = what sender gives, counter.request = what sender receives
     // → recipient must own counter.request.
     assertValidResourceTradeMap(payload.offer);
     assertValidResourceTradeMap(payload.request);
     this.assertCanPayMap(actor, payload.request);
     const updated = this.tradeService.updateRecipient(offer.id, actor.seat, {
-      status: TradeRecipientStatus.Countered,
+      status: nextStatus,
       counter: { offer: { ...payload.offer }, request: { ...payload.request } },
     });
     if (!updated) {
@@ -127,7 +132,34 @@ export class TradeActionsService {
     }
     return {
       cancelled: [],
-      updates: [{ lobbyId: lobby.lobbyId, trade: updated }],
+      updates: [this.makePayload(updated, TradeUpdateKind.RecipientCountered, actor.seat)],
+      lobbyId: lobby.lobbyId,
+    };
+  }
+
+  public withdrawCounterTrade(
+    context: TradeActionContext,
+    sessionToken: string,
+    payload: TradeWithdrawCounterPayload,
+  ): TradeActionResult {
+    const lobby = this.requireOpenLobby(context, payload.lobbyId);
+    const actor = this.requirePlayer(lobby, sessionToken);
+    this.requireTradingPhase(lobby);
+    const offer = this.requireOpenOffer(payload.tradeId);
+    const slot = this.requireRecipientSlot(offer, actor.seat);
+    const nextStatus = TradeRecipientSlotMachine.withdrawCounter(slot.status);
+    const updated = this.tradeService.updateRecipient(offer.id, actor.seat, {
+      status: nextStatus,
+      counter: undefined,
+    });
+    if (!updated) {
+      return { cancelled: [], updates: [], lobbyId: lobby.lobbyId };
+    }
+    return {
+      cancelled: [],
+      updates: [
+        this.makePayload(updated, TradeUpdateKind.RecipientCounterWithdrawn, actor.seat),
+      ],
       lobbyId: lobby.lobbyId,
     };
   }
@@ -149,14 +181,15 @@ export class TradeActionsService {
       }
       return {
         cancelled: [],
-        updates: [{ lobbyId: lobby.lobbyId, trade: updated }],
+        updates: [this.makePayload(updated, TradeUpdateKind.Cancelled, actor.seat)],
         lobbyId: lobby.lobbyId,
       };
     }
     // Recipient rejects own slot.
-    this.requireRecipientSlot(offer, actor.seat);
+    const slot = this.requireRecipientSlot(offer, actor.seat);
+    const nextStatus = TradeRecipientSlotMachine.reject(slot.status);
     const updated = this.tradeService.updateRecipient(offer.id, actor.seat, {
-      status: TradeRecipientStatus.Rejected,
+      status: nextStatus,
       counter: undefined,
     });
     if (!updated) {
@@ -164,7 +197,7 @@ export class TradeActionsService {
     }
     return {
       cancelled: [],
-      updates: [{ lobbyId: lobby.lobbyId, trade: updated }],
+      updates: [this.makePayload(updated, TradeUpdateKind.RecipientRejected, actor.seat)],
       lobbyId: lobby.lobbyId,
     };
   }
@@ -195,7 +228,7 @@ export class TradeActionsService {
       giveMap = offer.offer;
       takeMap = offer.request;
     } else {
-      throw new Error(ActionRejectCode.TradeNotOpen);
+      throw new Error(ActionRejectCode.InvalidTradeTransition);
     }
     assertValidResourceTradeMap(giveMap);
     assertValidResourceTradeMap(takeMap);
@@ -212,9 +245,17 @@ export class TradeActionsService {
     }
     return {
       cancelled: [],
-      updates: [{ lobbyId: lobby.lobbyId, trade: updated }],
+      updates: [this.makePayload(updated, TradeUpdateKind.Finalized, actor.seat)],
       lobbyId: lobby.lobbyId,
     };
+  }
+
+  private makePayload(
+    trade: TradeOfferDto,
+    kind: TradeUpdateKind,
+    actorSeat: PlayerSeat,
+  ): TradeUpdatedPayload {
+    return { lobbyId: trade.lobbyId, trade, kind, actorSeat };
   }
 
   private normalizeRecipients(

@@ -148,6 +148,8 @@ export class EnumTranslate {
         return 'reject.unknownTrade';
       case ActionRejectCode.TradeNotOpen:
         return 'reject.tradeNotOpen';
+      case ActionRejectCode.InvalidTradeTransition:
+        return 'reject.invalidTradeTransition';
       case ActionRejectCode.NoDevCardAvailable:
         return 'reject.noDevCardAvailable';
       case ActionRejectCode.DevCardNotOwned:

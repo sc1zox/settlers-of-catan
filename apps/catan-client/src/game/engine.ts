@@ -19,6 +19,7 @@ import {
   BuildKind,
   GamePhase,
   PlayerSeat,
+  ResourceType,
   SceneUserDataKey,
 } from '@catan/api-interfaces';
 import type {
@@ -58,6 +59,7 @@ import {
   TILE_UPDATE_BOUNDS_RADIUS,
 } from './engine-runtime/constants';
 import { BonusAwardFlight } from './engine-runtime/bonus-award-flight';
+import { TradeSwapFlight } from './engine-runtime/trade-swap-flight';
 import { FocusCardFan } from './engine-runtime/focus-cards';
 import { FrustumCull } from './engine-runtime/frustum-cull';
 import { OrbitCameraAid } from './engine-runtime/orbit-camera';
@@ -117,6 +119,7 @@ export class GameEngine {
   private readonly perfAggregator = new PerfStatsAggregator();
   private readonly focusFan = new FocusCardFan();
   private readonly bonusFlight = new BonusAwardFlight();
+  private readonly tradeSwap: TradeSwapFlight;
 
   private currentSeed: number | null = null;
 
@@ -153,6 +156,7 @@ export class GameEngine {
     this.scene = new Scene();
     this.scene.background = new Color(0xb89a78);
     this.scene.fog = new Fog(0xb89a78, 70, 200);
+    this.tradeSwap = new TradeSwapFlight(this.scene);
 
     const { clientWidth, clientHeight } = container;
     const aspect = clientWidth / Math.max(clientHeight, 1);
@@ -509,6 +513,26 @@ export class GameEngine {
    * for everyone else it floats by their avatar) for ~2 seconds, then settles
    * onto the table next to their hand. Idempotent re-emits restart the flight.
    */
+  /**
+   * Animate a finalised trade for *all* viewers: the cards the giver sent fly
+   * over the table to the receiver, and vice-versa. Triggered from a live
+   * socket event (not FullState replay) so reconnects don't re-play it.
+   */
+  public playTradeSwap(
+    fromSeat: PlayerSeat,
+    toSeat: PlayerSeat,
+    give: Readonly<Partial<Record<ResourceType, number>>>,
+    take: Readonly<Partial<Record<ResourceType, number>>>,
+  ): void {
+    if (
+      !this.playerAreaActiveAtTable[fromSeat] ||
+      !this.playerAreaActiveAtTable[toSeat]
+    ) {
+      return;
+    }
+    this.tradeSwap.start(fromSeat, toSeat, give, take, this.players);
+  }
+
   public playBonusAward(kind: BonusAwardKind, recipientSeat: PlayerSeat): void {
     const area = this.players[recipientSeat];
     if (!area || !this.playerAreaActiveAtTable[recipientSeat]) {
@@ -525,6 +549,7 @@ export class GameEngine {
   public dispose(): void {
     this.stop();
     this.bonusFlight.clearAll();
+    this.tradeSwap.dispose();
     this.orbitAid.resetSpectator(this.controls);
     this.resizeObserver.disconnect();
     this.controls.dispose();
@@ -906,6 +931,7 @@ export class GameEngine {
     this.orbitAid.clampOrbitTarget(this.camera, this.controls);
     this.focusFan.update(this.camera);
     this.bonusFlight.update(dt, this.camera, this.players);
+    this.tradeSwap.update(dt, this.camera);
     let visiblePlayers = 0;
     let activePlayersTotal = 0;
     for (let i = 0; i < this.players.length; i += 1) {

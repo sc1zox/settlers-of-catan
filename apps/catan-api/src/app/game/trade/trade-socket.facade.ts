@@ -8,6 +8,7 @@ import {
   TradeProposePayload,
   TradeRejectPayload,
   TradeUpdatedPayload,
+  TradeWithdrawCounterPayload,
   formatSocketIoLobbyRoomId,
   GameSocketServerEvent,
 } from '@catan/api-interfaces';
@@ -99,6 +100,19 @@ export class TradeSocketFacade {
 
   public counterTrade(server: Server, payload: TradeCounterPayload, sessionToken: string): void {
     const result = this.tradeActions.counterTrade(
+      this.tradeActionContext(server),
+      sessionToken,
+      payload,
+    );
+    this.broadcastResult(server, result);
+  }
+
+  public withdrawCounterTrade(
+    server: Server,
+    payload: TradeWithdrawCounterPayload,
+    sessionToken: string,
+  ): void {
+    const result = this.tradeActions.withdrawCounterTrade(
       this.tradeActionContext(server),
       sessionToken,
       payload,

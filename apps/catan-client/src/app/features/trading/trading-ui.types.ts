@@ -17,6 +17,28 @@ export enum TradeResourceSide {
   Request = 'request',
 }
 
+/**
+ * Tag for an in-flight trade socket call so the panel can show a spinner /
+ * disabled state on exactly the button the user just pressed and clear it as
+ * soon as the matching server echo arrives.
+ */
+export enum TradePendingActionKind {
+  Propose = 'propose',
+  Counter = 'counter',
+  WithdrawCounter = 'withdraw_counter',
+  Accept = 'accept',
+  Reject = 'reject',
+  Finalize = 'finalize',
+  Bank = 'bank',
+}
+
+export interface TradePendingAction {
+  readonly kind: TradePendingActionKind;
+  /** Empty until the server has assigned an id (Propose / Bank). */
+  readonly tradeId: string | null;
+  readonly startedAtMs: number;
+}
+
 export interface TradePartner {
   readonly seat: PlayerSeat;
   readonly name: string;

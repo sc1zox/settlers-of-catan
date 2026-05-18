@@ -357,10 +357,27 @@
                 @if (ui.lobbyGameUi.canOpenTrade()) {
                   <button
                     type="button"
+                    class="hud__trade-button"
                     [class.active]="ui.tradingPanel.tradeOpen()"
+                    [class.hud__trade-button--alert]="
+                      ui.tradingPanel.hasMinimisedIncoming() ||
+                      ui.tradingPanel.unseenResponseCount() > 0
+                    "
                     (click)="ui.tradingPanel.toggleTrade()"
                   >
                     {{ 'shell.buttonTrade' | translate }}
+                    @if (ui.tradingPanel.unseenResponseCount() > 0) {
+                      <span class="hud__trade-badge">
+                        {{
+                          'trade.responsesBadge'
+                            | translate: { count: ui.tradingPanel.unseenResponseCount() }
+                        }}
+                      </span>
+                    } @else if (ui.tradingPanel.hasMinimisedIncoming()) {
+                      <span class="hud__trade-badge">
+                        {{ 'trade.incomingMinimisedBadge' | translate }}
+                      </span>
+                    }
                   </button>
                 }
                 @if (ui.lobbyGameUi.canFinishTrading()) {
@@ -431,9 +448,11 @@
       [selfHarborRates]="ui.lobbyGameUi.selfHarborRates()"
       [partnerList]="ui.lobbyGameUi.tradePartners()"
       [pendingTrade]="ui.lobbyGameUi.pendingTrade()"
+      [pendingAction]="ui.tradingPanel.pendingAction()"
       (bankTrade)="ui.tradingPanel.onBankTrade($event)"
       (propose)="ui.tradingPanel.onProposeTrade($event)"
       (counter)="ui.tradingPanel.onCounterTrade($event)"
+      (withdrawCounter)="ui.tradingPanel.onWithdrawCounter($event)"
       (accept)="ui.tradingPanel.onAcceptTrade($event)"
       (reject)="ui.tradingPanel.onRejectTrade($event)"
       (finalize)="ui.tradingPanel.onFinalizeTrade($event)"

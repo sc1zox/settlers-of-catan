@@ -16,6 +16,7 @@ const REJECT_KEY: Record<ActionRejectCode, string> = {
   [ActionRejectCode.PlayerNotInLobby]: 'reject.playerNotInLobby',
   [ActionRejectCode.UnknownTrade]: 'reject.unknownTrade',
   [ActionRejectCode.TradeNotOpen]: 'reject.tradeNotOpen',
+  [ActionRejectCode.InvalidTradeTransition]: 'reject.invalidTradeTransition',
   [ActionRejectCode.NoDevCardAvailable]: 'reject.noDevCardAvailable',
   [ActionRejectCode.DevCardNotOwned]: 'reject.devCardNotOwned',
   [ActionRejectCode.DevCardAlreadyPlayed]: 'reject.devCardAlreadyPlayed',

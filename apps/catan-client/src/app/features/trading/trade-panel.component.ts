@@ -22,12 +22,14 @@ import { TranslateInstantFn } from '../../../shared/i18n/translate-instant-fn';
 import {
   TradeComposerView,
   TradePanelMode,
+  TradePendingActionKind,
   TradeResourceSide,
   type BankTradeRequest,
   type CounterTradeRequest,
   type FinalizeTradeRequest,
   type ProposeTradeRequest,
   type TradePartner,
+  type TradePendingAction,
 } from './trading-ui.types';
 import { RESOURCE_TYPE_ORDER, resourceTypeLabel } from '../../../shared/i18n/resource-labels';
 
@@ -118,9 +120,9 @@ const DEFAULT_HARBOR_RATES: PlayerHarborRatesDto = {
 
               <p class="sub-label">{{ 'trade.responsesLabel' | translate }}</p>
               <ul class="responses">
-                @for (resp of trade.recipients; track resp.seat) {
+                @for (resp of trade.recipients; track slotKey(resp)) {
                   <li
-                    class="response"
+                    class="response response--pulse"
                     [class.response--pending]="resp.status === recipientStatusEnum.Pending"
                     [class.response--accepted]="resp.status === recipientStatusEnum.Accepted"
                     [class.response--countered]="resp.status === recipientStatusEnum.Countered"
@@ -172,12 +174,17 @@ const DEFAULT_HARBOR_RATES: PlayerHarborRatesDto = {
                       <button
                         type="button"
                         class="accept response__finalize"
-                        [disabled]="!canFinalizeWith(resp)"
+                        [disabled]="!canFinalizeWith(resp) || hasAnyPending()"
                         (click)="
                           finalize.emit({ tradeId: trade.id, recipientSeat: resp.seat })
                         "
                       >
-                        {{ 'trade.finalizeWith' | translate: { name: partnerName(resp.seat) } }}
+                        @if (isPendingKind(pendingKindEnum.Finalize, trade.id)) {
+                          <span class="spinner" aria-hidden="true"></span>
+                          {{ 'trade.processing' | translate }}
+                        } @else {
+                          {{ 'trade.finalizeWith' | translate: { name: partnerName(resp.seat) } }}
+                        }
                       </button>
                     }
                   </li>
@@ -188,9 +195,15 @@ const DEFAULT_HARBOR_RATES: PlayerHarborRatesDto = {
                 <button
                   type="button"
                   class="reject"
+                  [disabled]="hasAnyPending()"
                   (click)="reject.emit(trade.id)"
                 >
-                  {{ 'trade.withdrawOffer' | translate }}
+                  @if (isPendingKind(pendingKindEnum.Reject, trade.id)) {
+                    <span class="spinner" aria-hidden="true"></span>
+                    {{ 'trade.processing' | translate }}
+                  } @else {
+                    {{ 'trade.withdrawOffer' | translate }}
+                  }
                 </button>
               </div>
             }
@@ -280,41 +293,88 @@ const DEFAULT_HARBOR_RATES: PlayerHarborRatesDto = {
               @if (mySlot.status === recipientStatusEnum.Pending && !canAcceptIncoming()) {
                 <p class="hint hint--warn">{{ 'trade.cannotAfford' | translate }}</p>
               }
-              <div class="incoming-actions">
-                <button
-                  type="button"
-                  class="accept"
-                  [disabled]="
-                    mySlot.status === recipientStatusEnum.Accepted ||
-                    !canAcceptIncoming()
-                  "
-                  (click)="accept.emit(trade.id)"
-                >
-                  {{ 'trade.accept' | translate }}
-                </button>
-                <button
-                  type="button"
-                  class="reject"
-                  [disabled]="mySlot.status === recipientStatusEnum.Rejected"
-                  (click)="reject.emit(trade.id)"
-                >
-                  {{ 'trade.reject' | translate }}
-                </button>
-                <button
-                  type="button"
-                  class="revise"
-                  (click)="enterCounterMode()"
-                >
-                  {{ 'trade.revise' | translate }}
-                </button>
-              </div>
+              @if (mySlot.status === recipientStatusEnum.Countered) {
+                <p class="hint hint--info">
+                  {{
+                    'trade.youCounteredHint'
+                      | translate: { name: partnerName(trade.fromSeat) }
+                  }}
+                </p>
+                <div class="incoming-actions incoming-actions--countered">
+                  <button
+                    type="button"
+                    class="revise"
+                    [disabled]="hasAnyPending()"
+                    (click)="enterCounterMode()"
+                  >
+                    {{ 'trade.revise' | translate }}
+                  </button>
+                  <button
+                    type="button"
+                    class="reject"
+                    [disabled]="hasAnyPending()"
+                    (click)="emitWithdrawCounter()"
+                  >
+                    @if (isPendingKind(pendingKindEnum.WithdrawCounter, trade.id)) {
+                      <span class="spinner" aria-hidden="true"></span>
+                      {{ 'trade.processing' | translate }}
+                    } @else {
+                      {{ 'trade.withdrawCounter' | translate }}
+                    }
+                  </button>
+                </div>
+              } @else {
+                <div class="incoming-actions">
+                  <button
+                    type="button"
+                    class="accept"
+                    [disabled]="
+                      mySlot.status === recipientStatusEnum.Accepted ||
+                      !canAcceptIncoming() ||
+                      hasAnyPending()
+                    "
+                    (click)="accept.emit(trade.id)"
+                  >
+                    @if (isPendingKind(pendingKindEnum.Accept, trade.id)) {
+                      <span class="spinner" aria-hidden="true"></span>
+                      {{ 'trade.processing' | translate }}
+                    } @else {
+                      {{ 'trade.accept' | translate }}
+                    }
+                  </button>
+                  <button
+                    type="button"
+                    class="reject"
+                    [disabled]="
+                      mySlot.status === recipientStatusEnum.Rejected ||
+                      hasAnyPending()
+                    "
+                    (click)="reject.emit(trade.id)"
+                  >
+                    @if (isPendingKind(pendingKindEnum.Reject, trade.id)) {
+                      <span class="spinner" aria-hidden="true"></span>
+                      {{ 'trade.processing' | translate }}
+                    } @else {
+                      {{ 'trade.reject' | translate }}
+                    }
+                  </button>
+                  <button
+                    type="button"
+                    class="revise"
+                    [disabled]="hasAnyPending()"
+                    (click)="enterCounterMode()"
+                  >
+                    {{ 'trade.revise' | translate }}
+                  </button>
+                </div>
+              }
 
               @if (otherRecipients(trade).length > 0) {
                 <p class="sub-label">{{ 'trade.otherResponses' | translate }}</p>
                 <ul class="responses responses--compact">
-                  @for (resp of otherRecipients(trade); track resp.seat) {
+                  @for (resp of otherRecipients(trade); track slotKey(resp)) {
                     <li
-                      class="response response--compact"
+                      class="response response--compact response--pulse"
                       [class.response--pending]="resp.status === recipientStatusEnum.Pending"
                       [class.response--accepted]="resp.status === recipientStatusEnum.Accepted"
                       [class.response--countered]="resp.status === recipientStatusEnum.Countered"
@@ -431,16 +491,26 @@ const DEFAULT_HARBOR_RATES: PlayerHarborRatesDto = {
                 <p class="hint hint--soft">{{ 'trade.proposeHint' | translate }}</p>
               }
               <div class="composer-actions">
-                <button type="button" class="back" (click)="exitCounterMode()">
+                <button
+                  type="button"
+                  class="back"
+                  [disabled]="hasAnyPending()"
+                  (click)="exitCounterMode()"
+                >
                   {{ 'trade.cancelRevise' | translate }}
                 </button>
                 <button
                   type="button"
                   class="confirm"
-                  [disabled]="!canSubmitCounter()"
+                  [disabled]="!canSubmitCounter() || hasAnyPending()"
                   (click)="emitCounter()"
                 >
-                  {{ 'trade.sendCounter' | translate }}
+                  @if (isPendingKind(pendingKindEnum.Counter, trade.id)) {
+                    <span class="spinner" aria-hidden="true"></span>
+                    {{ 'trade.sending' | translate }}
+                  } @else {
+                    {{ 'trade.sendCounter' | translate }}
+                  }
                 </button>
               </div>
             }
@@ -498,7 +568,7 @@ const DEFAULT_HARBOR_RATES: PlayerHarborRatesDto = {
                     <button
                       type="button"
                       class="confirm"
-                      [disabled]="!canSubmitBank()"
+                      [disabled]="!canSubmitBank() || hasAnyPending()"
                       (click)="
                         bankTrade.emit({
                           give: bankGive(),
@@ -507,7 +577,12 @@ const DEFAULT_HARBOR_RATES: PlayerHarborRatesDto = {
                         })
                       "
                     >
-                      {{ 'trade.bankExecute' | translate }}
+                      @if (isPendingKind(pendingKindEnum.Bank)) {
+                        <span class="spinner" aria-hidden="true"></span>
+                        {{ 'trade.sending' | translate }}
+                      } @else {
+                        {{ 'trade.bankExecute' | translate }}
+                      }
                     </button>
                   </div>
                 }
@@ -617,10 +692,15 @@ const DEFAULT_HARBOR_RATES: PlayerHarborRatesDto = {
                     <button
                       type="button"
                       class="confirm"
-                      [disabled]="!canSubmitPropose()"
+                      [disabled]="!canSubmitPropose() || hasAnyPending()"
                       (click)="emitPropose()"
                     >
-                      {{ 'trade.sendOffer' | translate }}
+                      @if (isPendingKind(pendingKindEnum.Propose)) {
+                        <span class="spinner" aria-hidden="true"></span>
+                        {{ 'trade.sending' | translate }}
+                      } @else {
+                        {{ 'trade.sendOffer' | translate }}
+                      }
                     </button>
                   </div>
                 }
@@ -991,6 +1071,67 @@ const DEFAULT_HARBOR_RATES: PlayerHarborRatesDto = {
         border-color: rgba(255, 255, 255, 0.18);
         margin-top: 0.4rem;
       }
+      .incoming-actions--countered {
+        grid-template-columns: 1fr 1fr;
+      }
+      .spinner {
+        display: inline-block;
+        width: 0.8rem;
+        height: 0.8rem;
+        margin-right: 0.4rem;
+        vertical-align: -2px;
+        border: 2px solid rgba(255, 255, 255, 0.35);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: trade-spin 0.6s linear infinite;
+      }
+      @keyframes trade-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      /* Re-keyed @for ensures these animations restart on every status flip. */
+      .response--pulse.response--accepted {
+        animation: trade-pulse-accept 1.6s ease-out;
+      }
+      .response--pulse.response--countered {
+        animation: trade-pulse-counter 1.6s ease-out;
+      }
+      .response--pulse.response--rejected {
+        animation: trade-pulse-reject 1.4s ease-out;
+      }
+      @keyframes trade-pulse-accept {
+        0% {
+          box-shadow: 0 0 0 0 rgba(92, 194, 122, 0);
+          background: rgba(92, 194, 122, 0.28);
+        }
+        60% {
+          box-shadow: 0 0 0 8px rgba(92, 194, 122, 0);
+        }
+        100% {
+          background: rgba(92, 194, 122, 0.08);
+        }
+      }
+      @keyframes trade-pulse-counter {
+        0% {
+          box-shadow: 0 0 0 0 rgba(213, 154, 58, 0);
+          background: rgba(213, 154, 58, 0.32);
+        }
+        60% {
+          box-shadow: 0 0 0 8px rgba(213, 154, 58, 0);
+        }
+        100% {
+          background: rgba(213, 154, 58, 0.08);
+        }
+      }
+      @keyframes trade-pulse-reject {
+        0% {
+          background: rgba(220, 90, 80, 0.25);
+        }
+        100% {
+          background: rgba(220, 90, 80, 0.06);
+        }
+      }
     `,
   ],
 })
@@ -1005,10 +1146,17 @@ export class TradePanelComponent {
   readonly selfHarborRates = input<PlayerHarborRatesDto>(DEFAULT_HARBOR_RATES);
   readonly partnerList = input<readonly TradePartner[]>([]);
   readonly pendingTrade = input<TradeOfferDto | null>(null);
+  /**
+   * The trade action the user just dispatched and is waiting for the server to
+   * echo. Drives the per-button spinner / disabled state so the user gets
+   * immediate visual feedback instead of staring at an unchanged panel.
+   */
+  readonly pendingAction = input<TradePendingAction | null>(null);
 
   readonly bankTrade = output<BankTradeRequest>();
   readonly propose = output<ProposeTradeRequest>();
   readonly counter = output<CounterTradeRequest>();
+  readonly withdrawCounter = output<string>();
   readonly accept = output<string>();
   readonly reject = output<string>();
   readonly finalize = output<FinalizeTradeRequest>();
@@ -1018,6 +1166,7 @@ export class TradePanelComponent {
   protected readonly recipientStatusEnum = TradeRecipientStatus;
   protected readonly modeEnum = TradePanelMode;
   protected readonly viewEnum = TradeComposerView;
+  protected readonly pendingKindEnum = TradePendingActionKind;
   protected readonly sideOffer = TradeResourceSide.Offer;
   protected readonly sideRequest = TradeResourceSide.Request;
   protected readonly partners = computed<readonly TradePartner[]>(() => this.partnerList());
@@ -1269,6 +1418,36 @@ export class TradePanelComponent {
       offer: this.request(),
       request: this.offer(),
     });
+  }
+
+  protected emitWithdrawCounter(): void {
+    const trade = this.pendingTrade();
+    if (trade === null) {
+      return;
+    }
+    this.withdrawCounter.emit(trade.id);
+  }
+
+  /** True iff the pending action matches this button (ignores trade id for Propose). */
+  protected isPendingKind(kind: TradePendingActionKind, tradeId?: string | null): boolean {
+    const pending = this.pendingAction();
+    if (pending === null || pending.kind !== kind) {
+      return false;
+    }
+    if (kind === TradePendingActionKind.Propose || kind === TradePendingActionKind.Bank) {
+      return true;
+    }
+    return pending.tradeId === (tradeId ?? null);
+  }
+
+  /** True iff *any* inflight action exists — disables sibling buttons while one is pending. */
+  protected hasAnyPending(): boolean {
+    return this.pendingAction() !== null;
+  }
+
+  /** Stable key per slot that flips on status change so @for re-renders the element (CSS pulse restarts). */
+  protected slotKey(resp: TradeRecipientResponse): string {
+    return `${resp.seat}|${resp.status}`;
   }
 
   private hasAnyMovementInComposer(): boolean {

@@ -145,6 +145,7 @@ export enum GameSocketClientEvent {
   TradeAccept = 'game:tradeAccept',
   TradeReject = 'game:tradeReject',
   TradeCounter = 'game:tradeCounter',
+  TradeWithdrawCounter = 'game:tradeWithdrawCounter',
   TradeFinalize = 'game:tradeFinalize',
   KickAndReplaceWithBot = 'game:kickAndReplaceWithBot',
 }

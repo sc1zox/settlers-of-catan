@@ -43,6 +43,7 @@ import {
   TradeProposePayload,
   TradeRejectPayload,
   TradeUpdatedPayload,
+  TradeWithdrawCounterPayload,
 } from '@catan/api-interfaces';
 import { environment } from '../../../environments/environment';
 import { PlayerSessionService } from '../session/player-session.service';
@@ -263,6 +264,11 @@ export class GameSocketService implements OnDestroy {
   ): void {
     const payload: TradeCounterPayload = { lobbyId, tradeId, offer, request };
     this.socket?.emit(GameSocketClientEvent.TradeCounter, payload);
+  }
+
+  public withdrawCounterTrade(lobbyId: string, tradeId: string): void {
+    const payload: TradeWithdrawCounterPayload = { lobbyId, tradeId };
+    this.socket?.emit(GameSocketClientEvent.TradeWithdrawCounter, payload);
   }
 
   public finalizeTrade(lobbyId: string, tradeId: string, recipientSeat: PlayerSeat): void {

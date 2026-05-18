@@ -13,6 +13,7 @@
     "playerNotInLobby": "Du bist in dieser Lobby nicht (mehr) eingeloggt — Lobby erneut beitreten.",
     "unknownTrade": "Dieses Handelsangebot gibt es nicht mehr (abgelaufen oder schon entschieden).",
     "tradeNotOpen": "Auf dieses Angebot kann nicht reagiert werden — es ist nicht mehr offen.",
+    "invalidTradeTransition": "Diese Reaktion auf das Angebot ist gerade nicht möglich. Bitte aktualisiere die Ansicht.",
     "noDevCardAvailable": "Im Stapel liegen keine Entwicklungskarten mehr.",
     "devCardNotOwned": "Du hast diese Entwicklungskarte nicht (oder sie wurde schon gespielt).",
     "devCardAlreadyPlayed": "Du hast in diesem Zug bereits eine Entwicklungskarte gespielt — pro Zug ist nur eine erlaubt.",
@@ -287,6 +288,13 @@
     "youGive": "Du gibst",
     "youWant": "Du willst",
     "sendOffer": "Angebot senden",
+    "withdrawCounter": "Gegenvorschlag zurückziehen",
+    "youCounteredHint": "Du hast ein Gegenangebot gesendet. Wartet auf {{name}}. Ziehe es zurück, wenn du stattdessen das Originalangebot annehmen willst.",
+    "sending": "Wird gesendet …",
+    "processing": "Bitte warten …",
+    "incomingFromBadge": "Angebot von {{name}}",
+    "incomingMinimisedBadge": "Handel offen — antippen",
+    "responsesBadge": "{{count}} Antworten",
     "dismiss": "Schließen"
   },
   "devCard": {

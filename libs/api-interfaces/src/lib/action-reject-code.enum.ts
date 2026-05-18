@@ -12,6 +12,7 @@ export enum ActionRejectCode {
   PlayerNotInLobby = 'player_not_in_lobby',
   UnknownTrade = 'unknown_trade',
   TradeNotOpen = 'trade_not_open',
+  InvalidTradeTransition = 'invalid_trade_transition',
   NoDevCardAvailable = 'no_dev_card_available',
   DevCardNotOwned = 'dev_card_not_owned',
   DevCardAlreadyPlayed = 'dev_card_already_played',

@@ -92,6 +92,14 @@ export class TradingStateService {
     this.sockets.counterTrade(params.lobbyId, tradeId, offer, request);
   }
 
+  public withdrawCounterTrade(tradeId: string): void {
+    const params = this.gameState.connection();
+    if (params === undefined) {
+      return;
+    }
+    this.sockets.withdrawCounterTrade(params.lobbyId, tradeId);
+  }
+
   public finalizeTrade(tradeId: string, recipientSeat: PlayerSeat): void {
     const params = this.gameState.connection();
     if (params === undefined) {

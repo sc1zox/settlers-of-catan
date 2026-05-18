@@ -13,7 +13,6 @@ import { Server, Socket } from 'socket.io';
 import { GameService } from '../core/game.service';
 import { SocketConnectionRegistry } from './socket-connection.registry';
 import { resolveSocketIoCors } from '../../http/cors-env.util';
-import { GatewaySocketSessionService } from './gateway-common.services';
 import { GatewayAuthService } from './gateway-auth.service';
 import { GatewayGameplayHandlers } from './gateway-gameplay.handlers';
 import { GatewayLobbyHandlers } from './gateway-lobby.handlers';
@@ -271,6 +270,14 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ): void {
     this.tradeHandlers.tradeCounter(this.server, client, payload);
+  }
+
+  @SubscribeMessage(GameSocketClientEvent.TradeWithdrawCounter)
+  public handleTradeWithdrawCounter(
+    @MessageBody() payload: TradeIdWsDto,
+    @ConnectedSocket() client: Socket,
+  ): void {
+    this.tradeHandlers.tradeWithdrawCounter(this.server, client, payload);
   }
 
   @SubscribeMessage(GameSocketClientEvent.TradeFinalize)

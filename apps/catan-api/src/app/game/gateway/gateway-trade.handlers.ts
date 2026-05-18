@@ -8,6 +8,7 @@ import {
   TradeFinalizePayload,
   TradeProposePayload,
   TradeRejectPayload,
+  TradeWithdrawCounterPayload,
 } from '@catan/api-interfaces';
 import { TradeSocketFacade } from '../trade/trade-socket.facade';
 import { GatewaySocketSessionService } from './gateway-common.services';
@@ -47,6 +48,15 @@ export class GatewayTradeHandlers {
   public tradeCounter(server: Server, client: Socket, payload: TradeCounterPayload): void {
     const sessionToken = this.sessions.requireSessionToken(client);
     this.tradeSocket.counterTrade(server, payload, sessionToken);
+  }
+
+  public tradeWithdrawCounter(
+    server: Server,
+    client: Socket,
+    payload: TradeWithdrawCounterPayload,
+  ): void {
+    const sessionToken = this.sessions.requireSessionToken(client);
+    this.tradeSocket.withdrawCounterTrade(server, payload, sessionToken);
   }
 
   public tradeFinalize(server: Server, client: Socket, payload: TradeFinalizePayload): void {

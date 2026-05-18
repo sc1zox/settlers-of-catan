@@ -81,7 +81,42 @@ export interface TradeFinalizePayload {
   readonly recipientSeat: PlayerSeat;
 }
 
+/** Recipient takes back their counter-proposal and returns to Pending. */
+export interface TradeWithdrawCounterPayload {
+  readonly lobbyId: string;
+  readonly tradeId: string;
+}
+
+/**
+ * Coarse classification of what produced this `TradeUpdated`, so the client
+ * can drive the right UX (pulse colour, banner copy, card-swap flight) without
+ * having to diff snapshots locally.
+ */
+export enum TradeUpdateKind {
+  /** Brand new open offer the sender just sent. */
+  Created = 'created',
+  /** A recipient flipped a slot to Accepted. */
+  RecipientAccepted = 'recipient_accepted',
+  /** A recipient flipped a slot to Countered (first or rewritten). */
+  RecipientCountered = 'recipient_countered',
+  /** A recipient pulled back their counter, slot is Pending again. */
+  RecipientCounterWithdrawn = 'recipient_counter_withdrawn',
+  /** A recipient flipped a slot to Rejected. */
+  RecipientRejected = 'recipient_rejected',
+  /** Sender finalised the deal — animate the card swap. */
+  Finalized = 'finalized',
+  /** Sender cancelled the whole thread. */
+  Cancelled = 'cancelled',
+  /** A fresh propose superseded this thread server-side. */
+  Superseded = 'superseded',
+  /** Trading phase ended; any still-open trades got auto-rejected. */
+  PhaseClosed = 'phase_closed',
+}
+
 export interface TradeUpdatedPayload {
   readonly lobbyId: string;
   readonly trade: TradeOfferDto;
+  readonly kind: TradeUpdateKind;
+  /** Who caused the update — sender for Created/Cancelled/Finalized, recipient for slot transitions. */
+  readonly actorSeat: PlayerSeat;
 }

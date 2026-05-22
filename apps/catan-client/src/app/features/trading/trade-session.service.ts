@@ -1,4 +1,5 @@
-import { computed, inject, Injectable, OnDestroy, signal } from '@angular/core';
+import { computed, DestroyRef, inject, Injectable, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   PlayerHarborRatesDto,
   PlayerSeat,
@@ -7,7 +8,6 @@ import {
   TradeUpdateKind,
   type TradeUpdatedPayload,
 } from '@catan/api-interfaces';
-import type { Subscription } from 'rxjs';
 import { GameStateResource } from '../../core/game/game-state.resource';
 import { GameSocketService } from '../../core/socket/game-socket.service';
 import type { TradePartner } from './trading-ui.types';
@@ -46,9 +46,10 @@ const DEFAULT_HARBOR_RATES: PlayerHarborRatesDto = {
  * `tradeUpdated$` (lobby-scoped by canonical id).
  */
 @Injectable({ providedIn: 'root' })
-export class TradeSessionService implements OnDestroy {
+export class TradeSessionService {
   private readonly sockets = inject(GameSocketService);
   private readonly gameState = inject(GameStateResource);
+  private readonly destroyRef = inject(DestroyRef);
 
   private readonly currentTrade = signal<TradeOfferDto | null>(null);
   private readonly lastTradeUpdateSignal = signal<TradeUpdatedPayload | undefined>(undefined);
@@ -56,24 +57,17 @@ export class TradeSessionService implements OnDestroy {
   public readonly pendingTrade = this.currentTrade.asReadonly();
   public readonly lastTradeUpdate = this.lastTradeUpdateSignal.asReadonly();
 
-  private tradeUpdatedSubscription: Subscription | null = null;
-
   public constructor() {
-    this.tradeUpdatedSubscription = this.sockets.tradeUpdated$.subscribe((update) => {
-      const canonical = this.gameState.canonicalLobbyId();
-      if (canonical.length === 0 || update.lobbyId !== canonical) {
-        return;
-      }
-      this.applyTradeUpdate(update);
-      this.lastTradeUpdateSignal.set(update);
-    });
-  }
-
-  public ngOnDestroy(): void {
-    if (this.tradeUpdatedSubscription !== null) {
-      this.tradeUpdatedSubscription.unsubscribe();
-      this.tradeUpdatedSubscription = null;
-    }
+    this.sockets.tradeUpdated$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((update) => {
+        const canonical = this.gameState.canonicalLobbyId();
+        if (canonical.length === 0 || update.lobbyId !== canonical) {
+          return;
+        }
+        this.applyTradeUpdate(update);
+        this.lastTradeUpdateSignal.set(update);
+      });
   }
 
   public readonly tradePartners = computed<readonly TradePartner[]>(() => {

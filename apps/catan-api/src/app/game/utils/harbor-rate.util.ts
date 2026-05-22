@@ -1,4 +1,4 @@
-import { PlayerHarborRatesDto, PlayerSeat, ResourceType } from '@catan/api-interfaces';
+import { HarborVertexSet, PlayerHarborRatesDto, PlayerSeat, ResourceType } from '@catan/api-interfaces';
 import { CORNER_OFFSETS, hexRing } from '@catan/shared-game-field';
 import { LobbyRuntime } from '../lobby/lobby-runtime';
 
@@ -23,7 +23,11 @@ const NEIGHBOR_DIRS: readonly { q: number; r: number }[] = [
   { q: 0, r: 1 },
 ];
 
-export function resolveHarborRates(lobby: LobbyRuntime, seat: PlayerSeat): PlayerHarborRatesDto {
+export function resolveHarborRates(
+  lobby: LobbyRuntime,
+  seat: PlayerSeat,
+  harborSets: readonly HarborVertexSet[] = computeHarborVertexSets(lobby),
+): PlayerHarborRatesDto {
   let generic = 4;
   const perResource: Record<ResourceType, number> = {
     [ResourceType.Wood]: 4,
@@ -32,7 +36,7 @@ export function resolveHarborRates(lobby: LobbyRuntime, seat: PlayerSeat): Playe
     [ResourceType.Wool]: 4,
     [ResourceType.Ore]: 4,
   };
-  const harborVertices = getHarborVertexSets(lobby);
+  const harborVertices = harborSets;
   for (let i = 0; i < harborVertices.length; i += 1) {
     const harbor = harborVertices[i];
     const owned = playerOwnsAnyVertex(lobby, seat, harbor.vertexIds);
@@ -70,9 +74,7 @@ function playerOwnsAnyVertex(
   return false;
 }
 
-function getHarborVertexSets(
-  lobby: LobbyRuntime,
-): { vertexIds: readonly string[]; resource: ResourceType | null; ratio: number }[] {
+export function computeHarborVertexSets(lobby: LobbyRuntime): HarborVertexSet[] {
   const ring = hexRing(2);
   const sets: { vertexIds: readonly string[]; resource: ResourceType | null; ratio: number }[] = [];
   for (let i = 0; i < HARBOR_HEX_INDICES.length; i += 1) {
@@ -98,6 +100,8 @@ function getHarborVertexSets(
   return sets;
 }
 
+// Returns the neighbor direction whose neighbor hex lies at ring distance 3 (outermost ring).
+// The score is the squared axial magnitude (q²+r²+(q+r)²), which is maximized exactly on ring 3.
 function findOuterSideDirection(q: number, r: number): { q: number; r: number } | null {
   let bestDir: { q: number; r: number } | null = null;
   let bestScore = Number.NEGATIVE_INFINITY;

@@ -5,6 +5,12 @@ import { PlayerSeat } from './player-seat.enum';
 import { ResourceType } from './resource-type.enum';
 import { AxialCoordDto, DiceRollDto } from './turn-flow.dto';
 
+export interface HarborVertexSet {
+  readonly vertexIds: readonly string[];
+  readonly resource: ResourceType | null;
+  readonly ratio: number;
+}
+
 export interface PlayerHarborRatesDto {
   /** Best generic (3:1 or 4:1) rate available to this player. */
   readonly generic: number;

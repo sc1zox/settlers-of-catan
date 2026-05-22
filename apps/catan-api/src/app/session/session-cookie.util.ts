@@ -1,10 +1,10 @@
-import { SessionCookieName } from '@catan/api-interfaces';
+import { ProcessEnvKey, SessionCookieName } from '@catan/api-interfaces';
 import type { CookieOptions, Response } from 'express';
 
 const REFRESH_COOKIE_PATH = '/api/session';
 
 export function refreshTokenCookieOptions(refreshTtlSec: number): CookieOptions {
-  const isProduction = process.env['NODE_ENV']?.trim().toLowerCase() === 'production';
+  const isProduction = process.env[ProcessEnvKey.NodeEnv]?.trim().toLowerCase() === 'production';
   return {
     httpOnly: true,
     secure: isProduction,
@@ -21,7 +21,7 @@ export function setRefreshTokenCookie(res: Response, refreshToken: string, refre
 export function clearRefreshTokenCookie(res: Response): void {
   res.clearCookie(SessionCookieName.RefreshToken, {
     httpOnly: true,
-    secure: process.env['NODE_ENV']?.trim().toLowerCase() === 'production',
+    secure: process.env[ProcessEnvKey.NodeEnv]?.trim().toLowerCase() === 'production',
     sameSite: 'lax',
     path: REFRESH_COOKIE_PATH,
   });

@@ -43,24 +43,35 @@ Nest bootstraps in `apps/catan-api/src/main.ts`: global `ValidationPipe` (whitel
 
 Every successful response is wrapped by `ApiStandardHttpInterceptor` into `{ data, requestId }` (`ApiEnvelope<T>` in `api-envelope.dto.ts`). On the client side, `apiEnvelopeInterceptor` unwraps it — controllers and services do *not* see the envelope shape.
 
+### Infrastructure layer
+
+`apps/catan-api/src/app/infrastructure/` holds adapters for external systems, kept out of `game/` so feature services depend on a narrow service, not a client library:
+- `redis/redis-lobby-store.service.ts` — `RedisLobbyStoreService` wraps `ioredis`. Owns the canonical-lobby-id alias, lobby-member records, and an idle-TTL refresh. Connects lazily; a missing Redis degrades to warnings, it does not crash the API.
+- `livekit/livekit-room.service.ts` — `LiveKitRoomService` creates / deletes the LiveKit video room that backs a lobby's webcam feature.
+
+Lobby identity has two forms: a human-typed **lobby code** and a **canonical lobby id** (UUID-shaped, minted via Redis). `LobbyService` keeps a `canonicalIdByLobbyCode` map so either form resolves; wire DTOs and socket rooms always use the canonical id.
+
 ### Game state
 
-`GameModule` (`game/game.module.ts`) aggregates feature modules under `game/<feature>/` (gateway, core facade, lobby, match-flow, turn, economy, build, robber, trade, demo-bot, validation, utils) — same idea as Angular feature folders. The in-memory `Map<lobbyId, LobbyRuntime>` lives in `LobbyService`, *not* `GameService` — there is no persistence yet. The pieces:
+`GameModule` (`game/game.module.ts`) aggregates feature modules under `game/<feature>/` (gateway, core facade, lobby, lobby-orchestrator, reconnect, match-flow, turn, economy, build, robber, trade, dev-cards, demo-bot, validation, utils) — same idea as Angular feature folders. The in-memory `Map<lobbyId, LobbyRuntime>` lives in `LobbyService`, *not* `GameService` — there is no persistence yet (Redis only stores the lobby-code alias + activity TTL, not match state). The pieces:
 
 - `LobbyRuntime` (`game/lobby/lobby-runtime.ts`) — per-lobby state: players, seats, settlements, roads, robber position, dev deck, FSM. Each lobby has its own RNG seed; tile placements come from `makeStandardLandPlacements(seed)` in the shared `game-field` lib.
 - `TurnStateMachine` (`game/turn/turn-state-machine.ts`) — single-method-per-transition FSM over `GamePhase`. *All* phase changes go through this class; ad-hoc `lobby.fsm.setPhase(...)` calls in handlers bypass the assertions and should be avoided.
 - `createBoardTopology(tiles)` (`libs/shared/game-field/src/lib/board-topology.ts`) — derives vertex/edge IDs from cube coordinates; the resulting IDs are the contract for `BuildSettlement` / `BuildRoad` payloads and are echoed back to the client in `LobbyFullStatePayload.{vertexIds,edgeIds}`. Edge IDs are formatted `"<vertexA>|<vertexB>"` (the client splits on `|`).
 - `scoring.util.ts`, `robber.util.ts`, `harbor-rate.util.ts` under `game/utils/` — pure functions invoked by the services below.
 
-**Service decomposition.** `GameService` (`game/core/game.service.ts`) is a *thin facade*: each public method resolves the lobby, asserts it's open, delegates to a feature service, then broadcasts `FullState`. The actual rules live in feature services, each with its own `*.module.ts` that `GameModule` imports:
+**Service decomposition.** `GameService` (`game/core/game.service.ts`) is *mostly* a facade: each public action method resolves the lobby, asserts it's open, delegates to a feature service, then broadcasts `FullState`. It is not purely thin — it also wires the demo-bot autoplay callbacks (see the code-quality note below). The actual rules live in feature services, each with its own `*.module.ts` that `GameModule` imports:
 
-- `LobbyService` — owns the lobby `Map`; join/disconnect/reconnect grace, seat assignment, `toFullState` (including the per-viewer `legal*Ids` arrays), `broadcastFullState`, `requireLobby` / `assertLobbyOpen`.
+- `LobbyService` — owns the lobby `Map`; seat assignment, the lobby-code↔canonical-id alias, `toFullState` (including the per-viewer `legal*Ids` arrays), `broadcastFullState`, `requireLobby` / `assertLobbyOpen`, `tearDownLobby`.
+- `LobbyOrchestratorService` — lobby lifecycle that spans subsystems: `createLobby` / `joinLobby` (Redis alias + LiveKit room + seat join), `leaveLobby`, `fillLobbyWithBots`, summary-screen scheduling.
+- `ReconnectService` — disconnect grace timers, `resumeSessionSocket`, `kickAndReplaceWithBot`, empty-lobby teardown.
 - `MatchFlowService` — `startLobby`, `rollDice`, `finishTrading`, `endTurn` — the phase-to-phase progression of a match.
-- `BuildActionService` — `buildSettlement`, `buildRoad`, `buildCity`, `playRoadBuilding` (placement legality + piece placement).
-- `EconomyService` — dice-roll resource production, `buyDevCard`, monopoly / year-of-plenty / bank-trade resource movement.
+- `BuildActionService` — `buildSettlement`, `buildRoad`, `buildCity` (placement legality + piece placement).
+- `EconomyService` — dice-roll resource production, monopoly / year-of-plenty / bank-trade resource movement.
+- `DevCardsService` — `buyDevCard` and playing knight / monopoly / year-of-plenty / road-building dev cards.
 - `RobberService` — robber discard, `moveRobber`, `playKnight`.
 - `TurnFlowService` — turn order / seat rotation / setup-phase transitions.
-- `TradeService` + `TradeActionsService` — player-to-player trade lifecycle (propose / accept / reject). The gateway calls `TradeActionsService` directly rather than through `GameService`.
+- `TradeService` + `TradeActionsService` — player-to-player trade lifecycle (propose / accept / reject / counter / finalize).
 - `DemoBotService` — the `KnownLobbyId.DemoClient` (`'demo'`) lobby auto-fills with bots and autoplays the setup phase.
 - `GameActionValidationService` — shared assertions (`assertPhase`, `assertCurrentPlayer`, legal settlement/road/city checks) injected into the feature services.
 
@@ -76,6 +87,8 @@ When adding a server action, extend the matching feature service (or add a new m
 4. None of those? Disconnect.
 
 The resolved `sessionId` becomes the player's stable identity (`LobbyPlayerSlot.sessionToken`) and is mapped to the current `socket.id` in `SocketConnectionRegistry` (`game/gateway/socket-connection.registry.ts`). Disconnects start a grace timer in `LobbyRuntime`; reconnecting with the same sessionId re-binds without losing the seat.
+
+`GameGateway` itself only holds `@SubscribeMessage` decorators; the body of each handler delegates to one of three injected handler services — `GatewayLobbyHandlers`, `GatewayGameplayHandlers`, `GatewayTradeHandlers` — which resolve the session token (`GatewaySocketSessionService`) and call the matching feature service. `GatewayAuthService` owns handshake auth, `GatewayActionRejectService` formats `ActionRejected` emissions, `GameGatewayExceptionFilter` catches thrown errors.
 
 Client→server events are `GameSocketClientEvent.*`, server→client are `GameSocketServerEvent.*` (both in `libs/api-interfaces/src/lib/socket-events.ts`). After any state-changing handler, the gateway broadcasts `GameSocketServerEvent.FullState` to all sockets in `formatSocketIoLobbyRoomId(lobbyId)` — the client treats `FullState` as the source of truth.
 
@@ -100,11 +113,16 @@ src/
     http/                 # rxResourceStream, observeAbort, session HTTP context
     game-scene/           # LobbySceneState + mapLobbyFullStateToSceneState (app↔engine bridge)
   app/
-    core/                 # bootstrap, session, http interceptors, socket, game-state resource
+    core/                 # bootstrap, session, http interceptors, socket, lobby HTTP, game-state resource
     features/<feature>/   # UI feature folders — colocate feature types + pure helpers here
     game-canvas/          # interactive + passive canvas overlays
   game/                   # Three.js engine only (no Angular imports)
+    engine-runtime/       # per-frame engine helpers (focus fan, fly-in animations, frustum cull, perf)
+    animation/            # shared deterministic RNG + wind helpers for ambient motion
+    i18n/                 # canvas-side enum-label helpers (no ngx-translate, runs outside Angular)
 ```
+
+Active client feature folders under `app/features/`: `session-shell`, `lobby-game-ui`, `trading`, `dev-cards`, `player-stats-panel`, `bonus-announce-banner`, `disconnect-banner`, `summary-screen`, `game-settings`, `spectator-camera`, `webcam-head`, `shell-feedback`.
 
 **Where new code goes**
 
@@ -130,7 +148,7 @@ src/
 
 `GameSocketService` (`app/core/socket/game-socket.service.ts`) is the only socket.io-client and exposes RxJS subjects (`fullState$`, `tradeUpdated$`, etc.). `GameStateResource` (`app/core/game/game-state.resource.ts`) wraps these in `rxResource<LobbyFullStatePayload | undefined, ...>` so components consume the lobby as a signal-shaped resource. When the lobby changes shape, every `computed(...)` that reads `GameStateResource` re-derives — do not mutate payloads in place.
 
-`SessionShellComponent` (`app/features/session-shell/session-shell.ts`) is the entry UI: sign-in → join lobby → in-game. It owns reactive forms and delegates lobby navigation, build mode, robber flow, trading, and dev-card overlays to **`SessionLobbyFlowService`**, **`SessionBuildInteractionService`**, **`SessionRobberFlowService`**, **`SessionTradingPanelService`**, and **`SessionDevCardOverlayService`** (all provided on `SessionShell`). **`LobbyShellGameUiService`** (`app/features/lobby-game-ui/`, root-provided) holds derived lobby/game UI: mapped `LobbyUiState`, `can…` capability flags, discard/trade models, announcer text, and HUD lock/passive-wait flags. Pure helpers and UI types live in the same feature folder (`lobby-ui-state.ts`, `lobby-ui.mapper.ts`, `turn-announcer-text.ts`, `in-game-hud-state.ts`, `resource-card-totals.ts`). Shell feedback helpers (`action-reject.ts`, `user-facing-error.ts`) live under `features/shell-feedback/`. Phase sync between `LobbyWaiting` and in-game is handled by an `effect` in `SessionLobbyFlowService` (which calls `attachUiStep` on the game UI service). Robber victim candidates are built inline in `SessionRobberFlowService` via `collectRobberVictimSeats` from `@catan/shared-game-field`. When adding a new player action, add a `can…` on the game UI service (if it is pure state) and a thin handler on the shell that calls `GameStateResource`. Interactive DOM overlays — `BuildConfirmPopoverComponent`, `DiscardModalComponent`, `DevCardModalComponent`, `TradePanelComponent`, `RobberVictimPopoverComponent` (all under `app/game-canvas/`). `app.ts` is intentionally tiny (`<app-session-shell />`).
+`SessionShell` (`app/features/session-shell/session-shell.ts`) is the entry UI: sign-in → join lobby → in-game. The component class itself is tiny — it injects **`SessionShellFacadeService`** (exposed to the template as `ui`) and **`SessionCleanupService`**. `SessionShellFacadeService` owns the reactive forms and aggregates the per-concern services it provides: **`SessionLobbyFlowService`** (lobby navigation), **`SessionBuildInteractionService`** (build mode), **`SessionRobberFlowService`** (robber/knight flow), **`SessionTradingPanelService`** (trading), **`SessionDevCardOverlayService`** (dev-card overlays). **`LobbyShellGameUiService`** (`app/features/lobby-game-ui/`, root-provided) is the derived-UI facade; it composes `LobbyGameUiStateService` (mapped `LobbyUiState`), `LobbyActionCapabilitiesUiService` (`can…` flags), `LobbyDiscardUiService`, and `LobbyHudUiService` (HUD lock / passive-wait). Pure helpers and UI types live in the same feature folder (`lobby-ui-state.ts`, `lobby-ui.mapper.ts`, `turn-announcer-text.ts`, `in-game-hud-state.ts`, `resource-card-totals.ts`, `matches-lobby-connection.ts`). Shell feedback helpers live under `features/shell-feedback/`. When adding a new player action, add a `can…` on the capabilities service (if it is pure state) and a thin handler on the facade that calls `GameStateResource`. Interactive DOM overlays — `BuildConfirmPopover`, `DiscardModal`, `DevCardPlayPicker`, `TradePanel`, `RobberVictimPopover`. `app.ts` is intentionally tiny (`<app-session-shell />`).
 
 New per-feature client code goes under `app/features/<feature>/` (e.g. `features/spectator-camera/` — a root `SpectatorCameraService` signal plus a toggle component; `GameCanvasComponent` mirrors its `mode()` into `engine.setSpectatorCameraMode()` via an `effect`).
 
@@ -187,7 +205,7 @@ Water tiles and harbors are *not* part of `Board` — they live in `World` / `Ha
 
 ### Player areas and hover convention
 
-Four `PlayerArea` instances rotate around the Y-axis by `seat * π/2`. Each builds an "arsenal" (roads/settlements/cities) at fixed local coordinates plus a hand of resource + dev cards. Card textures are generated procedurally via canvas in `src/game/cards/textures.ts`. Labels/names are German (`PLAYER_NAME_DE`, `RESOURCE_LABEL_DE`, `DEV_LABEL_DE`); user-facing UI strings throughout the client are German.
+Four `PlayerArea` instances rotate around the Y-axis by `seat * π/2`. `PlayerArea` does not build geometry itself — it composes one self-contained subsystem per concern, each owning its own meshes/materials and exposing `update(dt)` / `dispose()`: `PlayerAreaArsenal` (roads/settlements/cities stash), `PlayerAreaHand` (resource + dev cards), `PlayerAreaAvatar` (head + name + webcam), `PlayerAreaSelfPad` (the seat felt), `PlayerAreaBonusCards` (Längste Handelsstraße / Größte Rittermacht award cards). When adding a new per-seat element, add a subsystem rather than growing `PlayerArea`, and aggregate it into the `cards` getter / `update` / `dispose` / `setPresenceDimmed` fan-out. Card textures are generated procedurally via canvas in `src/game/cards/textures.ts`. Labels/names are German (`PLAYER_NAME_DE`, `RESOURCE_LABEL_DE`, `DEV_LABEL_DE`); user-facing UI strings throughout the client are German.
 
 `HoverSystem` walks up the parent chain looking for `userData[SceneUserDataKey.Kind]`, a `SceneObjectKind` enum value (in `@catan/api-interfaces`, alongside `SceneUserDataKey` for the other userData keys and `scene-hover-handlers.ts` for the callback signatures). Kinds in use:
 - `Harbor` and `Chip` produce a `HoverTarget` (tooltip). `Chip` is also click-only during robber placement (`setTileClickHandler`).
@@ -207,3 +225,18 @@ Build mode is **owned by Angular**, not the engine. The server sends the legal-m
 - ESLint disables `@typescript-eslint/prefer-for-of` workspace-wide — classic `for (let i = 0; i < arr.length; i++)` is idiomatic here, especially in hot paths inside `GameEngine`.
 - Angular component selectors use the `app-` prefix; directives use camelCase (`app-eslint` config). Component **files** omit `.component` (see Client section above).
 - The client environment file (`apps/catan-client/src/environments/environment.ts`) points at `DevelopmentApiOrigin.LocalHttp` — there is no production environment.ts yet.
+
+## Code quality expectations
+
+Code quality is a priority in this repo. Hold to these when adding or changing code:
+
+- **Encapsulate by domain, compose over grow.** A class that accumulates a second responsibility should instead delegate to a self-contained subsystem. The established pattern: server feature services (`game/<feature>/`) and client subsystems (`PlayerAreaArsenal`, `PlayerAreaBonusCards`, `FocusCardFan`, `BonusAwardFlight`, …). Each subsystem owns its own state + lifecycle (`update` / `dispose`). Do not bolt feature-specific fields onto `PlayerArea`, `GameEngine`, `LobbyRuntime`, or `GameService` — add a subsystem and aggregate it.
+- **No dead indirection layers.** A class that only forwards calls 1:1 to another class earns its keep only if it adds behaviour (validation, fan-out, translation). A pass-through wrapper is noise — call the real service. (The `*-socket.facade.ts` files are an inconsistent example: `TradeSocketFacade` does real work, the other five just forward — see the code-quality report.)
+- **Single source of truth.** Server state is authoritative; the client renders `FullState`, never re-derives game rules. On the server, every state-mutating action ends with `applyPostActionScoring` — do not inline scoring.
+- **Test the rules, not just the plumbing.** Pure game-logic functions (scoring, legality, board generation, resource math) must have specs under `tests/`. UI wiring and Three.js rendering are exempt.
+- **Keep files focused.** When a file passes ~400 lines, look for a subsystem to extract before adding more. `engine.ts` is the current outlier and a known target for decomposition.
+- **Strict typing, no escapes.** No `any`, no `@ts-ignore` / `@ts-expect-error`, no `as unknown as`. The repo is currently clean of all three — keep it that way. Bracket access on index signatures is the one sanctioned exception (see the TypeScript note above).
+- **No stray `console.*`.** Server logging goes through Nest's `Logger`; the client has no logging sink yet — don't add `console.log`.
+- Run `npm run lint` and `npm run build` before considering a change done; add or update specs when you touch game rules.
+
+A living analysis of where the codebase still falls short of these expectations — with priorities — lives in `docs/code-quality-report.md`.

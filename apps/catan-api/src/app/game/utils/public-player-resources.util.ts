@@ -10,11 +10,15 @@ export function countResourceCards(player: LobbyPlayerSlot): number {
   return total;
 }
 
-export function emptyPublicResourceRecord(): Readonly<Record<ResourceType, number>> {
+export function emptyMutableResourceRecord(): Record<ResourceType, number> {
   const out: Partial<Record<ResourceType, number>> = {};
   const keys = Object.values(ResourceType);
   for (let i = 0; i < keys.length; i += 1) {
     out[keys[i]] = 0;
   }
-  return out as Readonly<Record<ResourceType, number>>;
+  return out as Record<ResourceType, number>;
+}
+
+export function emptyPublicResourceRecord(): Readonly<Record<ResourceType, number>> {
+  return emptyMutableResourceRecord();
 }

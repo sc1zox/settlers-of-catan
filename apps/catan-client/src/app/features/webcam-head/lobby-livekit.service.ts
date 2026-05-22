@@ -41,6 +41,23 @@ export class LobbyLiveKitService implements OnDestroy {
     void this.disconnect();
   }
 
+  public tryPrime(): void {
+    if (typeof globalThis.isSecureContext === 'boolean' && !globalThis.isSecureContext) {
+      return;
+    }
+    this.beginLocalVideoCaptureFromUserGesture();
+  }
+
+  public canJoinWithWebcam(): 'ok' | 'insecureContext' {
+    if (!this.gameSettings.webcamEnabled()) {
+      return 'ok';
+    }
+    if (typeof globalThis.isSecureContext === 'boolean' && !globalThis.isSecureContext) {
+      return 'insecureContext';
+    }
+    return 'ok';
+  }
+
   public beginLocalVideoCaptureFromUserGesture(): void {
     if (!this.gameSettings.webcamEnabled()) {
       return;

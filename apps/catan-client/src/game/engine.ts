@@ -814,21 +814,33 @@ export class GameEngine {
       if (!this.playerAreaActiveAtTable[player.info.seat]) {
         continue;
       }
+      const isOwnSeat = this.selfSeat !== null && player.info.seat === this.selfSeat;
       if (spectator) {
-        if (this.selfSeat === null || player.info.seat !== this.selfSeat) {
-          continue;
-        }
-        for (let j = 0; j < player.cards.length; j += 1) {
-          hoverables.push(player.cards[j].mesh);
+        // Spectator: own hand stays interactable; everyone else exposes only
+        // their publicly-visible cards (cost + bonus awards).
+        if (isOwnSeat) {
+          for (let j = 0; j < player.cards.length; j += 1) {
+            hoverables.push(player.cards[j].mesh);
+          }
+        } else {
+          hoverables.push(player.getCostCard().mesh);
+          const bonusCards = player.getBonusCards();
+          for (let j = 0; j < bonusCards.length; j += 1) {
+            hoverables.push(bonusCards[j].mesh);
+          }
         }
         continue;
       }
-      if (this.selfSeat !== null && player.info.seat === this.selfSeat) {
+      if (isOwnSeat) {
         for (let j = 0; j < player.cards.length; j += 1) {
           hoverables.push(player.cards[j].mesh);
         }
       } else {
         hoverables.push(player.getCostCard().mesh);
+        const bonusCards = player.getBonusCards();
+        for (let j = 0; j < bonusCards.length; j += 1) {
+          hoverables.push(bonusCards[j].mesh);
+        }
       }
     }
     if (!spectator) {
@@ -854,17 +866,18 @@ export class GameEngine {
   }
 
   private cardIsInspectable(card: Card): boolean {
-    if (this.orbitAid.isSpectatorActive()) {
-      if (this.selfSeat === null) {
-        return false;
-      }
-      return this.players[this.selfSeat]?.cards.includes(card) ?? false;
-    }
+    // Publicly-visible cards (cost reference + bonus awards) are inspectable
+    // across every seat. Hand cards are private and only inspectable on the
+    // viewer's own seat.
     for (let i = 0; i < this.players.length; i += 1) {
       if (!this.playerAreaActiveAtTable[i]) {
         continue;
       }
-      if (this.players[i].getCostCard() === card) {
+      const player = this.players[i];
+      if (player.getCostCard() === card) {
+        return true;
+      }
+      if (player.ownsBonusCard(card)) {
         return true;
       }
     }

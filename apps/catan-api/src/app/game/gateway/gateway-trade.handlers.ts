@@ -10,14 +10,14 @@ import {
   TradeRejectPayload,
   TradeWithdrawCounterPayload,
 } from '@catan/api-interfaces';
-import { TradeSocketFacade } from '../trade/trade-socket.facade';
+import { TradeGatewayService } from '../trade/trade-gateway.service';
 import { GatewaySocketSessionService } from './gateway-common.services';
 
 @Injectable()
 export class GatewayTradeHandlers {
   public constructor(
     private readonly sessions: GatewaySocketSessionService,
-    private readonly tradeSocket: TradeSocketFacade,
+    private readonly tradeSocket: TradeGatewayService,
   ) {}
 
   public bankTrade(server: Server, client: Socket, payload: BankTradePayload): void {

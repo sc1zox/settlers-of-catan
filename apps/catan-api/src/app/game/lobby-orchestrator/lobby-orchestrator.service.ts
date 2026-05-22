@@ -135,17 +135,16 @@ export class LobbyOrchestratorService {
     if (lobby.fsm.getPhase() !== GamePhase.Finished) {
       return;
     }
-    if (lobby.summaryEntryTimer !== null) {
+    if (lobby.timers.isSummaryEntryPending()) {
       return;
     }
     this.logger.log(`scheduling Summary entry for ${lobby.lobbyCode} in ${SUMMARY_ENTRY_DELAY_MS}ms`);
-    lobby.startSummaryEntryHold(SUMMARY_ENTRY_DELAY_MS, () => {
+    lobby.timers.startSummaryEntryHold(SUMMARY_ENTRY_DELAY_MS, () => {
       this.enterSummary(lobby, server);
     });
   }
 
   private enterSummary(lobby: LobbyRuntime, server: Server): void {
-    lobby.summaryEntryTimer = null;
     if (lobby.fsm.getPhase() !== GamePhase.Finished) {
       return;
     }
@@ -153,14 +152,13 @@ export class LobbyOrchestratorService {
     this.logger.log(
       `lobby ${lobby.lobbyCode} entered Summary; hard end in ${SUMMARY_HARD_END_DELAY_MS}ms`,
     );
-    lobby.startSummaryHardEndHold(SUMMARY_HARD_END_DELAY_MS, () => {
+    lobby.timers.startSummaryHardEndHold(SUMMARY_HARD_END_DELAY_MS, () => {
       void this.onSummaryHardEnd(lobby, server);
     });
     this.lobby.broadcastFullState(server, lobby);
   }
 
   private async onSummaryHardEnd(lobby: LobbyRuntime, server: Server): Promise<void> {
-    lobby.summaryHardEndTimer = null;
     if (lobby.fsm.getPhase() !== GamePhase.Summary) {
       return;
     }
@@ -181,7 +179,7 @@ export class LobbyOrchestratorService {
     if (lobby.isTearingDown) {
       throw new BadRequestException(ActionRejectCode.LobbyAlreadyExists);
     }
-    lobby.clearEmptyLobbyCleanupTimer();
+    lobby.timers.clearEmptyLobbyCleanupTimer();
     const player = lobby.findPlayerByToken(sessionToken);
     if (!player) {
       let seat;
@@ -217,7 +215,7 @@ export class LobbyOrchestratorService {
         },
       };
     }
-    lobby.clearDisconnectTimer(player);
+    lobby.timers.clearDisconnectTimer(player);
     player.socketId = socketId;
     player.disconnectGraceExpiresAt = null;
     player.awaitingAdminDecision = false;

@@ -291,6 +291,7 @@
 
 .hud__trade-button {
   position: relative;
+  pointer-events: auto;
 }
 
 .hud__trade-button--alert {

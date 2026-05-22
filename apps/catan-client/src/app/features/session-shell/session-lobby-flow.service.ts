@@ -6,7 +6,6 @@ import { firstValueFrom } from 'rxjs';
 import {
   ClientStorageKey,
   GamePhase,
-  LiveKitCredentialsPayload,
   isLobbyCodeValid,
   normalizeLobbyCode,
 } from '@catan/api-interfaces';
@@ -188,50 +187,17 @@ export class SessionLobbyFlowService {
     this.uiStep.set(LobbyUiStep.SignIn);
   }
 
-  public beginWebcamPrimingIfEnabledAndSecure(): void {
-    if (!this.gameSettings.webcamEnabled()) {
-      return;
-    }
-    if (typeof globalThis.isSecureContext === 'boolean' && !globalThis.isSecureContext) {
-      return;
-    }
-    this.liveKit.beginLocalVideoCaptureFromUserGesture();
-  }
-
   public onWebcamEnabledChange(inputChecked: boolean): void {
     this.gameSettings.setWebcamEnabled(inputChecked);
     if (inputChecked) {
-      this.beginWebcamPrimingIfEnabledAndSecure();
+      this.liveKit.tryPrime();
     } else {
       void this.liveKit.abandonPrimedLocalVideoCapture();
     }
   }
 
-  private blockLobbyJoinIfWebcamRequiresSecureContext(): boolean {
-    if (!this.gameSettings.webcamEnabled()) {
-      return true;
-    }
-    if (typeof globalThis.isSecureContext === 'boolean' && !globalThis.isSecureContext) {
-      this.shellFeedback.setFeedback(
-        UiFeedbackTone.Error,
-        this.translate.instant(marker('shell.webcamInsecureContext')),
-      );
-      return false;
-    }
-    return true;
-  }
-
-  private connectLiveKitInBackground(credentials: LiveKitCredentialsPayload): void {
-    void this.liveKit.connect(credentials).catch(() => {
-      this.shellFeedback.setFeedback(
-        UiFeedbackTone.Info,
-        this.translate.instant(marker('shell.liveKitConnectFailed')),
-      );
-    });
-  }
-
   private async runStartSession(normalizedDisplayName: string): Promise<void> {
-    this.beginWebcamPrimingIfEnabledAndSecure();
+    this.liveKit.tryPrime();
     let sid = this.playerSession.sessionId();
     if (sid.length === 0) {
       await this.playerSession.ensureReady();
@@ -275,7 +241,11 @@ export class SessionLobbyFlowService {
       );
       return;
     }
-    if (!this.blockLobbyJoinIfWebcamRequiresSecureContext()) {
+    if (this.liveKit.canJoinWithWebcam() === 'insecureContext') {
+      this.shellFeedback.setFeedback(
+        UiFeedbackTone.Error,
+        this.translate.instant(marker('shell.webcamInsecureContext')),
+      );
       return;
     }
     this.joinInProgress.set(true);
@@ -301,7 +271,12 @@ export class SessionLobbyFlowService {
         }),
       );
       if (joined.liveKit !== undefined) {
-        this.connectLiveKitInBackground(joined.liveKit);
+        void this.liveKit.connect(joined.liveKit).catch(() => {
+          this.shellFeedback.setFeedback(
+            UiFeedbackTone.Info,
+            this.translate.instant(marker('shell.liveKitConnectFailed')),
+          );
+        });
       }
     } catch (error: unknown) {
       void this.liveKit.abandonPrimedLocalVideoCapture();
@@ -334,7 +309,11 @@ export class SessionLobbyFlowService {
       );
       return;
     }
-    if (!this.blockLobbyJoinIfWebcamRequiresSecureContext()) {
+    if (this.liveKit.canJoinWithWebcam() === 'insecureContext') {
+      this.shellFeedback.setFeedback(
+        UiFeedbackTone.Error,
+        this.translate.instant(marker('shell.webcamInsecureContext')),
+      );
       return;
     }
     this.joinInProgress.set(true);
@@ -356,7 +335,12 @@ export class SessionLobbyFlowService {
         }),
       );
       if (joined.liveKit !== undefined) {
-        this.connectLiveKitInBackground(joined.liveKit);
+        void this.liveKit.connect(joined.liveKit).catch(() => {
+          this.shellFeedback.setFeedback(
+            UiFeedbackTone.Info,
+            this.translate.instant(marker('shell.liveKitConnectFailed')),
+          );
+        });
       }
     } catch (error: unknown) {
       void this.liveKit.abandonPrimedLocalVideoCapture();

@@ -13,7 +13,6 @@ import {
   StartLobbyPayload,
 } from '@catan/api-interfaces';
 import { GameService } from '../core/game.service';
-import { LobbySocketFacade } from '../match-flow/lobby-socket.facade';
 import { ReconnectService } from '../reconnect/reconnect.service';
 import { GatewaySocketSessionService } from './gateway-common.services';
 
@@ -22,7 +21,6 @@ export class GatewayLobbyHandlers {
   public constructor(
     private readonly gameService: GameService,
     private readonly sessions: GatewaySocketSessionService,
-    private readonly lobbySocket: LobbySocketFacade,
     private readonly reconnect: ReconnectService,
   ) {}
 
@@ -73,7 +71,7 @@ export class GatewayLobbyHandlers {
 
   public startLobby(server: Server, client: Socket, payload: StartLobbyPayload): void {
     const sessionToken = this.sessions.requireSessionToken(client);
-    this.lobbySocket.startLobby(payload.lobbyId, sessionToken, server);
+    this.gameService.startLobby(payload.lobbyId, sessionToken, server);
   }
 
   public fillLobbyWithBots(
@@ -82,7 +80,7 @@ export class GatewayLobbyHandlers {
     payload: FillLobbyWithBotsPayload,
   ): void {
     const sessionToken = this.sessions.requireSessionToken(client);
-    this.lobbySocket.fillLobbyWithBots(payload.lobbyId, sessionToken, server);
+    this.gameService.fillLobbyWithBots(payload.lobbyId, sessionToken, server);
   }
 
   public kickAndReplaceWithBot(

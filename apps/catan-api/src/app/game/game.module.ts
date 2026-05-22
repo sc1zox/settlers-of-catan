@@ -1,9 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BuildActionsModule } from './build/build-actions.module';
-import { BuildSocketFacade } from './build/build-socket.facade';
 import { DemoBotModule } from './demo-bot/demo-bot.module';
 import { DevCardsModule } from './dev-cards/dev-cards.module';
-import { DevCardsSocketFacade } from './dev-cards/dev-cards-socket.facade';
 import { EconomyModule } from './economy/economy.module';
 import { GameActionValidationModule } from './validation/game-action-validation.module';
 import { GameGateway } from './gateway/game.gateway';
@@ -20,13 +18,10 @@ import { GameService } from './core/game.service';
 import { LobbyModule } from './lobby/lobby.module';
 import { LobbyOrchestratorModule } from './lobby-orchestrator/lobby-orchestrator.module';
 import { MatchFlowModule } from './match-flow/match-flow.module';
-import { LobbySocketFacade } from './match-flow/lobby-socket.facade';
-import { TurnSocketFacade } from './match-flow/turn-socket.facade';
 import { ReconnectModule } from './reconnect/reconnect.module';
 import { RobberModule } from './robber/robber.module';
-import { RobberSocketFacade } from './robber/robber-socket.facade';
 import { SocketConnectionRegistry } from './gateway/socket-connection.registry';
-import { TradeSocketFacade } from './trade/trade-socket.facade';
+import { TradeGatewayService } from './trade/trade-gateway.service';
 import { TradeModule } from './trade/trade.module';
 import { TurnFlowModule } from './turn/turn-flow.module';
 
@@ -49,7 +44,7 @@ import { TurnFlowModule } from './turn/turn-flow.module';
     GameGateway,
     GameService,
     SocketConnectionRegistry,
-    TradeSocketFacade,
+    TradeGatewayService,
     GameGatewayExceptionFilter,
     GatewayAuthService,
     GatewayActionRejectService,
@@ -57,11 +52,6 @@ import { TurnFlowModule } from './turn/turn-flow.module';
     GatewayLobbyHandlers,
     GatewayGameplayHandlers,
     GatewayTradeHandlers,
-    BuildSocketFacade,
-    RobberSocketFacade,
-    LobbySocketFacade,
-    TurnSocketFacade,
-    DevCardsSocketFacade,
   ],
 })
 export class GameModule {}

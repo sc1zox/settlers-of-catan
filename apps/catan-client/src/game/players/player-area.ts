@@ -2,11 +2,11 @@ import { Group, MeshStandardMaterial, Object3D, Quaternion, Vector3 } from 'thre
 import { BonusAwardKind, BuildKind } from '@catan/api-interfaces';
 import { DevKind, ResourceKind } from '../cards/textures';
 import { Card } from '../cards/card';
-import { createBonusCard } from '../cards/bonus-card';
 import { createCostCard } from '../cards/cost-card';
 import { PlayerColor, playerColorLabel } from './colors';
 import { ArsenalPlacedPieces, PlayerAreaArsenal } from './player-area-arsenal';
 import { PlayerAreaAvatar } from './player-area-avatar';
+import { PlayerAreaBonusCards } from './player-area-bonus-cards';
 import { PlayerAreaHand } from './player-area-hand';
 import { PlayerAreaSelfPad } from './player-area-self-pad';
 
@@ -37,11 +37,9 @@ export class PlayerArea {
   private readonly hand: PlayerAreaHand;
   private readonly avatar: PlayerAreaAvatar;
   private readonly selfPad: PlayerAreaSelfPad;
+  private readonly bonusCardsKit: PlayerAreaBonusCards;
 
   private readonly ownedMaterials: MeshStandardMaterial[] = [];
-  /** Materials backing currently-displayed bonus cards — disposed on remove. */
-  private readonly bonusMaterials = new Map<BonusAwardKind, MeshStandardMaterial[]>();
-  private readonly bonusCards = new Map<BonusAwardKind, Card>();
   private _cards: Card[];
   private presenceDimmed = false;
 
@@ -90,6 +88,12 @@ export class PlayerArea {
     );
 
     this.hand = new PlayerAreaHand(this.group, options.seat, this.tableY, this.cardRowZ);
+    this.bonusCardsKit = new PlayerAreaBonusCards({
+      group: this.group,
+      seat: options.seat,
+      tableTopY: this.tableY,
+      cardRowZ: this.cardRowZ,
+    });
     this._cards = [this.costCard];
 
     this.setHand(options.resourceHand, options.devHand.length);
@@ -116,9 +120,7 @@ export class PlayerArea {
     this.selfPad.setPresenceDimmed(dimmed);
     this.hand.setPresenceDimmed(dimmed);
     this.costCard.setPresenceDimmed(dimmed);
-    for (const bonus of this.bonusCards.values()) {
-      bonus.setPresenceDimmed(dimmed);
-    }
+    this.bonusCardsKit.setPresenceDimmed(dimmed);
     this.arsenalKit.setPresenceDimmed(dimmed);
   }
 
@@ -207,51 +209,21 @@ export class PlayerArea {
    * fly-in animation can drive it directly via {@link getBonusCard}.
    */
   public setBonusCard(kind: BonusAwardKind, owned: boolean): Card | null {
-    if (owned) {
-      const existing = this.bonusCards.get(kind);
-      if (existing) {
-        return existing;
-      }
-      const bonusThickness = 0.04;
-      const bonus = createBonusCard({
-        kind,
-        width: 1.0,
-        depth: 0.7,
-        thickness: bonusThickness,
-      });
-      bonus.card.setGroupKey(`bonus-${this.info.seat}-${kind}`);
-      const restPos = this.bonusRestPosition(kind, bonusThickness);
-      const restQuat = this.bonusRestQuaternion(kind);
-      bonus.card.setBasePose(restPos, restQuat);
-      this.group.add(bonus.card.mesh);
-      this.bonusCards.set(kind, bonus.card);
-      this.bonusMaterials.set(kind, [...bonus.materials]);
-      bonus.card.setPresenceDimmed(this.presenceDimmed);
-      this.refreshCardList();
-      return bonus.card;
-    }
-    const existing = this.bonusCards.get(kind);
-    if (!existing) {
-      return null;
-    }
-    existing.setMode('rest');
-    this.group.remove(existing.mesh);
-    existing.dispose();
-    this.bonusCards.delete(kind);
-    const mats = this.bonusMaterials.get(kind);
-    if (mats) {
-      for (let i = 0; i < mats.length; i += 1) {
-        mats[i].map?.dispose();
-        mats[i].dispose();
-      }
-      this.bonusMaterials.delete(kind);
-    }
+    const card = this.bonusCardsKit.set(kind, owned);
     this.refreshCardList();
-    return null;
+    return card;
   }
 
   public getBonusCard(kind: BonusAwardKind): Card | undefined {
-    return this.bonusCards.get(kind);
+    return this.bonusCardsKit.getCard(kind);
+  }
+
+  public getBonusCards(): readonly Card[] {
+    return this.bonusCardsKit.listCards();
+  }
+
+  public ownsBonusCard(card: Card): boolean {
+    return this.bonusCardsKit.ownsCard(card);
   }
 
   /**
@@ -272,34 +244,13 @@ export class PlayerArea {
     return out.applyMatrix4(this.group.matrixWorld);
   }
 
-  /**
-   * Layout slots between the cost card (X ≈ -5.2) and the hand (X ≈ -2.7) so
-   * both award cards fit without overlapping either neighbour, and rotate with
-   * the seat group.
-   */
-  private bonusRestPosition(kind: BonusAwardKind, thickness: number): Vector3 {
-    const slotX = kind === BonusAwardKind.LongestRoad ? -4.6 : -3.45;
-    return new Vector3(slotX, this.tableY + thickness / 2 + 0.005, this.cardRowZ);
-  }
-
-  private bonusRestQuaternion(kind: BonusAwardKind): Quaternion {
-    // Flip the card face-up (face material is on the -Y face) and add a tiny
-    // seat-specific yaw jitter so the two awards don't look machine-stamped.
-    const yaw = kind === BonusAwardKind.LongestRoad ? 0.05 : -0.06;
-    return new Quaternion()
-      .setFromAxisAngle(new Vector3(1, 0, 0), Math.PI)
-      .multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), yaw));
-  }
-
   private refreshCardList(): void {
-    this._cards = [this.costCard, ...this.bonusCards.values(), ...this.hand.cards];
+    this._cards = [this.costCard, ...this.bonusCardsKit.listCards(), ...this.hand.cards];
   }
 
   public update(dt: number): void {
     this.costCard.update(dt);
-    for (const bonus of this.bonusCards.values()) {
-      bonus.update(dt);
-    }
+    this.bonusCardsKit.update(dt);
     this.hand.update(dt);
     this.avatar.update(dt);
     this.arsenalKit.update(dt);
@@ -313,17 +264,7 @@ export class PlayerArea {
       m.map?.dispose();
       m.dispose();
     }
-    for (const card of this.bonusCards.values()) {
-      card.dispose();
-    }
-    for (const mats of this.bonusMaterials.values()) {
-      for (let i = 0; i < mats.length; i += 1) {
-        mats[i].map?.dispose();
-        mats[i].dispose();
-      }
-    }
-    this.bonusCards.clear();
-    this.bonusMaterials.clear();
+    this.bonusCardsKit.dispose();
     this.hand.dispose();
     this.costCard.dispose();
     this.avatar.dispose();

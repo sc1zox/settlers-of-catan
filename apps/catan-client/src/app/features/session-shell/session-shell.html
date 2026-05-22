@@ -1,19 +1,24 @@
 <main class="shell">
-  <app-game-canvas
-    class="canvas-layer"
-    [buildMode]="ui.buildFlow.buildMode()"
-    [freeRoadMode]="ui.buildFlow.freeRoadMode()"
-    [robberMode]="ui.robberMode()"
-    [diceRollClickEnabled]="ui.lobbyGameUi.canRollDice() && !ui.spectatorCamService.mode()"
-    [devCardPlayable]="ui.devCards.canPlayDevCard()"
-    [uiChromeHidden]="ui.spectatorCamService.mode()"
-    (arsenalBuild)="ui.buildFlow.onArsenalBuild($event)"
-    (buildSpotPicked)="ui.buildFlow.onBuildSpotPicked($event)"
-    (robberTilePicked)="ui.robberFlow.onRobberTilePicked($event)"
-    (buildModeCancelled)="ui.buildFlow.onBuildModeCancelled()"
-    (playDevCard)="ui.devOverlay.onPlayDevCard($event)"
-    (rollDiceRequested)="ui.rollDice()"
-  />
+  @if (
+    ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.Lobby ||
+    ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.InGame
+  ) {
+    <app-game-canvas
+      class="canvas-layer"
+      [buildMode]="ui.buildFlow.buildMode()"
+      [freeRoadMode]="ui.buildFlow.freeRoadMode()"
+      [robberMode]="ui.robberMode()"
+      [diceRollClickEnabled]="ui.lobbyGameUi.canRollDice() && !ui.spectatorCamService.mode()"
+      [devCardPlayable]="ui.devCards.canPlayDevCard()"
+      [uiChromeHidden]="ui.spectatorCamService.mode()"
+      (arsenalBuild)="ui.buildFlow.onArsenalBuild($event)"
+      (buildSpotPicked)="ui.buildFlow.onBuildSpotPicked($event)"
+      (robberTilePicked)="ui.robberFlow.onRobberTilePicked($event)"
+      (buildModeCancelled)="ui.buildFlow.onBuildModeCancelled()"
+      (playDevCard)="ui.devOverlay.onPlayDevCard($event)"
+      (rollDiceRequested)="ui.rollDice()"
+    />
+  }
   <section class="ui-layer">
     @if (
       ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.Lobby ||

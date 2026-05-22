@@ -95,7 +95,7 @@ export class ReconnectService {
       return;
     }
     await client.join(formatSocketIoLobbyRoomId(lobby.lobbyId));
-    lobby.clearDisconnectTimer(player);
+    lobby.timers.clearDisconnectTimer(player);
     player.socketId = client.id;
     player.disconnectGraceExpiresAt = null;
     player.awaitingAdminDecision = false;
@@ -120,7 +120,7 @@ export class ReconnectService {
     }
     player.disconnectGraceExpiresAt = Date.now() + PLAYER_DISCONNECT_GRACE_MS;
     player.awaitingAdminDecision = false;
-    lobby.startDisconnectHold(player, PLAYER_DISCONNECT_GRACE_MS, () => {
+    lobby.timers.startDisconnectHold(player, PLAYER_DISCONNECT_GRACE_MS, () => {
       this.onDisconnectGraceExpired(lobby, player, server);
     });
     this.lobby.broadcastFullState(server, lobby);
@@ -159,7 +159,7 @@ export class ReconnectService {
     target.socketId = null;
     target.disconnectGraceExpiresAt = null;
     target.awaitingAdminDecision = false;
-    lobby.clearDisconnectTimer(target);
+    lobby.timers.clearDisconnectTimer(target);
     if (wasAdmin) {
       lobby.adminSessionToken = pickFallbackHumanAdminSessionToken(lobby);
     }
@@ -179,16 +179,16 @@ export class ReconnectService {
    */
   public async maybeCloseVideoLobby(lobby: LobbyRuntime): Promise<void> {
     if (this.lobby.countConnectedHumans(lobby) > 0) {
-      lobby.clearEmptyLobbyCleanupTimer();
+      lobby.timers.clearEmptyLobbyCleanupTimer();
       return;
     }
-    if (lobby.emptyLobbyCleanupTimer !== null || lobby.isTearingDown) {
+    if (lobby.timers.isEmptyLobbyCleanupPending() || lobby.isTearingDown) {
       return;
     }
     this.logger.log(
       `lobby ${lobby.lobbyCode} has no connected humans, scheduling cleanup in ${EMPTY_LOBBY_CLEANUP_DELAY_MS}ms`,
     );
-    lobby.startEmptyLobbyCleanupHold(EMPTY_LOBBY_CLEANUP_DELAY_MS, () => {
+    lobby.timers.startEmptyLobbyCleanupHold(EMPTY_LOBBY_CLEANUP_DELAY_MS, () => {
       void this.finalizeEmptyLobbyCleanup(lobby);
     });
   }
@@ -211,7 +211,6 @@ export class ReconnectService {
   }
 
   private async finalizeEmptyLobbyCleanup(lobby: LobbyRuntime): Promise<void> {
-    lobby.emptyLobbyCleanupTimer = null;
     if (this.lobby.countConnectedHumans(lobby) > 0) {
       return;
     }

@@ -14,45 +14,39 @@ import {
   RobberDiscardPayload,
   RollDicePayload,
 } from '@catan/api-interfaces';
-import { BuildSocketFacade } from '../build/build-socket.facade';
-import { DevCardsSocketFacade } from '../dev-cards/dev-cards-socket.facade';
-import { RobberSocketFacade } from '../robber/robber-socket.facade';
-import { TurnSocketFacade } from '../match-flow/turn-socket.facade';
+import { GameService } from '../core/game.service';
 import { GatewaySocketSessionService } from './gateway-common.services';
 
 @Injectable()
 export class GatewayGameplayHandlers {
   public constructor(
     private readonly sessions: GatewaySocketSessionService,
-    private readonly buildSocket: BuildSocketFacade,
-    private readonly robberSocket: RobberSocketFacade,
-    private readonly turnSocket: TurnSocketFacade,
-    private readonly devCardsSocket: DevCardsSocketFacade,
+    private readonly gameService: GameService,
   ) {}
 
   public buildSettlement(server: Server, client: Socket, payload: BuildSettlementPayload): void {
     const sessionToken = this.sessions.requireSessionToken(client);
-    this.buildSocket.buildSettlement(payload.lobbyId, sessionToken, payload.vertexId, server);
+    this.gameService.buildSettlement(payload.lobbyId, sessionToken, payload.vertexId, server);
   }
 
   public buildRoad(server: Server, client: Socket, payload: BuildRoadPayload): void {
     const sessionToken = this.sessions.requireSessionToken(client);
-    this.buildSocket.buildRoad(payload.lobbyId, sessionToken, payload.edgeId, server);
+    this.gameService.buildRoad(payload.lobbyId, sessionToken, payload.edgeId, server);
   }
 
   public buildCity(server: Server, client: Socket, payload: BuildCityPayload): void {
     const sessionToken = this.sessions.requireSessionToken(client);
-    this.buildSocket.buildCity(payload.lobbyId, sessionToken, payload.vertexId, server);
+    this.gameService.buildCity(payload.lobbyId, sessionToken, payload.vertexId, server);
   }
 
   public buyDevCard(server: Server, client: Socket, payload: BuyDevCardPayload): void {
     const sessionToken = this.sessions.requireSessionToken(client);
-    this.devCardsSocket.buyDevCard(payload.lobbyId, sessionToken, server);
+    this.gameService.buyDevCard(payload.lobbyId, sessionToken, server);
   }
 
   public playKnight(server: Server, client: Socket, payload: PlayKnightPayload): void {
     const sessionToken = this.sessions.requireSessionToken(client);
-    this.robberSocket.playKnight(
+    this.gameService.playKnight(
       payload.lobbyId,
       sessionToken,
       payload.q,
@@ -64,12 +58,12 @@ export class GatewayGameplayHandlers {
 
   public playMonopoly(server: Server, client: Socket, payload: PlayMonopolyPayload): void {
     const sessionToken = this.sessions.requireSessionToken(client);
-    this.devCardsSocket.playMonopoly(payload.lobbyId, sessionToken, payload.resource, server);
+    this.gameService.playMonopoly(payload.lobbyId, sessionToken, payload.resource, server);
   }
 
   public playYearOfPlenty(server: Server, client: Socket, payload: PlayYearOfPlentyPayload): void {
     const sessionToken = this.sessions.requireSessionToken(client);
-    this.devCardsSocket.playYearOfPlenty(
+    this.gameService.playYearOfPlenty(
       payload.lobbyId,
       sessionToken,
       payload.first,
@@ -80,7 +74,7 @@ export class GatewayGameplayHandlers {
 
   public playRoadBuilding(server: Server, client: Socket, payload: PlayRoadBuildingPayload): void {
     const sessionToken = this.sessions.requireSessionToken(client);
-    this.buildSocket.playRoadBuilding(
+    this.gameService.playRoadBuilding(
       payload.lobbyId,
       sessionToken,
       payload.firstEdgeId,
@@ -91,17 +85,17 @@ export class GatewayGameplayHandlers {
 
   public rollDice(server: Server, client: Socket, payload: RollDicePayload): void {
     const sessionToken = this.sessions.requireSessionToken(client);
-    this.turnSocket.rollDice(payload.lobbyId, sessionToken, server);
+    this.gameService.rollDice(payload.lobbyId, sessionToken, server);
   }
 
   public robberDiscard(server: Server, client: Socket, payload: RobberDiscardPayload): void {
     const sessionToken = this.sessions.requireSessionToken(client);
-    this.robberSocket.submitRobberDiscard(payload.lobbyId, sessionToken, payload.discard, server);
+    this.gameService.submitRobberDiscard(payload.lobbyId, sessionToken, payload.discard, server);
   }
 
   public moveRobber(server: Server, client: Socket, payload: MoveRobberPayload): void {
     const sessionToken = this.sessions.requireSessionToken(client);
-    this.robberSocket.moveRobber(
+    this.gameService.moveRobber(
       payload.lobbyId,
       sessionToken,
       payload.q,
@@ -113,6 +107,6 @@ export class GatewayGameplayHandlers {
 
   public endTurn(server: Server, client: Socket, payload: EndTurnPayload): void {
     const sessionToken = this.sessions.requireSessionToken(client);
-    this.turnSocket.endTurn(payload.lobbyId, sessionToken, server);
+    this.gameService.endTurn(payload.lobbyId, sessionToken, server);
   }
 }

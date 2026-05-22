@@ -1,6 +1,7 @@
 import { ActionRejectCode, PlayerSeat, ResourceType, TileType } from '@catan/api-interfaces';
 import { collectRobberVictimSeats } from '@catan/shared-game-field';
 import { LobbyPlayerSlot, LobbyRuntime } from '../lobby/lobby-runtime';
+import { countResourceCards } from '../utils/public-player-resources.util';
 
 export function applyRobberMove(
   lobby: LobbyRuntime,
@@ -46,7 +47,7 @@ function collectRobberVictims(
     lobby.settlements.map((s) => ({ seat: s.seat, vertexId: s.vertexId })),
     lobby.players.map((p) => ({
       seat: p.seat,
-      totalResourceCards: countTotalResources(p),
+      totalResourceCards: countResourceCards(p),
     })),
     actorSeat,
     q,
@@ -63,15 +64,6 @@ function collectRobberVictims(
   return victims;
 }
 
-function countTotalResources(player: LobbyPlayerSlot): number {
-  const keys = Object.values(ResourceType);
-  let total = 0;
-  for (let i = 0; i < keys.length; i += 1) {
-    const key = keys[i];
-    total += player.resources[key] ?? 0;
-  }
-  return total;
-}
 
 function stealRandomResource(from: LobbyPlayerSlot, to: LobbyPlayerSlot): void {
   const owned: ResourceType[] = [];

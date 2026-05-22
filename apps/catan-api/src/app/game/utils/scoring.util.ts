@@ -47,11 +47,28 @@ export function applyPostActionScoring(lobby: LobbyRuntime): void {
   }
 }
 
+/**
+ * Largest Army holder requires ≥3 played knights and must be strictly beaten
+ * to lose the bonus — ties leave the incumbent in place (standard Catan rule).
+ * `lobby.players` is in join order, not seat order, so we cannot rely on
+ * iteration order alone: seed the threshold with the current holder's count.
+ */
 function recomputeLargestArmy(lobby: LobbyRuntime): void {
+  const minToHold = 3;
   let bestSeat: PlayerSeat | null = null;
-  let bestCount = 2;
+  let bestCount = minToHold - 1;
+  if (lobby.largestArmySeat !== null) {
+    const holder = lobby.findPlayerBySeat(lobby.largestArmySeat);
+    if (holder && holder.playedKnights >= minToHold) {
+      bestSeat = lobby.largestArmySeat;
+      bestCount = holder.playedKnights;
+    }
+  }
   for (let i = 0; i < lobby.players.length; i += 1) {
     const player = lobby.players[i];
+    if (player.seat === bestSeat) {
+      continue;
+    }
     if (player.playedKnights > bestCount) {
       bestCount = player.playedKnights;
       bestSeat = player.seat;
@@ -64,15 +81,34 @@ function recomputeLargestArmy(lobby: LobbyRuntime): void {
   }
 }
 
+/**
+ * Longest Road holder requires ≥5 connected segments. Unlike Largest Army the
+ * holder's length CAN drop (opponent splits the chain with a settlement), so
+ * we recompute every seat's length first, then apply the "ties leave the
+ * incumbent in place" rule against the freshly-computed numbers.
+ */
 function recomputeLongestRoad(lobby: LobbyRuntime): void {
-  let bestSeat: PlayerSeat | null = null;
-  let bestLength = 4;
+  const minToHold = 5;
   for (let i = 0; i < lobby.players.length; i += 1) {
     const player = lobby.players[i];
-    const length = computeLongestRoadForSeat(lobby, player.seat);
-    player.longestRoadLength = length;
-    if (length > bestLength) {
-      bestLength = length;
+    player.longestRoadLength = computeLongestRoadForSeat(lobby, player.seat);
+  }
+  let bestSeat: PlayerSeat | null = null;
+  let bestLength = minToHold - 1;
+  if (lobby.longestRoadSeat !== null) {
+    const holder = lobby.findPlayerBySeat(lobby.longestRoadSeat);
+    if (holder && holder.longestRoadLength >= minToHold) {
+      bestSeat = lobby.longestRoadSeat;
+      bestLength = holder.longestRoadLength;
+    }
+  }
+  for (let i = 0; i < lobby.players.length; i += 1) {
+    const player = lobby.players[i];
+    if (player.seat === bestSeat) {
+      continue;
+    }
+    if (player.longestRoadLength > bestLength) {
+      bestLength = player.longestRoadLength;
       bestSeat = player.seat;
     }
   }

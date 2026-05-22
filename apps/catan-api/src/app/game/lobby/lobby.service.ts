@@ -8,6 +8,7 @@ import {
   normalizeLobbyCode,
   PlayerSeat,
   type BonusAwardedPayload,
+  type HarborVertexSet,
   type LobbyFullStatePayload,
 } from '@catan/api-interfaces';
 import { Server } from 'socket.io';
@@ -19,7 +20,7 @@ import {
   countResourceCards,
   emptyPublicResourceRecord,
 } from '../utils/public-player-resources.util';
-import { resolveHarborRates } from '../utils/harbor-rate.util';
+import { computeHarborVertexSets, resolveHarborRates } from '../utils/harbor-rate.util';
 import { getTotalVictoryPoints } from '../utils/scoring.util';
 import {
   countRemainingCitiesForSeat,
@@ -32,6 +33,11 @@ export class LobbyService {
   private readonly logger = new Logger(LobbyService.name);
   private readonly lobbies = new Map<string, LobbyRuntime>();
   private readonly canonicalIdByLobbyCode = new Map<string, string>();
+  private readonly bonusAnnounceState = new Map<string, {
+    longestRoad: PlayerSeat | null;
+    largestArmy: PlayerSeat | null;
+  }>();
+  private readonly harborCache = new Map<string, HarborVertexSet[]>();
 
   public constructor(
     private readonly validation: GameActionValidationService,
@@ -91,6 +97,8 @@ export class LobbyService {
   public removeLobby(canonicalLobbyId: string, lobbyCode: string): void {
     this.lobbies.delete(canonicalLobbyId);
     this.canonicalIdByLobbyCode.delete(lobbyCode);
+    this.bonusAnnounceState.delete(canonicalLobbyId);
+    this.harborCache.delete(canonicalLobbyId);
   }
 
   public findLobbyByPlayerToken(
@@ -107,6 +115,11 @@ export class LobbyService {
 
   public toFullState(lobby: LobbyRuntime, viewerSessionToken: string): LobbyFullStatePayload {
     this.ensureLobbyAdminConsistent(lobby);
+    let harborSets = this.harborCache.get(lobby.lobbyId);
+    if (harborSets === undefined) {
+      harborSets = computeHarborVertexSets(lobby);
+      this.harborCache.set(lobby.lobbyId, harborSets);
+    }
     const players = lobby.players.map((p) => {
       const isSelf = p.sessionToken === viewerSessionToken;
       return {
@@ -124,7 +137,7 @@ export class LobbyService {
         visibleVictoryPoints: p.visibleVictoryPoints,
         totalVictoryPoints: getTotalVictoryPoints(p),
         longestRoadLength: p.longestRoadLength,
-        harborRates: resolveHarborRates(lobby, p.seat),
+        harborRates: resolveHarborRates(lobby, p.seat, harborSets),
         remainingPieces: {
           roads: countRemainingRoadsForSeat(lobby, p.seat),
           settlements: countRemainingSettlementsForSeat(lobby, p.seat),
@@ -265,10 +278,12 @@ export class LobbyService {
    */
   private announceBonusAwardTransitions(server: Server, lobby: LobbyRuntime): void {
     const room = formatSocketIoLobbyRoomId(lobby.lobbyId);
-    if (
-      lobby.longestRoadSeat !== null &&
-      lobby.longestRoadSeat !== lobby.lastAnnouncedLongestRoadSeat
-    ) {
+    let state = this.bonusAnnounceState.get(lobby.lobbyId);
+    if (state === undefined) {
+      state = { longestRoad: null, largestArmy: null };
+      this.bonusAnnounceState.set(lobby.lobbyId, state);
+    }
+    if (lobby.longestRoadSeat !== null && lobby.longestRoadSeat !== state.longestRoad) {
       const payload: BonusAwardedPayload = {
         lobbyId: lobby.lobbyId,
         kind: BonusAwardKind.LongestRoad,
@@ -276,11 +291,8 @@ export class LobbyService {
       };
       server.to(room).emit(GameSocketServerEvent.BonusAwarded, payload);
     }
-    lobby.lastAnnouncedLongestRoadSeat = lobby.longestRoadSeat;
-    if (
-      lobby.largestArmySeat !== null &&
-      lobby.largestArmySeat !== lobby.lastAnnouncedLargestArmySeat
-    ) {
+    state.longestRoad = lobby.longestRoadSeat;
+    if (lobby.largestArmySeat !== null && lobby.largestArmySeat !== state.largestArmy) {
       const payload: BonusAwardedPayload = {
         lobbyId: lobby.lobbyId,
         kind: BonusAwardKind.LargestArmy,
@@ -288,7 +300,7 @@ export class LobbyService {
       };
       server.to(room).emit(GameSocketServerEvent.BonusAwarded, payload);
     }
-    lobby.lastAnnouncedLargestArmySeat = lobby.largestArmySeat;
+    state.largestArmy = lobby.largestArmySeat;
   }
 
   private nonBotLobbyMembersHaveSockets(lobby: LobbyRuntime): boolean {

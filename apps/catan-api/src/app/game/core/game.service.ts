@@ -12,7 +12,7 @@ import {
 } from '@catan/api-interfaces';
 import { Server, Socket } from 'socket.io';
 import { BuildActionService } from '../build/build-action.service';
-import { DemoBotService } from '../demo-bot/demo-bot.service';
+import { DemoBotService, DemoMainGameCallbacks, DemoSetupBotCallbacks } from '../demo-bot/demo-bot.service';
 import { DevCardsService } from '../dev-cards/dev-cards.service';
 import { EconomyService } from '../economy/economy.service';
 import { LobbyRuntime } from '../lobby/lobby-runtime';
@@ -83,34 +83,7 @@ export class GameService {
   public broadcastFullState(server: Server, lobby: LobbyRuntime): void {
     this.lobby.broadcastFullState(server, lobby);
     this.lobbyOrchestrator.maybeScheduleSummaryEntry(lobby, server);
-    const lobbyId = lobby.lobbyId;
-    this.demoBots.afterLobbyBroadcast(lobbyId, server, {
-      getLobby: (id: string) => this.lobby.getLobby(id),
-      rollDice: (id, sessionToken, srv) => {
-        this.rollDice(id, sessionToken, srv);
-      },
-      completeTradingPhaseAndExpireOffers: (id, sessionToken, srv) => {
-        this.finishTrading(id, sessionToken, srv);
-      },
-      endTurn: (id, sessionToken, srv) => {
-        this.endTurn(id, sessionToken, srv);
-      },
-      submitRobberDiscard: (id, sessionToken, discard, srv) => {
-        this.submitRobberDiscard(id, sessionToken, discard, srv);
-      },
-      moveRobber: (id, sessionToken, q, r, victimSeat, srv) => {
-        this.moveRobber(id, sessionToken, q, r, victimSeat, srv);
-      },
-      buildSettlement: (id, sessionToken, vertexId, srv) => {
-        this.buildSettlement(id, sessionToken, vertexId, srv);
-      },
-      buildRoad: (id, sessionToken, edgeId, srv) => {
-        this.buildRoad(id, sessionToken, edgeId, srv);
-      },
-      buildCity: (id, sessionToken, vertexId, srv) => {
-        this.buildCity(id, sessionToken, vertexId, srv);
-      },
-    });
+    this.demoBots.afterLobbyBroadcast(lobby.lobbyId, server, this.buildMainGameCallbacks());
   }
 
   public async resumeSessionSocket(
@@ -138,15 +111,7 @@ export class GameService {
     const lobby = this.reconnect.kickAndReplaceWithBot(lobbyId, sessionToken, seat);
     this.broadcastFullState(server, lobby);
     // Setup phase needs its own autoplay drain hook (broadcastFullState only kicks the main-game drain).
-    this.demoBots.runDemoSetupAutoplay(lobby.lobbyId, server, {
-      getLobby: (id: string) => this.lobby.getLobby(id),
-      buildSettlement: (id, botSessionToken, vId, srv) => {
-        this.buildSettlement(id, botSessionToken, vId, srv);
-      },
-      buildRoad: (id, botSessionToken, eId, srv) => {
-        this.buildRoad(id, botSessionToken, eId, srv);
-      },
-    });
+    this.demoBots.runDemoSetupAutoplay(lobby.lobbyId, server, this.buildSetupAutoplayPort());
   }
 
   public buildSettlement(
@@ -166,25 +131,7 @@ export class GameService {
     this.lobby.assertLobbyOpen(lobby);
     this.buildActions.buildRoad(lobby, sessionToken, edgeId);
     this.broadcastFullState(server, lobby);
-    this.demoBots.runDemoSetupAutoplay(lobbyId, server, {
-      getLobby: (requestedLobbyId: string) => this.lobby.getLobby(requestedLobbyId),
-      buildSettlement: (
-        requestedLobbyId: string,
-        botSessionToken: string,
-        vId: string,
-        requestedServer: Server,
-      ) => {
-        this.buildSettlement(requestedLobbyId, botSessionToken, vId, requestedServer);
-      },
-      buildRoad: (
-        requestedLobbyId: string,
-        botSessionToken: string,
-        eId: string,
-        requestedServer: Server,
-      ) => {
-        this.buildRoad(requestedLobbyId, botSessionToken, eId, requestedServer);
-      },
-    });
+    this.demoBots.runDemoSetupAutoplay(lobbyId, server, this.buildSetupAutoplayPort());
   }
 
   public startLobby(lobbyId: string, sessionToken: string, server: Server): void {
@@ -193,25 +140,7 @@ export class GameService {
     this.lobby.ensureLobbyAdminConsistent(lobby);
     this.matchFlow.startLobby(lobby, sessionToken);
     this.broadcastFullState(server, lobby);
-    this.demoBots.runDemoSetupAutoplay(lobbyId, server, {
-      getLobby: (requestedLobbyId: string) => this.lobby.getLobby(requestedLobbyId),
-      buildSettlement: (
-        requestedLobbyId: string,
-        botSessionToken: string,
-        vertexId: string,
-        requestedServer: Server,
-      ) => {
-        this.buildSettlement(requestedLobbyId, botSessionToken, vertexId, requestedServer);
-      },
-      buildRoad: (
-        requestedLobbyId: string,
-        botSessionToken: string,
-        edgeId: string,
-        requestedServer: Server,
-      ) => {
-        this.buildRoad(requestedLobbyId, botSessionToken, edgeId, requestedServer);
-      },
-    });
+    this.demoBots.runDemoSetupAutoplay(lobbyId, server, this.buildSetupAutoplayPort());
   }
 
   public fillLobbyWithBots(lobbyId: string, sessionToken: string, server: Server): void {
@@ -353,6 +282,28 @@ export class GameService {
       receiveResource,
     );
     this.broadcastFullState(server, lobby);
+  }
+
+  private buildSetupAutoplayPort(): DemoSetupBotCallbacks {
+    return {
+      getLobby: (id: string) => this.lobby.getLobby(id),
+      buildSettlement: (id, token, vertexId, srv) => this.buildSettlement(id, token, vertexId, srv),
+      buildRoad: (id, token, edgeId, srv) => this.buildRoad(id, token, edgeId, srv),
+    };
+  }
+
+  private buildMainGameCallbacks(): DemoMainGameCallbacks {
+    return {
+      getLobby: (id: string) => this.lobby.getLobby(id),
+      rollDice: (id, token, srv) => this.rollDice(id, token, srv),
+      completeTradingPhaseAndExpireOffers: (id, token, srv) => this.finishTrading(id, token, srv),
+      endTurn: (id, token, srv) => this.endTurn(id, token, srv),
+      submitRobberDiscard: (id, token, discard, srv) => this.submitRobberDiscard(id, token, discard, srv),
+      moveRobber: (id, token, q, r, victimSeat, srv) => this.moveRobber(id, token, q, r, victimSeat, srv),
+      buildSettlement: (id, token, vertexId, srv) => this.buildSettlement(id, token, vertexId, srv),
+      buildRoad: (id, token, edgeId, srv) => this.buildRoad(id, token, edgeId, srv),
+      buildCity: (id, token, vertexId, srv) => this.buildCity(id, token, vertexId, srv),
+    };
   }
 
   public describeError(e: unknown): { code: ActionRejectCode; message: string } {

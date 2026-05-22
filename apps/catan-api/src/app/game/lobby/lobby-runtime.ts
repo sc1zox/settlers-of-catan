@@ -15,6 +15,11 @@ import {
   type TilePlacement,
 } from '@catan/shared-game-field';
 import { createShuffledDevDeck } from '../dev-cards/dev-deck.util';
+import {
+  countResourceCards,
+  emptyMutableResourceRecord,
+} from '../utils/public-player-resources.util';
+import { LobbyTimerRegistry } from './lobby-timer-registry';
 import { TurnStateMachine } from '../turn/turn-state-machine';
 
 export const CLOCKWISE_SEATS: readonly PlayerSeat[] = [
@@ -104,17 +109,8 @@ export class LobbyRuntime {
   public readonly devDeck: DevCardType[];
   public longestRoadSeat: PlayerSeat | null = null;
   public largestArmySeat: PlayerSeat | null = null;
-  /** Last seat we emitted a Longest-Road `BonusAwarded` for — used to detect transitions. */
-  public lastAnnouncedLongestRoadSeat: PlayerSeat | null = null;
-  /** Last seat we emitted a Largest-Army `BonusAwarded` for — used to detect transitions. */
-  public lastAnnouncedLargestArmySeat: PlayerSeat | null = null;
   public winnerSeat: PlayerSeat | null = null;
-  /** Pending teardown after the last connected human left. Cleared if anyone (re)joins in time. */
-  public emptyLobbyCleanupTimer: NodeJS.Timeout | null = null;
-  /** Pending Finished → Summary transition (15s after winner). */
-  public summaryEntryTimer: NodeJS.Timeout | null = null;
-  /** Pending hard end-of-summary teardown (5min after Summary started). */
-  public summaryHardEndTimer: NodeJS.Timeout | null = null;
+  public readonly timers: LobbyTimerRegistry = new LobbyTimerRegistry();
   /** True while finalizeEmptyLobbyCleanup / forceTerminate is mid-flight — joins reject as LobbyAlreadyExists. */
   public isTearingDown = false;
 
@@ -176,20 +172,11 @@ export class LobbyRuntime {
     return undefined;
   }
 
-  public emptyResourceBag(): Record<ResourceType, number> {
-    return {
-      [ResourceType.Wood]: 0,
-      [ResourceType.Brick]: 0,
-      [ResourceType.Wheat]: 0,
-      [ResourceType.Wool]: 0,
-      [ResourceType.Ore]: 0,
-    };
-  }
 
   public removePlayer(sessionToken: string): void {
     for (let i = 0; i < this.players.length; i += 1) {
       if (this.players[i].sessionToken === sessionToken) {
-        this.clearDisconnectTimer(this.players[i]);
+        this.timers.clearDisconnectTimer(this.players[i]);
         this.players.splice(i, 1);
         return;
       }
@@ -206,7 +193,7 @@ export class LobbyRuntime {
     if (seat === undefined) {
       throw new Error(ActionRejectCode.LobbyFull);
     }
-    const resources = this.emptyResourceBag();
+    const resources = emptyMutableResourceRecord();
     this.players.push({
       sessionToken,
       displayName,
@@ -236,75 +223,12 @@ export class LobbyRuntime {
     }
   }
 
-  public clearDisconnectTimer(player: LobbyPlayerSlot): void {
-    if (player.disconnectTimer) {
-      clearTimeout(player.disconnectTimer);
-      player.disconnectTimer = null;
-    }
-  }
-
   public clearAllDisconnectTimers(): void {
-    for (let i = 0; i < this.players.length; i += 1) {
-      this.clearDisconnectTimer(this.players[i]);
-    }
-    this.clearEmptyLobbyCleanupTimer();
-    this.clearSummaryEntryTimer();
-    this.clearSummaryHardEndTimer();
-  }
-
-  public startDisconnectHold(player: LobbyPlayerSlot, delayMs: number, onExpire: () => void): void {
-    this.clearDisconnectTimer(player);
-    player.disconnectTimer = setTimeout(onExpire, delayMs);
-  }
-
-  public clearEmptyLobbyCleanupTimer(): void {
-    if (this.emptyLobbyCleanupTimer) {
-      clearTimeout(this.emptyLobbyCleanupTimer);
-      this.emptyLobbyCleanupTimer = null;
-    }
-  }
-
-  public startEmptyLobbyCleanupHold(delayMs: number, onExpire: () => void): void {
-    this.clearEmptyLobbyCleanupTimer();
-    this.emptyLobbyCleanupTimer = setTimeout(onExpire, delayMs);
-  }
-
-  public clearSummaryEntryTimer(): void {
-    if (this.summaryEntryTimer) {
-      clearTimeout(this.summaryEntryTimer);
-      this.summaryEntryTimer = null;
-    }
-  }
-
-  public startSummaryEntryHold(delayMs: number, onExpire: () => void): void {
-    this.clearSummaryEntryTimer();
-    this.summaryEntryTimer = setTimeout(onExpire, delayMs);
-  }
-
-  public clearSummaryHardEndTimer(): void {
-    if (this.summaryHardEndTimer) {
-      clearTimeout(this.summaryHardEndTimer);
-      this.summaryHardEndTimer = null;
-    }
-  }
-
-  public startSummaryHardEndHold(delayMs: number, onExpire: () => void): void {
-    this.clearSummaryHardEndTimer();
-    this.summaryHardEndTimer = setTimeout(onExpire, delayMs);
-  }
-
-  public countTotalResources(player: LobbyPlayerSlot): number {
-    let total = 0;
-    const keys = Object.values(ResourceType);
-    for (let i = 0; i < keys.length; i += 1) {
-      const key = keys[i];
-      total += player.resources[key] ?? 0;
-    }
-    return total;
+    this.timers.clearAll(this.players);
   }
 
   public requiredRobberDiscardCount(player: LobbyPlayerSlot): number {
-    const total = this.countTotalResources(player);
+    const total = countResourceCards(player);
     if (total <= 7) {
       return 0;
     }

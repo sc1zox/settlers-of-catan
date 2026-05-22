@@ -2,6 +2,7 @@ import {
   AfterViewInit,
   ChangeDetectionStrategy,
   Component,
+  computed,
   ElementRef,
   OnDestroy,
   ViewChild,
@@ -24,6 +25,7 @@ import { HeadVideoSyncService } from '../features/webcam-head/head-video-sync.se
 import { SpectatorCameraService } from '../features/spectator-camera/spectator-camera.service';
 import { TradeFinalizeAnimationService } from '../features/trading/trade-finalize-animation.service';
 import { mapLobbyFullStateToSceneState } from '../../shared/game-scene/map-lobby-full-state-to-scene';
+import type { LobbySceneState } from '../../shared/game-scene/lobby-scene-state';
 import { HoverState } from '../../game/interaction/hover';
 import { BuildConfirmModel } from './build-confirm-popover';
 import { CardTooltip, CardTooltipModel } from './card-tooltip';
@@ -77,6 +79,11 @@ export class GameCanvas implements AfterViewInit, OnDestroy {
   readonly focusedDevCardType = signal<DevCardType | null>(null);
   protected readonly devCardTypeEnum = DevCardType;
 
+  private readonly currentSceneState = computed<LobbySceneState | null>(() => {
+    const state = this.gameState.lobby.value();
+    return state !== undefined ? mapLobbyFullStateToSceneState(state) : null;
+  });
+
   private readonly diceOverlayAutoDismiss = effect((onCleanup) => {
     const overlay = this.diceOverlay();
     if (overlay === null) {
@@ -91,30 +98,29 @@ export class GameCanvas implements AfterViewInit, OnDestroy {
   });
 
   private readonly lobbyStateSync = effect(() => {
-    const state = this.gameState.lobby.value();
+    const scene = this.currentSceneState();
     if (!this.engine) {
       return;
     }
-    if (!state) {
+    if (scene === null) {
       if (this.gameState.connection() === undefined) {
         this.engine.clearLobbySceneOverlay();
       }
       return;
     }
-    const scene = mapLobbyFullStateToSceneState(state);
     this.engine.applySceneState(scene);
-    const lastRoll = state.lastDiceRoll;
+    const state = this.gameState.lobby.value();
+    const lastRoll = state?.lastDiceRoll ?? null;
     this.engine.setRolledNumberChipHighlight(lastRoll !== null ? lastRoll.sum : null);
     this.headVideoSync.syncToEngine(this.engine, scene);
   });
 
   private readonly headVideoSyncEffect = effect(() => {
     this.headVideoSync.readSyncTriggers();
-    const state = this.gameState.lobby.value();
-    if (!this.engine || state === undefined) {
+    const scene = this.currentSceneState();
+    if (!this.engine || scene === null) {
       return;
     }
-    const scene = mapLobbyFullStateToSceneState(state);
     this.headVideoSync.syncToEngine(this.engine, scene);
   });
 
@@ -231,25 +237,28 @@ export class GameCanvas implements AfterViewInit, OnDestroy {
     });
     this.engine.setBuildModeCancelHandler(() => this.buildModeCancelled.emit());
     this.engine.setDiceRollRequestHandler(() => this.rollDiceRequested.emit());
-    this.engine.setShadowQuality(this.gameSettings.shadowQuality());
-    this.engine.setSceneBrightness(this.gameSettings.sceneBrightness());
-    this.headVideoSync.applyDisplayGammaToEngine(this.engine);
-    if (this.gameSettings.performanceSamplingEnabled()) {
-      this.engine.setPerformanceStatsHandler((stats) => {
-        this.gameSettings.handlePerformanceStats(stats);
-      });
-    }
     this.engine.start();
-    const current = this.gameState.lobby.value();
-    if (current) {
-      const scene = mapLobbyFullStateToSceneState(current);
+    const scene = this.currentSceneState();
+    if (scene !== null) {
       this.engine.applySceneState(scene);
       this.headVideoSync.syncToEngine(this.engine, scene);
     }
-    this.engine.showBuildSpots(this.buildMode(), this.freeRoadMode());
-    this.engine.setRobberMode(this.robberMode());
-    this.engine.setSpectatorCameraMode(this.spectatorCam.mode());
-    this.engine.setDiceRollClickEnabled(this.diceRollClickEnabled());
+    this.seedEngineSettings(this.engine);
+  }
+
+  private seedEngineSettings(engine: GameEngine): void {
+    engine.setShadowQuality(this.gameSettings.shadowQuality());
+    engine.setSceneBrightness(this.gameSettings.sceneBrightness());
+    engine.showBuildSpots(this.buildMode(), this.freeRoadMode());
+    engine.setRobberMode(this.robberMode());
+    engine.setSpectatorCameraMode(this.spectatorCam.mode());
+    engine.setDiceRollClickEnabled(this.diceRollClickEnabled());
+    this.headVideoSync.applyDisplayGammaToEngine(engine);
+    if (this.gameSettings.performanceSamplingEnabled()) {
+      engine.setPerformanceStatsHandler((stats) => {
+        this.gameSettings.handlePerformanceStats(stats);
+      });
+    }
   }
 
   public ngOnDestroy(): void {

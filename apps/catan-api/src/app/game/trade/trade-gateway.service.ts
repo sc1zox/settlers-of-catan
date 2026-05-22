@@ -17,7 +17,7 @@ import { TradeActionsService, type TradeActionResult } from './trade-actions.ser
 import { emitTradeUpdatedToInvolvedSockets } from './trade-emit.util';
 
 @Injectable()
-export class TradeSocketFacade {
+export class TradeGatewayService {
   public constructor(
     private readonly gameService: GameService,
     private readonly tradeActions: TradeActionsService,
@@ -50,32 +50,29 @@ export class TradeSocketFacade {
     if (tradeUpdate === undefined) {
       return;
     }
-    // Demo bots auto-respond to fresh proposes only.
     const lobby = this.gameService.getLobby(payload.lobbyId);
     if (lobby === undefined) {
       return;
     }
-    for (let i = 0; i < tradeUpdate.trade.recipients.length; i += 1) {
-      const slot = tradeUpdate.trade.recipients[i];
-      const botSession = this.demoBots.resolveDemoBotTradeAcceptorSessionToken(lobby, slot.seat);
-      if (botSession === null) {
-        continue;
-      }
-      const ctx = this.tradeActionContext(server);
-      try {
+    const ctx = this.tradeActionContext(server);
+    this.demoBots.respondToTradePropose(
+      lobby,
+      tradeUpdate.trade.recipients,
+      (botSession) => {
         const accepted = this.tradeActions.acceptTrade(ctx, botSession, {
           lobbyId: payload.lobbyId,
           tradeId: tradeUpdate.trade.id,
         });
         this.broadcastResult(server, accepted);
-      } catch {
+      },
+      (botSession) => {
         const rejected = this.tradeActions.rejectTrade(ctx, botSession, {
           lobbyId: payload.lobbyId,
           tradeId: tradeUpdate.trade.id,
         });
         this.broadcastResult(server, rejected);
-      }
-    }
+      },
+    );
   }
 
   public acceptTrade(server: Server, payload: TradeAcceptPayload, sessionToken: string): void {

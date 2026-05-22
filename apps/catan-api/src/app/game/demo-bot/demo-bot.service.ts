@@ -9,6 +9,7 @@ import {
   type LobbyPlayerSlot,
   LobbyRuntime,
 } from '../lobby/lobby-runtime';
+import { countResourceCards } from '../utils/public-player-resources.util';
 
 const BOT_SESSION_TOKEN_PREFIX = 'bot-';
 const DEMO_SETUP_AUTOPLAY_MAX_STEPS = 16;
@@ -95,6 +96,25 @@ export class DemoBotService {
 
   public getActiveTurnSeats(lobby: LobbyRuntime): PlayerSeat[] {
     return getOccupiedSeatsClockwise(lobby);
+  }
+
+  public respondToTradePropose(
+    lobby: LobbyRuntime,
+    recipients: readonly { readonly seat: PlayerSeat }[],
+    tryAccept: (botSessionToken: string) => void,
+    fallbackReject: (botSessionToken: string) => void,
+  ): void {
+    for (let i = 0; i < recipients.length; i += 1) {
+      const botSession = this.resolveDemoBotTradeAcceptorSessionToken(lobby, recipients[i].seat);
+      if (botSession === null) {
+        continue;
+      }
+      try {
+        tryAccept(botSession);
+      } catch {
+        fallbackReject(botSession);
+      }
+    }
   }
 
   public resolveDemoBotTradeAcceptorSessionToken(
@@ -331,7 +351,7 @@ export class DemoBotService {
       lobby.settlements.map((s) => ({ seat: s.seat, vertexId: s.vertexId })),
       lobby.players.map((p) => ({
         seat: p.seat,
-        totalResourceCards: this.countResourceCards(p),
+        totalResourceCards: countResourceCards(p),
       })),
       actorSeat,
       q,
@@ -343,24 +363,11 @@ export class DemoBotService {
     return seats[0] as PlayerSeat;
   }
 
-  private countResourceCards(player: LobbyPlayerSlot): number {
-    let total = 0;
-    const keys = Object.values(ResourceType);
-    for (let i = 0; i < keys.length; i += 1) {
-      total += player.resources[keys[i]] ?? 0;
-    }
-    return total;
-  }
-
   private pickLegalSetupSettlementVertex(lobby: LobbyRuntime, bot: LobbyPlayerSlot): string | null {
     const vertexIds = Array.from(lobby.verticesById.keys());
     for (let i = 0; i < vertexIds.length; i += 1) {
-      const vertexId = vertexIds[i];
-      try {
-        this.validation.assertLegalSettlementVertex(lobby, bot, vertexId, false);
-        return vertexId;
-      } catch (error: unknown) {
-        void error;
+      if (this.validation.canPlaceSettlementAtVertex(lobby, bot, vertexIds[i], false)) {
+        return vertexIds[i];
       }
     }
     return null;
@@ -373,12 +380,8 @@ export class DemoBotService {
   ): string | null {
     const edgeIds = Array.from(lobby.edgesById.keys());
     for (let i = 0; i < edgeIds.length; i += 1) {
-      const edgeId = edgeIds[i];
-      try {
-        this.validation.assertLegalRoadEdge(lobby, bot, edgeId, requiredVertexId);
-        return edgeId;
-      } catch (error: unknown) {
-        void error;
+      if (this.validation.canPlaceRoadAtEdge(lobby, bot, edgeIds[i], requiredVertexId)) {
+        return edgeIds[i];
       }
     }
     return null;

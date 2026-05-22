@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { BuildActionsModule } from './build/build-actions.module';
-import { BotModule } from ../bot/bot.module';
+import { BotModule } from './bot/bot.module';
 import { DevCardsModule } from './dev-cards/dev-cards.module';
 import { EconomyModule } from './economy/economy.module';
 import { GameActionValidationModule } from './validation/game-action-validation.module';

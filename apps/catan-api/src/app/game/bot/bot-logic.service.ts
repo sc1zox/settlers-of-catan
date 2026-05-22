@@ -56,7 +56,7 @@ export class BotLogicService {
         }
         return { type: 'buildSettlement', vertexId: bestVertex };
       }
-      if (this.validation.canAffordDevCard(bot)) {
+      if (this.validation.canAffordDevCardCost(bot)) {
         return { type: 'buyDevCard' };
       }
       if (moves.roads.length > 0) {
@@ -136,7 +136,7 @@ export class BotLogicService {
         score += prob * 5;
         const victim = lobby.findPlayerBySeat(victimSeat as PlayerSeat);
         if (victim) {
-          score += victim.victoryPoints * 2;
+          score += victim.visibleVictoryPoints * 2;
         }
       }
 

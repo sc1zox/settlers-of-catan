@@ -1,0 +1,3 @@
+export const BOT_SESSION_TOKEN_PREFIX = 'bot-';
+export const BOT_SETUP_AUTOPLAY_MAX_STEPS = 16;
+export const BOT_MAIN_GAME_DRAIN_MAX_STEPS = 150;

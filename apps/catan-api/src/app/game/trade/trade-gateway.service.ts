@@ -11,7 +11,7 @@ import {
 } from '@catan/api-interfaces';
 import { Server } from 'socket.io';
 import { GameService } from '../core/game.service';
-import { DemoBotService } from '../demo-bot/demo-bot.service';
+import { BotService } from '../bot/bot.service';
 import type { LobbyRuntime } from '../lobby/lobby-runtime';
 import { TradeActionsService, type TradeActionResult } from './trade-actions.service';
 import { emitTradeUpdatedToInvolvedSockets } from './trade-emit.util';
@@ -21,7 +21,7 @@ export class TradeGatewayService {
   public constructor(
     private readonly gameService: GameService,
     private readonly tradeActions: TradeActionsService,
-    private readonly demoBots: DemoBotService,
+    private readonly demoBots: BotService,
   ) {}
 
   public bankTrade(server: Server, payload: BankTradePayload, sessionToken: string): void {

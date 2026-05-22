@@ -12,7 +12,9 @@ import {
 } from '@catan/api-interfaces';
 import type { Server, Socket } from 'socket.io';
 import { RedisLobbyStoreService } from '../../infrastructure/redis/redis-lobby-store.service';
-import { DemoBotService } from '../demo-bot/demo-bot.service';
+import { BotService } from '../bot/bot.service';
+import { BotManagementService } from '../bot/bot-management.service';
+import { BOT_SESSION_TOKEN_PREFIX } from '../bot/bot.config';
 import {
   LobbyPlayerSlot,
   LobbyRuntime,
@@ -50,7 +52,8 @@ export class ReconnectService {
     private readonly lobby: LobbyService,
     private readonly trades: TradeService,
     private readonly redisLobby: RedisLobbyStoreService,
-    private readonly demoBots: DemoBotService,
+    private readonly demoBots: BotService,
+    private readonly botManagement: BotManagementService,
   ) {}
 
   /**
@@ -153,8 +156,8 @@ export class ReconnectService {
     const oldSessionToken = target.sessionToken;
     const wasAdmin = lobby.adminSessionToken === oldSessionToken;
     // Mutate the slot in place — slot identity carries the player's pieces, resources, devs.
-    target.sessionToken = `bot-${randomUUID()}`;
-    target.displayName = this.demoBots.getDemoBotDisplayName(seat);
+    target.sessionToken = `${BOT_SESSION_TOKEN_PREFIX}${randomUUID()}`;
+    target.displayName = this.botManagement.getBotDisplayName(seat);
     target.isBot = true;
     target.socketId = null;
     target.disconnectGraceExpiresAt = null;

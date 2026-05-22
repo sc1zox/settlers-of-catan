@@ -12,7 +12,7 @@ import {
 } from '@catan/api-interfaces';
 import { Server, Socket } from 'socket.io';
 import { BuildActionService } from '../build/build-action.service';
-import { DemoBotService, DemoMainGameCallbacks, DemoSetupBotCallbacks } from '../demo-bot/demo-bot.service';
+import { BotService, BotMainGameCallbacks, BotSetupCallbacks } from '../bot/bot.service';
 import { DevCardsService } from '../dev-cards/dev-cards.service';
 import { EconomyService } from '../economy/economy.service';
 import { LobbyRuntime } from '../lobby/lobby-runtime';
@@ -51,7 +51,7 @@ export class GameService {
     private readonly economy: EconomyService,
     private readonly robber: RobberService,
     private readonly devCards: DevCardsService,
-    private readonly demoBots: DemoBotService,
+    private readonly demoBots: BotService,
   ) {}
 
   public getLobby(lobbyId: string): LobbyRuntime | undefined {
@@ -111,7 +111,7 @@ export class GameService {
     const lobby = this.reconnect.kickAndReplaceWithBot(lobbyId, sessionToken, seat);
     this.broadcastFullState(server, lobby);
     // Setup phase needs its own autoplay drain hook (broadcastFullState only kicks the main-game drain).
-    this.demoBots.runDemoSetupAutoplay(lobby.lobbyId, server, this.buildSetupAutoplayPort());
+    this.demoBots.runSetupAutoplay(lobby.lobbyId, server, this.buildSetupAutoplayPort());
   }
 
   public buildSettlement(
@@ -131,7 +131,7 @@ export class GameService {
     this.lobby.assertLobbyOpen(lobby);
     this.buildActions.buildRoad(lobby, sessionToken, edgeId);
     this.broadcastFullState(server, lobby);
-    this.demoBots.runDemoSetupAutoplay(lobbyId, server, this.buildSetupAutoplayPort());
+    this.demoBots.runSetupAutoplay(lobbyId, server, this.buildSetupAutoplayPort());
   }
 
   public startLobby(lobbyId: string, sessionToken: string, server: Server): void {
@@ -140,7 +140,7 @@ export class GameService {
     this.lobby.ensureLobbyAdminConsistent(lobby);
     this.matchFlow.startLobby(lobby, sessionToken);
     this.broadcastFullState(server, lobby);
-    this.demoBots.runDemoSetupAutoplay(lobbyId, server, this.buildSetupAutoplayPort());
+    this.demoBots.runSetupAutoplay(lobbyId, server, this.buildSetupAutoplayPort());
   }
 
   public fillLobbyWithBots(lobbyId: string, sessionToken: string, server: Server): void {
@@ -284,7 +284,7 @@ export class GameService {
     this.broadcastFullState(server, lobby);
   }
 
-  private buildSetupAutoplayPort(): DemoSetupBotCallbacks {
+  private buildSetupAutoplayPort(): BotSetupCallbacks {
     return {
       getLobby: (id: string) => this.lobby.getLobby(id),
       buildSettlement: (id, token, vertexId, srv) => this.buildSettlement(id, token, vertexId, srv),
@@ -292,7 +292,7 @@ export class GameService {
     };
   }
 
-  private buildMainGameCallbacks(): DemoMainGameCallbacks {
+  private buildMainGameCallbacks(): BotMainGameCallbacks {
     return {
       getLobby: (id: string) => this.lobby.getLobby(id),
       rollDice: (id, token, srv) => this.rollDice(id, token, srv),
@@ -303,6 +303,7 @@ export class GameService {
       buildSettlement: (id, token, vertexId, srv) => this.buildSettlement(id, token, vertexId, srv),
       buildRoad: (id, token, edgeId, srv) => this.buildRoad(id, token, edgeId, srv),
       buildCity: (id, token, vertexId, srv) => this.buildCity(id, token, vertexId, srv),
+      buyDevCard: (id, token, srv) => this.buyDevCard(id, token, srv),
     };
   }
 

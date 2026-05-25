@@ -84,6 +84,7 @@ export class GameService {
     this.lobby.broadcastFullState(server, lobby);
     this.lobbyOrchestrator.maybeScheduleSummaryEntry(lobby, server);
     this.demoBots.afterLobbyBroadcast(lobby.lobbyId, server, this.buildMainGameCallbacks());
+    this.demoBots.runSetupAutoplay(lobby.lobbyId, server, this.buildSetupAutoplayPort());
   }
 
   public async resumeSessionSocket(
@@ -110,8 +111,6 @@ export class GameService {
   ): void {
     const lobby = this.reconnect.kickAndReplaceWithBot(lobbyId, sessionToken, seat);
     this.broadcastFullState(server, lobby);
-    // Setup phase needs its own autoplay drain hook (broadcastFullState only kicks the main-game drain).
-    this.demoBots.runSetupAutoplay(lobby.lobbyId, server, this.buildSetupAutoplayPort());
   }
 
   public buildSettlement(
@@ -131,7 +130,6 @@ export class GameService {
     this.lobby.assertLobbyOpen(lobby);
     this.buildActions.buildRoad(lobby, sessionToken, edgeId);
     this.broadcastFullState(server, lobby);
-    this.demoBots.runSetupAutoplay(lobbyId, server, this.buildSetupAutoplayPort());
   }
 
   public startLobby(lobbyId: string, sessionToken: string, server: Server): void {
@@ -140,7 +138,6 @@ export class GameService {
     this.lobby.ensureLobbyAdminConsistent(lobby);
     this.matchFlow.startLobby(lobby, sessionToken);
     this.broadcastFullState(server, lobby);
-    this.demoBots.runSetupAutoplay(lobbyId, server, this.buildSetupAutoplayPort());
   }
 
   public fillLobbyWithBots(lobbyId: string, sessionToken: string, server: Server): void {

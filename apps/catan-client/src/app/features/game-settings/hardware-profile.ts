@@ -12,40 +12,25 @@ export interface HardwareProbeSignals {
   readonly gpuRenderer: string | null;
 }
 
-interface NavigatorWithDeviceMemory {
-  readonly deviceMemory?: number;
-}
-
-interface NavigatorUserAgentDataLike {
-  readonly mobile?: boolean;
-}
-
-interface NavigatorWithUserAgentData {
-  readonly userAgentData?: NavigatorUserAgentDataLike;
-}
-
-interface NavigatorConnectionLike {
-  readonly saveData?: boolean;
-}
-
-interface NavigatorWithConnection {
-  readonly connection?: NavigatorConnectionLike;
+declare global {
+  interface Navigator {
+    readonly deviceMemory?: number;
+    readonly userAgentData?: { readonly mobile?: boolean };
+    readonly connection?: { readonly saveData?: boolean };
+  }
 }
 
 export function collectHardwareProbeSignals(): HardwareProbeSignals {
-  const navMemoryView: NavigatorWithDeviceMemory = navigator;
-  const navUaView: NavigatorWithUserAgentData = navigator;
-  const navConnView: NavigatorWithConnection = navigator;
   const cores = Number.isFinite(navigator.hardwareConcurrency)
     ? navigator.hardwareConcurrency
     : null;
-  const memory = typeof navMemoryView.deviceMemory === 'number' ? navMemoryView.deviceMemory : null;
-  const mobile = navUaView.userAgentData?.mobile === true || isLegacyMobileUserAgent();
+  const memory = typeof navigator.deviceMemory === 'number' ? navigator.deviceMemory : null;
+  const mobile = navigator.userAgentData?.mobile === true || isLegacyMobileUserAgent();
   const reducedMotion =
     typeof matchMedia === 'function'
       ? matchMedia('(prefers-reduced-motion: reduce)').matches
       : false;
-  const saveData = navConnView.connection?.saveData === true;
+  const saveData = navigator.connection?.saveData === true;
   return {
     hardwareConcurrency: cores,
     deviceMemoryGb: memory,

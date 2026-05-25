@@ -36,11 +36,10 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Increment version
-          NEW_VERSION=$(npm version patch -m "chore: bump version to %s [skip ci]")
-          echo "version=${NEW_VERSION#v}" >> $GITHUB_OUTPUT
+          npm version patch -m "chore: bump version to %s [skip ci]"
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
 
-          # Push changes and tag
           git push origin master --follow-tags
 
       - name: Lowercase GHCR image path

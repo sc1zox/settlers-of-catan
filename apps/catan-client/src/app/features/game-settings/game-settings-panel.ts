@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslatePipe } from '@ngx-translate/core';
 import { WebcamQuality } from '@catan/api-interfaces';
+import { environment } from '../../../environments/environment';
 import { ShadowQuality } from '../../../game/scene/shadow-quality.enum';
 import { GameSettingsService } from './game-settings.service';
 import { LobbyShellGameUiService } from '../lobby-game-ui/lobby-shell-game-ui.service';
@@ -23,6 +24,7 @@ export class GameSettingsPanel {
   protected readonly shadowQualityHigh = ShadowQuality.High;
   protected readonly webcamQualityLow = WebcamQuality.Low;
   protected readonly webcamQualityMedium = WebcamQuality.Medium;
+  protected readonly appVersion = environment.appVersion;
 
   public formatNumber(value: number, digits: number): string {
     return value.toFixed(digits);

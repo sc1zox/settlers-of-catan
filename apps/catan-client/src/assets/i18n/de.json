@@ -357,7 +357,8 @@
     "webcamLow": "Niedrig (320x240)",
     "webcamMedium": "Mittel (480x360)",
     "lobbyTitle": "Lobby",
-    "lobbyCodeLabel": "Aktiver Lobby-Code"
+    "lobbyCodeLabel": "Aktiver Lobby-Code",
+    "version": "Version"
   },
   "gameCanvas": {
     "closeCardAria": "Karte schließen",

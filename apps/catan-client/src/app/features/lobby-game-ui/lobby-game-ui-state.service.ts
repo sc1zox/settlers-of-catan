@@ -1,4 +1,4 @@
-import { computed, inject, Injectable, signal, Signal } from '@angular/core';
+import { computed, inject, Injectable } from '@angular/core';
 import { GamePhase, LobbyFullStatePayload, LobbyPlayerPublicDto, PlayerSeat } from '@catan/api-interfaces';
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslateService } from '@ngx-translate/core';
@@ -17,18 +17,19 @@ import {
 export class LobbyGameUiStateService {
   private readonly gameState = inject(GameStateResource);
   private readonly translate = inject(TranslateService);
-  private readonly uiStepHolder = signal<Signal<LobbyUiStep> | null>(null);
 
   private readonly instant: TranslateInstantFn = (key, params) =>
     this.translate.instant(marker(key), params);
 
-  public attachUiStep(uiStep: Signal<LobbyUiStep>): void {
-    this.uiStepHolder.set(uiStep);
-  }
-
   public readonly uiStep = computed<LobbyUiStep>(() => {
-    const holder = this.uiStepHolder();
-    return holder === null ? LobbyUiStep.SignIn : holder();
+    const lobbyState = this.gameState.lobby.value();
+    if (lobbyState === undefined) {
+      return LobbyUiStep.SignIn;
+    }
+    if (lobbyState.phase === GamePhase.LobbyWaiting) {
+      return LobbyUiStep.Lobby;
+    }
+    return LobbyUiStep.InGame;
   });
 
   public readonly lobbyUiState = computed<LobbyUiState | null>(() => {

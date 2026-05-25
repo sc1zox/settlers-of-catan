@@ -85,7 +85,7 @@ export class OrbitCameraAid {
       OrbitCameraAid.MATCH_START_CAMERA_Z,
     );
     if (selfSeat !== null) {
-      this.matchStartCameraPosition.applyAxisAngle(this.worldUpAxis, selfSeat * (Math.PI / 2));
+      this.matchStartCameraPosition.applyAxisAngle(this.worldUpAxis, -selfSeat * (Math.PI / 2));
     }
     camera.position.copy(this.matchStartCameraPosition);
     controls.update();

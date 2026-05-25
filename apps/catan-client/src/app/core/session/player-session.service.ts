@@ -9,15 +9,13 @@ import { Injectable, inject, signal } from '@angular/core';
 import {
   ApiEnvelopeFieldKey,
   ApiGlobalPathPrefix,
-  ClientStorageKey,
   extractApiErrorCodeFromBody,
   extractApiErrorCodeFromHttpStatus,
   InternalApiErrorCode,
   normalizeUserFacingErrorCode,
-  SessionHttpAction,
-  SessionRestPath,
   UserFacingErrorCode,
 } from '@catan/api-interfaces';
+import { ClientStorageKey, SessionHttpAction, SessionRestPath } from '../../../shared/client-constants';
 import { Observable, catchError, filter, firstValueFrom, map, of, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 

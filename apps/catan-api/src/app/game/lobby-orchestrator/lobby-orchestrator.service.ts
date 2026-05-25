@@ -13,7 +13,6 @@ import {
 import { Server } from 'socket.io';
 import { LiveKitRoomService } from '../../infrastructure/livekit/livekit-room.service';
 import { RedisLobbyStoreService } from '../../infrastructure/redis/redis-lobby-store.service';
-import { BotService } from '../bot/bot.service';
 import { BotManagementService } from '../bot/bot-management.service';
 import { LobbyRuntime } from '../lobby/lobby-runtime';
 import { LobbyService } from '../lobby/lobby.service';
@@ -28,7 +27,6 @@ export class LobbyOrchestratorService {
 
   public constructor(
     private readonly lobby: LobbyService,
-    private readonly demoBots: BotService,
     private readonly botManagement: BotManagementService,
     private readonly redisLobby: RedisLobbyStoreService,
     private readonly liveKit: LiveKitRoomService,

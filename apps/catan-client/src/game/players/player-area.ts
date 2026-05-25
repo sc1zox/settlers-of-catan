@@ -50,7 +50,7 @@ export class PlayerArea {
       name: playerColorLabel(options.color),
     };
 
-    this.group.rotation.y = options.seat * (Math.PI / 2);
+    this.group.rotation.y = -options.seat * (Math.PI / 2);
 
     this.selfPad = new PlayerAreaSelfPad(options.color, options.tableTopY, options.innerEdgeZ);
     this.group.add(this.selfPad.group);

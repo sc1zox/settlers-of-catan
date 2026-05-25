@@ -1,11 +1,7 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
-import {
-  formatBearerAuthorizationHeader,
-  HttpHeaderName,
-  SessionHttpAction,
-  SessionRestPath,
-} from '@catan/api-interfaces';
+import { formatBearerAuthorizationHeader, HttpHeaderName } from '@catan/api-interfaces';
+import { SessionHttpAction, SessionRestPath } from '../../../shared/client-constants';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { PlayerSessionService } from '../session/player-session.service';
 import { SESSION_AUTH_RETRY } from '../../../shared/http/session-http-context';

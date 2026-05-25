@@ -1,0 +1,62 @@
+<main class="shell">
+  <section class="ui-layer">
+    <article class="panel">
+      <header class="panel__header">
+        <h1>{{ 'shell.appTitle' | translate }}</h1>
+        <p>{{ 'shell.appSubtitle' | translate }}</p>
+      </header>
+
+      @if (feedback() !== null) {
+        <p
+          class="feedback"
+          [class.feedback--info]="feedback()?.tone === feedbackToneEnum.Info"
+          [class.feedback--success]="feedback()?.tone === feedbackToneEnum.Success"
+          [class.feedback--error]="feedback()?.tone === feedbackToneEnum.Error"
+          aria-live="polite"
+        >
+          {{ feedback()?.message }}
+        </p>
+      }
+
+      <form class="form-block" [formGroup]="sessionForm" (ngSubmit)="startSession()">
+        <label for="displayName">{{ 'shell.labelDisplayName' | translate }}</label>
+        <input
+          id="displayName"
+          type="text"
+          autocomplete="nickname"
+          formControlName="displayName"
+        />
+        @if (
+          sessionForm.controls.displayName.invalid &&
+          sessionForm.controls.displayName.touched
+        ) {
+          <p class="status">{{ 'shell.validationDisplayName' | translate }}</p>
+        }
+        <div class="webcam-option">
+          <div class="webcam-option__intro">
+            <span class="webcam-option__icon" aria-hidden="true"></span>
+            <div class="webcam-option__copy">
+              <p class="webcam-option__title">{{ 'shell.webcamTitle' | translate }}</p>
+              <p class="webcam-option__hint">{{ 'shell.webcamHint' | translate }}</p>
+            </div>
+          </div>
+          <label class="webcam-option__toggle">
+            <input
+              type="checkbox"
+              class="webcam-option__input"
+              [checked]="gameSettings.webcamEnabled()"
+              (change)="onWebcamEnabledChange($event)"
+            />
+            <span class="webcam-option__track" aria-hidden="true">
+              <span class="webcam-option__thumb"></span>
+            </span>
+            <span class="webcam-option__label">{{ 'shell.webcamToggle' | translate }}</span>
+          </label>
+        </div>
+        <div class="button-row">
+          <button type="submit">{{ 'shell.buttonStartSession' | translate }}</button>
+        </div>
+      </form>
+    </article>
+  </section>
+</main>

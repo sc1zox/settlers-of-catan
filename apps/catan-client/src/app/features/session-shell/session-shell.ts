@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { ReactiveFormsModule } from '@angular/forms';
+import { ChangeDetectionStrategy, Component, effect, inject } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
+import { GamePhase } from '@catan/api-interfaces';
 import { BuildConfirmPopover } from '../../game-canvas/build-confirm-popover';
 import { DiscardModal } from '../../game-canvas/discard-modal';
 import { DevCardPlayPicker } from '../dev-cards/dev-card-play-picker';
@@ -13,13 +14,9 @@ import { GameSettingsToggle } from '../game-settings/game-settings-toggle';
 import { SpectatorCameraToggle } from '../spectator-camera/spectator-camera-toggle';
 import { PlayerStatsPanel } from '../player-stats-panel/player-stats-panel';
 import { BonusAnnounceBanner } from '../bonus-announce-banner/bonus-announce-banner';
-import { SessionLobbyFlowService } from './session-lobby-flow.service';
-import { SessionBuildInteractionService } from './session-build-interaction.service';
-import { SessionRobberFlowService } from './session-robber-flow.service';
-import { SessionTradingPanelService } from './session-trading-panel.service';
-import { SessionDevCardOverlayService } from './session-dev-card-overlay.service';
+import { LobbyShellGameUiService } from '../lobby-game-ui/lobby-shell-game-ui.service';
 import { SessionShellFacadeService } from './session-shell-facade.service';
-import { SessionCleanupService } from './session-cleanup.service';
+import { SessionLobbyFlowService } from './session-lobby-flow.service';
 
 @Component({
   selector: 'app-session-shell',
@@ -27,7 +24,6 @@ import { SessionCleanupService } from './session-cleanup.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     GameCanvas,
-    ReactiveFormsModule,
     BuildConfirmPopover,
     DiscardModal,
     DevCardPlayPicker,
@@ -43,17 +39,23 @@ import { SessionCleanupService } from './session-cleanup.service';
   ],
   templateUrl: './session-shell.html',
   styleUrl: './session-shell.scss',
-  providers: [
-    SessionShellFacadeService,
-    SessionLobbyFlowService,
-    SessionBuildInteractionService,
-    SessionRobberFlowService,
-    SessionTradingPanelService,
-    SessionDevCardOverlayService,
-    SessionCleanupService,
-  ],
 })
 export class SessionShell {
   public readonly ui = inject(SessionShellFacadeService);
-  private readonly cleanup = inject(SessionCleanupService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly lobbyGameUi = inject(LobbyShellGameUiService);
+  private readonly lobbyFlow = inject(SessionLobbyFlowService);
+
+  public constructor() {
+    effect(() => {
+      const phase = this.lobbyGameUi.lobbyUiState()?.phase;
+      if (phase === GamePhase.LobbyWaiting) {
+        const lobbyCode = this.route.parent?.snapshot.paramMap.get('lobbyCode') ?? '';
+        if (lobbyCode.length > 0) {
+          void this.router.navigate(['/lobby', lobbyCode]);
+        }
+      }
+    });
+  }
 }

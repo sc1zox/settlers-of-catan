@@ -1,0 +1,125 @@
+<main class="shell">
+  <section class="ui-layer">
+    <button
+      type="button"
+      class="shell-back-btn"
+      [disabled]="lobbyFlow.isJoinInProgress() || lobbyGameUi.isLobbyLoading()"
+      [attr.aria-label]="'shell.backLeaveLobbyAria' | translate"
+      (click)="lobbyFlow.requestLeaveLobby()"
+    >
+      <span class="shell-back-btn__icon" aria-hidden="true">&#8592;</span>
+    </button>
+
+    <app-disconnect-banner />
+
+    @if (lobbyFlow.leaveLobbyPromptOpen()) {
+      <div class="shell-leave-overlay" role="presentation">
+        <button
+          type="button"
+          class="shell-leave-overlay__backdrop"
+          [attr.aria-label]="'shell.dismissLeaveDialogAria' | translate"
+          (click)="lobbyFlow.dismissLeaveLobbyPrompt()"
+        ></button>
+        <div
+          class="shell-leave-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="shell-leave-heading"
+        >
+          <h2 id="shell-leave-heading" class="shell-leave-dialog__title">
+            {{ 'shell.leaveLobbyPromptTitle' | translate }}
+          </h2>
+          <p class="shell-leave-dialog__hint">{{ 'shell.leaveLobbyPromptHint' | translate }}</p>
+          <div class="shell-leave-dialog__actions">
+            <button type="button" class="button--ghost" (click)="lobbyFlow.dismissLeaveLobbyPrompt()">
+              {{ 'shell.leaveLobbyNo' | translate }}
+            </button>
+            <button type="button" class="button--danger" (click)="lobbyFlow.confirmLeaveLobby()">
+              {{ 'shell.leaveLobbyYes' | translate }}
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <article class="panel">
+      <header class="panel__header">
+        <h1>{{ 'shell.appTitle' | translate }}</h1>
+        <p>{{ 'shell.appSubtitle' | translate }}</p>
+      </header>
+
+      @if (shellFeedback.feedback() !== null) {
+        <p
+          class="feedback"
+          [class.feedback--info]="shellFeedback.feedback()?.tone === feedbackToneEnum.Info"
+          [class.feedback--success]="shellFeedback.feedback()?.tone === feedbackToneEnum.Success"
+          [class.feedback--error]="shellFeedback.feedback()?.tone === feedbackToneEnum.Error"
+          aria-live="polite"
+        >
+          {{ shellFeedback.feedback()?.message }}
+        </p>
+      }
+
+      <div class="lobby-block">
+        <div class="lobby-code-display">
+          <span class="lobby-code-display__label">{{ 'shell.lobbyCodeLabel' | translate }}</span>
+          <span class="lobby-code-display__code">{{ lobbyCode() }}</span>
+        </div>
+
+        @if (lobbyFlow.isJoinInProgress()) {
+          <p class="status">
+            <span class="status-spinner" aria-hidden="true"></span>
+            <span>{{ 'shell.statusJoinInProgress' | translate }}</span>
+          </p>
+        } @else if (lobbyGameUi.isLobbyLoading()) {
+          <p class="status">
+            <span class="status-spinner" aria-hidden="true"></span>
+            <span>{{ 'shell.statusLoadingLobbyState' | translate }}</span>
+          </p>
+        }
+
+        <ul class="seat-list">
+          @for (seat of lobbyGameUi.lobbyUiState()?.seats ?? []; track seat.seat) {
+            <li class="seat-item">
+              <div>
+                <p class="seat-title">{{ seat.seatLabel }}</p>
+                <p class="seat-name">{{ seat.playerName }}</p>
+              </div>
+              <div class="seat-badges">
+                @if (seat.isSelf) {
+                  <span class="badge">{{ 'shell.badgeSelf' | translate }}</span>
+                }
+                @if (seat.isConnected) {
+                  <span class="badge badge--online">{{ 'shell.badgeOnline' | translate }}</span>
+                } @else {
+                  <span class="badge badge--offline">{{ 'shell.badgeOffline' | translate }}</span>
+                }
+              </div>
+            </li>
+          }
+        </ul>
+
+        <div class="button-row">
+          @if (lobbyGameUi.canStartLobby()) {
+            <button
+              type="button"
+              [disabled]="lobbyFlow.isJoinInProgress() || lobbyGameUi.isLobbyLoading()"
+              (click)="startLobby()"
+            >
+              {{ 'shell.buttonStartGame' | translate }}
+            </button>
+          }
+          @if (lobbyGameUi.canFillLobbyWithBots()) {
+            <button
+              type="button"
+              [disabled]="lobbyFlow.isJoinInProgress() || lobbyGameUi.isLobbyLoading()"
+              (click)="fillLobbyWithBots()"
+            >
+              {{ 'shell.buttonFillBots' | translate }}
+            </button>
+          }
+        </div>
+      </div>
+    </article>
+  </section>
+</main>

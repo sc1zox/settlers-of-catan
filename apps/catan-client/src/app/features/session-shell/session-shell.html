@@ -1,114 +1,96 @@
 <main class="shell">
-  @if (
-    ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.Lobby ||
-    ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.InGame
-  ) {
-    <app-game-canvas
-      class="canvas-layer"
-      [buildMode]="ui.buildFlow.buildMode()"
-      [freeRoadMode]="ui.buildFlow.freeRoadMode()"
-      [robberMode]="ui.robberMode()"
-      [diceRollClickEnabled]="ui.lobbyGameUi.canRollDice() && !ui.spectatorCamService.mode()"
-      [devCardPlayable]="ui.devCards.canPlayDevCard()"
-      [uiChromeHidden]="ui.spectatorCamService.mode()"
-      (arsenalBuild)="ui.buildFlow.onArsenalBuild($event)"
-      (buildSpotPicked)="ui.buildFlow.onBuildSpotPicked($event)"
-      (robberTilePicked)="ui.robberFlow.onRobberTilePicked($event)"
-      (buildModeCancelled)="ui.buildFlow.onBuildModeCancelled()"
-      (playDevCard)="ui.devOverlay.onPlayDevCard($event)"
-      (rollDiceRequested)="ui.rollDice()"
-    />
-  }
+  <app-game-canvas
+    class="canvas-layer"
+    [buildMode]="ui.buildFlow.buildMode()"
+    [freeRoadMode]="ui.buildFlow.freeRoadMode()"
+    [robberMode]="ui.robberMode()"
+    [diceRollClickEnabled]="ui.lobbyGameUi.canRollDice() && !ui.spectatorCamService.mode()"
+    [devCardPlayable]="ui.devCards.canPlayDevCard()"
+    [uiChromeHidden]="ui.spectatorCamService.mode()"
+    (arsenalBuild)="ui.buildFlow.onArsenalBuild($event)"
+    (buildSpotPicked)="ui.buildFlow.onBuildSpotPicked($event)"
+    (robberTilePicked)="ui.robberFlow.onRobberTilePicked($event)"
+    (buildModeCancelled)="ui.buildFlow.onBuildModeCancelled()"
+    (playDevCard)="ui.devOverlay.onPlayDevCard($event)"
+    (rollDiceRequested)="ui.rollDice()"
+  />
+
   <section class="ui-layer">
-    @if (
-      ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.Lobby ||
-      ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.InGame
-    ) {
-      <button
-        type="button"
-        class="shell-back-btn"
-        [disabled]="ui.lobbyFlow.isJoinInProgress() || ui.lobbyGameUi.isLobbyLoading()"
-        [attr.aria-label]="'shell.backLeaveLobbyAria' | translate"
-        (click)="ui.lobbyFlow.requestLeaveLobby()"
+    <button
+      type="button"
+      class="shell-back-btn"
+      [attr.aria-label]="'shell.backLeaveLobbyAria' | translate"
+      (click)="ui.lobbyFlow.requestLeaveLobby()"
+    >
+      <span class="shell-back-btn__icon" aria-hidden="true">&#8592;</span>
+    </button>
+    <app-disconnect-banner />
+    @if (ui.lobbyFlow.summaryScreenVisible()) {
+      <app-summary-screen (returnToMenu)="ui.lobbyFlow.backToJoinLobby()" />
+    }
+    @if (ui.lobbyDepartedFeed.entries().length > 0) {
+      <aside
+        class="shell-activity-feed"
+        role="log"
+        aria-relevant="additions"
+        aria-live="polite"
+        [attr.aria-label]="'shell.activityFeedAria' | translate"
       >
-        <span class="shell-back-btn__icon" aria-hidden="true">&#8592;</span>
-      </button>
-      <app-disconnect-banner />
-      @if (ui.lobbyFlow.summaryScreenVisible()) {
-        <app-summary-screen (returnToMenu)="ui.lobbyFlow.backToJoinLobby()" />
-      }
-      @if (ui.lobbyDepartedFeed.entries().length > 0) {
-        <aside
-          class="shell-activity-feed"
-          role="log"
-          aria-relevant="additions"
-          aria-live="polite"
-          [attr.aria-label]="'shell.activityFeedAria' | translate"
+        <div class="shell-activity-feed__chrome">
+          <span class="shell-activity-feed__title">{{
+            'shell.activityFeedHeading' | translate
+          }}</span>
+        </div>
+        <div class="shell-activity-feed__stream">
+          @for (
+            row of ui.lobbyDepartedFeed.entries().slice(-8);
+            track row.id
+          ) {
+            <p class="shell-activity-feed__bubble">{{ row.text }}</p>
+          }
+        </div>
+      </aside>
+    }
+    @if (ui.lobbyFlow.leaveLobbyPromptOpen()) {
+      <div class="shell-leave-overlay" role="presentation">
+        <button
+          type="button"
+          class="shell-leave-overlay__backdrop"
+          [attr.aria-label]="'shell.dismissLeaveDialogAria' | translate"
+          (click)="ui.lobbyFlow.dismissLeaveLobbyPrompt()"
+        ></button>
+        <div
+          class="shell-leave-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="shell-leave-heading"
         >
-          <div class="shell-activity-feed__chrome">
-            <span class="shell-activity-feed__title">{{
-              'shell.activityFeedHeading' | translate
-            }}</span>
-          </div>
-          <div class="shell-activity-feed__stream">
-            @for (
-              row of ui.lobbyDepartedFeed.entries().slice(-8);
-              track row.id
-            ) {
-              <p class="shell-activity-feed__bubble">{{ row.text }}</p>
-            }
-          </div>
-        </aside>
-      }
-      @if (ui.lobbyFlow.leaveLobbyPromptOpen()) {
-        <div class="shell-leave-overlay" role="presentation">
-          <button
-            type="button"
-            class="shell-leave-overlay__backdrop"
-            [attr.aria-label]="'shell.dismissLeaveDialogAria' | translate"
-            (click)="ui.lobbyFlow.dismissLeaveLobbyPrompt()"
-          ></button>
-          <div
-            class="shell-leave-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="shell-leave-heading"
-          >
-            <h2 id="shell-leave-heading" class="shell-leave-dialog__title">
-              {{ 'shell.leaveLobbyPromptTitle' | translate }}
-            </h2>
-            <p class="shell-leave-dialog__hint">{{ 'shell.leaveLobbyPromptHint' | translate }}</p>
-            <div class="shell-leave-dialog__actions">
-              <button type="button" class="button--ghost" (click)="ui.lobbyFlow.dismissLeaveLobbyPrompt()">
-                {{ 'shell.leaveLobbyNo' | translate }}
-              </button>
-              <button type="button" class="button--danger" (click)="ui.lobbyFlow.confirmLeaveLobby()">
-                {{ 'shell.leaveLobbyYes' | translate }}
-              </button>
-            </div>
+          <h2 id="shell-leave-heading" class="shell-leave-dialog__title">
+            {{ 'shell.leaveLobbyPromptTitle' | translate }}
+          </h2>
+          <p class="shell-leave-dialog__hint">{{ 'shell.leaveLobbyPromptHint' | translate }}</p>
+          <div class="shell-leave-dialog__actions">
+            <button type="button" class="button--ghost" (click)="ui.lobbyFlow.dismissLeaveLobbyPrompt()">
+              {{ 'shell.leaveLobbyNo' | translate }}
+            </button>
+            <button type="button" class="button--danger" (click)="ui.lobbyFlow.confirmLeaveLobby()">
+              {{ 'shell.leaveLobbyYes' | translate }}
+            </button>
           </div>
         </div>
-      }
+      </div>
     }
-    @if (
-      ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.InGame &&
-      !ui.spectatorCamService.mode()
-    ) {
+
+    @if (!ui.spectatorCamService.mode()) {
       <app-player-stats-panel />
       <app-bonus-announce-banner />
     }
-    @if (
-      ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.InGame &&
-      ui.lobbyGameUi.gameFinishedBannerText() !== null
-    ) {
+    @if (ui.lobbyGameUi.gameFinishedBannerText() !== null) {
       <div class="game-finished-banner" role="status" aria-live="polite">
         {{ ui.lobbyGameUi.gameFinishedBannerText() }}
       </div>
     }
-    @if (
-      ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.InGame &&
-      ui.lobbyGameUi.announcerEntry().text.length > 0
-    ) {
+    @if (ui.lobbyGameUi.announcerEntry().text.length > 0) {
       <aside class="hud-bottom-dock" role="status" aria-live="polite">
         @for (entry of [ui.lobbyGameUi.announcerEntry()]; track entry.id) {
           <p class="hud-bottom-dock__announcer">{{ entry.text }}</p>
@@ -117,16 +99,31 @@
     }
 
     @if (!ui.spectatorCamService.mode()) {
-      @if (ui.lobbyFlow.uiStep() !== ui.lobbyUiStepEnum.InGame) {
-        <article class="panel">
-          <header class="panel__header">
-            <h1>{{ 'shell.appTitle' | translate }}</h1>
-            <p>{{ 'shell.appSubtitle' | translate }}</p>
-          </header>
+      <aside
+        class="hud"
+        [class.hud--spectator-paused]="ui.lobbyGameUi.hudChromeSpectatorPaused()"
+      >
+        <div class="hud__chrome">
+          <div class="hud__stats">
+            <div class="hud__stats-row">
+              <div class="hud__stat">
+                <span>{{ 'shell.hudLargestArmy' | translate }}</span>
+                <strong>{{ ui.lobbyGameUi.largestArmyLabel() }}</strong>
+              </div>
+              <div class="hud__stat">
+                <span>{{ 'shell.hudLongestRoad' | translate }}</span>
+                <strong>{{ ui.lobbyGameUi.longestRoadLabel() }}</strong>
+              </div>
+            </div>
+            <div class="hud__stat hud__stat--phase">
+              <span>{{ 'shell.hudPhase' | translate }}</span>
+              <strong>{{ ui.lobbyGameUi.phaseLabel() }}</strong>
+            </div>
+          </div>
 
           @if (ui.shellFeedback.feedback() !== null) {
             <p
-              class="feedback"
+              class="hud__feedback feedback"
               [class.feedback--info]="
                 ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Info
               "
@@ -142,312 +139,99 @@
             </p>
           }
 
-          @if (ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.SignIn) {
-            <form class="form-block" [formGroup]="ui.sessionForm" (ngSubmit)="ui.startSession()">
-              <label for="displayName">{{ 'shell.labelDisplayName' | translate }}</label>
-              <input
-                id="displayName"
-                type="text"
-                autocomplete="nickname"
-                formControlName="displayName"
-              />
-              @if (
-                ui.sessionForm.controls.displayName.invalid &&
-                ui.sessionForm.controls.displayName.touched
-              ) {
-                <p class="status">{{ 'shell.validationDisplayName' | translate }}</p>
-              }
-              <div class="webcam-option">
-                <div class="webcam-option__intro">
-                  <span class="webcam-option__icon" aria-hidden="true"></span>
-                  <div class="webcam-option__copy">
-                    <p class="webcam-option__title">{{ 'shell.webcamTitle' | translate }}</p>
-                    <p class="webcam-option__hint">{{ 'shell.webcamHint' | translate }}</p>
-                  </div>
-                </div>
-                <label class="webcam-option__toggle">
-                  <input
-                    type="checkbox"
-                    class="webcam-option__input"
-                    [checked]="ui.gameSettings.webcamEnabled()"
-                    (change)="ui.onWebcamEnabledChange($event)"
-                  />
-                  <span class="webcam-option__track" aria-hidden="true">
-                    <span class="webcam-option__thumb"></span>
-                  </span>
-                  <span class="webcam-option__label">{{ 'shell.webcamToggle' | translate }}</span>
-                </label>
-              </div>
-              <div class="button-row">
-                <button type="submit">{{ 'shell.buttonStartSession' | translate }}</button>
-              </div>
-            </form>
-          }
-
-          @if (ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.JoinLobby) {
-            <form class="form-block" [formGroup]="ui.lobbyForm" (ngSubmit)="ui.joinLobby()">
-              <p class="session-pill">
-                {{
-                  'shell.sessionPill'
-                    | translate: { displayName: ui.lobbyFlow.sessionState()?.displayName ?? '' }
-                }}
-              </p>
-              @if (ui.lobbyFlow.lastLobbyRejoinAvailable()) {
-                <div class="button-row">
-                  <button
-                    type="button"
-                    [disabled]="ui.lobbyFlow.isJoinInProgress()"
-                    (click)="ui.lobbyFlow.submitRejoinLastLobby()"
-                  >
-                    {{
-                      'shell.buttonRejoinLastLobby'
-                        | translate: { lobbyCode: ui.lobbyFlow.lastLobbyCode() }
-                    }}
-                  </button>
-                </div>
-              }
-              <label for="lobbyCode">{{ 'shell.labelLobbyCode' | translate }}</label>
-              <input id="lobbyCode" type="text" autocomplete="off" formControlName="lobbyCode" />
-              @if (
-                ui.lobbyForm.controls.lobbyCode.invalid && ui.lobbyForm.controls.lobbyCode.touched
-              ) {
-                <p class="status">{{ 'shell.validationLobbyCode' | translate }}</p>
-              }
-              <div class="button-row">
-                <button
-                  type="button"
-                  class="button--ghost"
-                  [disabled]="ui.lobbyFlow.isJoinInProgress()"
-                  (click)="ui.lobbyFlow.backToSignIn()"
-                >
-                  {{ 'shell.buttonChangeName' | translate }}
-                </button>
-                <button type="submit" [disabled]="ui.lobbyFlow.isJoinInProgress()">
-                  @if (ui.lobbyFlow.isJoinInProgress()) {
-                    <span class="button-spinner" aria-hidden="true"></span>
-                    <span>{{ 'shell.buttonJoining' | translate }}</span>
-                  } @else {
-                    <span>{{ 'shell.buttonJoinGame' | translate }}</span>
-                  }
-                </button>
-                <button
-                  type="button"
-                  [disabled]="ui.lobbyFlow.isJoinInProgress()"
-                  (click)="ui.createLobby()"
-                >
-                  @if (ui.lobbyFlow.isJoinInProgress()) {
-                    <span class="button-spinner" aria-hidden="true"></span>
-                    <span>{{ 'shell.buttonCreating' | translate }}</span>
-                  } @else {
-                    <span>{{ 'shell.buttonCreateLobby' | translate }}</span>
-                  }
-                </button>
-              </div>
-            </form>
-          }
-
-          @if (ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.Lobby) {
-            <div class="lobby-block">
-              @if (ui.lobbyFlow.isJoinInProgress()) {
-                <p class="status">
-                  <span class="status-spinner" aria-hidden="true"></span>
-                  <span>{{ 'shell.statusJoinInProgress' | translate }}</span>
+          <div
+            class="hud__play-surface"
+            [class.hud__play-surface--locked]="ui.lobbyGameUi.hudGameplayLocked()"
+            [class.hud__play-surface--live]="!ui.lobbyGameUi.hudGameplayLocked()"
+          >
+            @if (ui.lobbyGameUi.hudGameplayLocked()) {
+              @if (ui.lobbyGameUi.hudRobberDiscardSelf()) {
+                <p class="hud__play-wait hud__play-wait--accent">
+                  {{ 'shell.hudDiscardPrompt' | translate }}
                 </p>
-              } @else if (ui.lobbyGameUi.isLobbyLoading()) {
-                <p class="status">
-                  <span class="status-spinner" aria-hidden="true"></span>
-                  <span>{{ 'shell.statusLoadingLobbyState' | translate }}</span>
+              } @else if (ui.lobbyGameUi.hudShowPassiveWait()) {
+                <p class="hud__play-wait">
+                  {{
+                    'shell.hudSpectateWait'
+                      | translate: { name: ui.lobbyGameUi.activeTurnPlayerName() }
+                  }}
                 </p>
               }
-
-              <ul class="seat-list">
-                @for (seat of ui.lobbyGameUi.lobbyUiState()?.seats ?? []; track seat.seat) {
-                  <li class="seat-item">
-                    <div>
-                      <p class="seat-title">{{ seat.seatLabel }}</p>
-                      <p class="seat-name">{{ seat.playerName }}</p>
-                    </div>
-                    <div class="seat-badges">
-                      @if (seat.isSelf) {
-                        <span class="badge">{{ 'shell.badgeSelf' | translate }}</span>
-                      }
-                      @if (seat.isConnected) {
-                        <span class="badge badge--online">{{
-                          'shell.badgeOnline' | translate
-                        }}</span>
-                      } @else {
-                        <span class="badge badge--offline">{{
-                          'shell.badgeOffline' | translate
-                        }}</span>
-                      }
-                    </div>
-                  </li>
-                }
-              </ul>
-
-              <div class="button-row">
-                @if (ui.lobbyGameUi.canStartLobby()) {
-                  <button
-                    type="button"
-                    [disabled]="ui.lobbyFlow.isJoinInProgress() || ui.lobbyGameUi.isLobbyLoading()"
-                    (click)="ui.startLobby()"
-                  >
-                    {{ 'shell.buttonStartGame' | translate }}
-                  </button>
-                }
-                @if (ui.lobbyGameUi.canFillLobbyWithBots()) {
-                  <button
-                    type="button"
-                    [disabled]="ui.lobbyFlow.isJoinInProgress() || ui.lobbyGameUi.isLobbyLoading()"
-                    (click)="ui.fillLobbyWithBots()"
-                  >
-                    {{ 'shell.buttonFillBots' | translate }}
-                  </button>
-                }
-              </div>
-            </div>
-          }
-        </article>
-      } @else {
-        <aside
-          class="hud"
-          [class.hud--spectator-paused]="ui.lobbyGameUi.hudChromeSpectatorPaused()"
-        >
-          <div class="hud__chrome">
-            <div class="hud__stats">
-              <div class="hud__stats-row">
-                <div class="hud__stat">
-                  <span>{{ 'shell.hudLargestArmy' | translate }}</span>
-                  <strong>{{ ui.lobbyGameUi.largestArmyLabel() }}</strong>
-                </div>
-                <div class="hud__stat">
-                  <span>{{ 'shell.hudLongestRoad' | translate }}</span>
-                  <strong>{{ ui.lobbyGameUi.longestRoadLabel() }}</strong>
-                </div>
-              </div>
-              <div class="hud__stat hud__stat--phase">
-                <span>{{ 'shell.hudPhase' | translate }}</span>
-                <strong>{{ ui.lobbyGameUi.phaseLabel() }}</strong>
-              </div>
+            }
+            <div class="hud__actions">
+              @if (ui.lobbyGameUi.canRollDice()) {
+                <button type="button" (click)="ui.rollDice()">
+                  {{ 'shell.buttonRollDice' | translate }}
+                </button>
+              }
+              @if (ui.lobbyGameUi.canOpenTrade()) {
+                <button
+                  type="button"
+                  class="hud__trade-button"
+                  [class.active]="ui.tradingPanel.tradeOpen()"
+                  [class.hud__trade-button--alert]="
+                    ui.tradingPanel.hasMinimisedIncoming() ||
+                    ui.tradingPanel.unseenResponseCount() > 0
+                  "
+                  (click)="ui.tradingPanel.toggleTrade()"
+                >
+                  {{ 'shell.buttonTrade' | translate }}
+                  @if (ui.tradingPanel.unseenResponseCount() > 0) {
+                    <span class="hud__trade-badge">
+                      {{
+                        'trade.responsesBadge'
+                          | translate: { count: ui.tradingPanel.unseenResponseCount() }
+                      }}
+                    </span>
+                  } @else if (ui.tradingPanel.hasMinimisedIncoming()) {
+                    <span class="hud__trade-badge">
+                      {{ 'trade.incomingMinimisedBadge' | translate }}
+                    </span>
+                  }
+                </button>
+              }
+              @if (ui.lobbyGameUi.canFinishTrading()) {
+                <button type="button" (click)="ui.finishTrading()">
+                  {{ 'shell.buttonFinishTrade' | translate }}
+                </button>
+              }
+              @if (ui.devCards.canBuyDevCard()) {
+                <button type="button" (click)="ui.buyDevCard()">
+                  {{ 'shell.buttonBuyDevCard' | translate }} ({{ ui.devCards.devDeckCount() }})
+                </button>
+              }
+              @if (ui.lobbyGameUi.canEndTurn()) {
+                <button type="button" (click)="ui.endTurn()">
+                  {{ 'shell.buttonEndTurn' | translate }}
+                </button>
+              }
             </div>
 
-            @if (ui.shellFeedback.feedback() !== null) {
-              <p
-                class="hud__feedback feedback"
-                [class.feedback--info]="
-                  ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Info
-                "
-                [class.feedback--success]="
-                  ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Success
-                "
-                [class.feedback--error]="
-                  ui.shellFeedback.feedback()?.tone === ui.uiFeedbackToneEnum.Error
-                "
-                aria-live="polite"
-              >
-                {{ ui.shellFeedback.feedback()?.message }}
+            @if (ui.buildFlow.buildMode() !== null) {
+              <p class="hud__hint">{{ 'shell.hintBuildSpot' | translate }}</p>
+            }
+            @if (ui.robberMode()) {
+              <p class="hud__hint">{{ 'shell.hintRobber' | translate }}</p>
+            }
+            @if (
+              ui.lobbyGameUi.canBuildSettlement() ||
+              ui.lobbyGameUi.canBuildRoad() ||
+              ui.lobbyGameUi.canBuildCity()
+            ) {
+              <p class="hud__hint hud__hint--soft">
+                {{ 'shell.hintBuildFromArsenal' | translate }}
               </p>
             }
-
-            <div
-              class="hud__play-surface"
-              [class.hud__play-surface--locked]="ui.lobbyGameUi.hudGameplayLocked()"
-              [class.hud__play-surface--live]="!ui.lobbyGameUi.hudGameplayLocked()"
-            >
-              @if (ui.lobbyGameUi.hudGameplayLocked()) {
-                @if (ui.lobbyGameUi.hudRobberDiscardSelf()) {
-                  <p class="hud__play-wait hud__play-wait--accent">
-                    {{ 'shell.hudDiscardPrompt' | translate }}
-                  </p>
-                } @else if (ui.lobbyGameUi.hudShowPassiveWait()) {
-                  <p class="hud__play-wait">
-                    {{
-                      'shell.hudSpectateWait'
-                        | translate: { name: ui.lobbyGameUi.activeTurnPlayerName() }
-                    }}
-                  </p>
-                }
-              }
-              <div class="hud__actions">
-                @if (ui.lobbyGameUi.canRollDice()) {
-                  <button type="button" (click)="ui.rollDice()">
-                    {{ 'shell.buttonRollDice' | translate }}
-                  </button>
-                }
-                @if (ui.lobbyGameUi.canOpenTrade()) {
-                  <button
-                    type="button"
-                    class="hud__trade-button"
-                    [class.active]="ui.tradingPanel.tradeOpen()"
-                    [class.hud__trade-button--alert]="
-                      ui.tradingPanel.hasMinimisedIncoming() ||
-                      ui.tradingPanel.unseenResponseCount() > 0
-                    "
-                    (click)="ui.tradingPanel.toggleTrade()"
-                  >
-                    {{ 'shell.buttonTrade' | translate }}
-                    @if (ui.tradingPanel.unseenResponseCount() > 0) {
-                      <span class="hud__trade-badge">
-                        {{
-                          'trade.responsesBadge'
-                            | translate: { count: ui.tradingPanel.unseenResponseCount() }
-                        }}
-                      </span>
-                    } @else if (ui.tradingPanel.hasMinimisedIncoming()) {
-                      <span class="hud__trade-badge">
-                        {{ 'trade.incomingMinimisedBadge' | translate }}
-                      </span>
-                    }
-                  </button>
-                }
-                @if (ui.lobbyGameUi.canFinishTrading()) {
-                  <button type="button" (click)="ui.finishTrading()">
-                    {{ 'shell.buttonFinishTrade' | translate }}
-                  </button>
-                }
-                @if (ui.devCards.canBuyDevCard()) {
-                  <button type="button" (click)="ui.buyDevCard()">
-                    {{ 'shell.buttonBuyDevCard' | translate }} ({{ ui.devCards.devDeckCount() }})
-                  </button>
-                }
-                @if (ui.lobbyGameUi.canEndTurn()) {
-                  <button type="button" (click)="ui.endTurn()">
-                    {{ 'shell.buttonEndTurn' | translate }}
-                  </button>
-                }
-              </div>
-
-              @if (ui.buildFlow.buildMode() !== null) {
-                <p class="hud__hint">{{ 'shell.hintBuildSpot' | translate }}</p>
-              }
-              @if (ui.robberMode()) {
-                <p class="hud__hint">{{ 'shell.hintRobber' | translate }}</p>
-              }
-              @if (
-                ui.lobbyGameUi.canBuildSettlement() ||
-                ui.lobbyGameUi.canBuildRoad() ||
-                ui.lobbyGameUi.canBuildCity()
-              ) {
-                <p class="hud__hint hud__hint--soft">
-                  {{ 'shell.hintBuildFromArsenal' | translate }}
-                </p>
-              }
-            </div>
           </div>
-        </aside>
-      }
+        </div>
+      </aside>
     }
   </section>
 
   <app-spectator-camera-toggle [visible]="true" />
-  <app-game-settings-toggle
-    [visible]="
-      ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.Lobby ||
-      ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.InGame
-    "
-  />
+  <app-game-settings-toggle [visible]="true" />
 
-  @if (ui.lobbyFlow.uiStep() === ui.lobbyUiStepEnum.InGame && !ui.spectatorCamService.mode()) {
+  @if (!ui.spectatorCamService.mode()) {
     <app-build-confirm-popover
       [model]="ui.buildFlow.buildConfirm()"
       (confirm)="ui.buildFlow.confirmBuild()"

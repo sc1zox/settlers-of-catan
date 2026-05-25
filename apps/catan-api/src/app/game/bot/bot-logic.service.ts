@@ -33,6 +33,7 @@ export class BotLogicService {
       if (pick) {
         return { type: 'moveRobber', q: pick.q, r: pick.r, victimSeat: pick.victimSeat };
       }
+      return this.pickFallbackRobberMove(lobby);
     }
 
     if (phase === GamePhase.Trading) {
@@ -56,7 +57,7 @@ export class BotLogicService {
         }
         return { type: 'buildSettlement', vertexId: bestVertex };
       }
-      if (this.validation.canAffordDevCardCost(bot)) {
+      if (this.validation.canAffordDevCardCost(bot) && lobby.devDeck.length > 0) {
         return { type: 'buyDevCard' };
       }
       if (moves.roads.length > 0) {
@@ -88,6 +89,20 @@ export class BotLogicService {
       }
     }
     return { type: 'discard', resources: discard };
+  }
+
+  private pickFallbackRobberMove(lobby: LobbyRuntime): BotAction {
+    for (let i = 0; i < lobby.tiles.length; i += 1) {
+      const tile = lobby.tiles[i];
+      if (tile.type === TileType.Water || tile.type === TileType.Desert) {
+        continue;
+      }
+      if (tile.coord.q === lobby.robberCoord.q && tile.coord.r === lobby.robberCoord.r) {
+        continue;
+      }
+      return { type: 'moveRobber', q: tile.coord.q, r: tile.coord.r, victimSeat: undefined };
+    }
+    return { type: 'none' };
   }
 
   public pickRobberMove(

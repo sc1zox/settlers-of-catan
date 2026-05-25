@@ -1,5 +1,4 @@
-import { inject, Injectable, Signal } from '@angular/core';
-import { LobbyUiStep } from './lobby-ui-state';
+import { inject, Injectable } from '@angular/core';
 import { LobbyActionCapabilitiesUiService } from './lobby-action-capabilities-ui.service';
 import { LobbyDiscardUiService } from './lobby-discard-ui.service';
 import { LobbyGameUiStateService } from './lobby-game-ui-state.service';
@@ -13,10 +12,6 @@ export class LobbyShellGameUiService {
   private readonly capabilities = inject(LobbyActionCapabilitiesUiService);
   private readonly tradeSession = inject(TradeSessionService);
   private readonly discardUi = inject(LobbyDiscardUiService);
-
-  public attachUiStep(uiStep: Signal<LobbyUiStep>): void {
-    this.core.attachUiStep(uiStep);
-  }
 
   public readonly lobbyUiState = this.core.lobbyUiState;
   public readonly rawLobbyState = this.core.rawLobbyState;

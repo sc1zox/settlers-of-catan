@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { SessionShell } from './features/session-shell/session-shell';
+import { RouterOutlet } from '@angular/router';
 
 @Component({
   selector: 'app-root',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SessionShell],
+  imports: [RouterOutlet],
   templateUrl: './app.html',
 })
 export class App {}

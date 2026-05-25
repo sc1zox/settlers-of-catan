@@ -1,53 +1,17 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import { GamePhase, PlayerSeat, ResourceType } from '@catan/api-interfaces';
+import { forwardRef, Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { GamePhase, PlayerSeat } from '@catan/api-interfaces';
 import { Server } from 'socket.io';
 import {
   CLOCKWISE_SEATS,
-  getOccupiedSeatsClockwise,
   type LobbyPlayerSlot,
   LobbyRuntime,
 } from '../lobby/lobby-runtime';
-import { BotLogicService } from './bot-logic.service';
+import { LobbyService } from '../lobby/lobby.service';
+import { BotLogicService, type BotAction } from './bot-logic.service';
 import { BotManagementService } from './bot-management.service';
 import { BOT_ACTION_DELAY_MS } from './bot.config';
+import { GameService } from '../core/game.service';
 
-export interface BotSetupCallbacks {
-  getLobby(lobbyId: string): LobbyRuntime | undefined;
-  buildSettlement(lobbyId: string, sessionToken: string, vertexId: string, server: Server): void;
-  buildRoad(lobbyId: string, sessionToken: string, edgeId: string, server: Server): void;
-}
-
-export interface BotMainGameCallbacks {
-  getLobby(lobbyId: string): LobbyRuntime | undefined;
-  rollDice(lobbyId: string, sessionToken: string, server: Server): void;
-  completeTradingPhaseAndExpireOffers(lobbyId: string, sessionToken: string, server: Server): void;
-  endTurn(lobbyId: string, sessionToken: string, server: Server): void;
-  submitRobberDiscard(
-    lobbyId: string,
-    sessionToken: string,
-    discard: Readonly<Partial<Record<ResourceType, number>>>,
-    server: Server,
-  ): void;
-  moveRobber(
-    lobbyId: string,
-    sessionToken: string,
-    q: number,
-    r: number,
-    victimSeat: PlayerSeat | undefined,
-    server: Server,
-  ): void;
-  buildSettlement(lobbyId: string, sessionToken: string, vertexId: string, server: Server): void;
-  buildRoad(lobbyId: string, sessionToken: string, edgeId: string, server: Server): void;
-  buildCity(lobbyId: string, sessionToken: string, vertexId: string, server: Server): void;
-  buyDevCard(lobbyId: string, sessionToken: string, server: Server): void;
-}
-
-/**
- * Drives bots one action at a time on a timer. A bot's placement triggers a
- * FullState broadcast, the broadcast hook schedules the next tick, and the
- * chain stops when no bot needs to act. The pacing matches the client's
- * arsenal fly-in duration so each piece reveals before the next one starts.
- */
 @Injectable()
 export class BotService implements OnModuleDestroy {
   private readonly logger = new Logger(BotService.name);
@@ -55,6 +19,9 @@ export class BotService implements OnModuleDestroy {
   private readonly mainGameTicks = new Map<string, NodeJS.Timeout>();
 
   public constructor(
+    @Inject(forwardRef(() => GameService))
+    private readonly gameService: GameService,
+    private readonly lobbyService: LobbyService,
     private readonly logic: BotLogicService,
     private readonly management: BotManagementService,
   ) {}
@@ -66,44 +33,38 @@ export class BotService implements OnModuleDestroy {
     this.mainGameTicks.clear();
   }
 
-  public afterLobbyBroadcast(
-    lobbyId: string,
-    server: Server,
-    callbacks: BotMainGameCallbacks,
-  ): void {
+  public afterLobbyBroadcast(lobbyId: string, server: Server): void {
     if (this.mainGameTicks.has(lobbyId)) return;
-    if (!this.hasPendingMainGameBotAction(lobbyId, callbacks)) return;
+    if (!this.hasPendingMainGameBotAction(lobbyId)) return;
+    const lobby = this.lobbyService.getLobby(lobbyId);
+    const phase = lobby?.fsm.getPhase();
+    const seat = lobby?.currentSeat;
+    this.logger.debug(`scheduling bot tick: lobby=${lobbyId} phase=${phase} seat=${seat}`);
     const timer = setTimeout(() => {
       this.mainGameTicks.delete(lobbyId);
       try {
-        this.tryOneMainGameAction(lobbyId, server, callbacks);
+        this.executeMainGameAction(lobbyId, server);
       } catch (error: unknown) {
         this.logAutoplayFailure(lobbyId, error);
+        this.scheduleRetryIfStillPending(lobbyId, server);
       }
     }, BOT_ACTION_DELAY_MS);
     this.mainGameTicks.set(lobbyId, timer);
   }
 
-  public runSetupAutoplay(
-    lobbyId: string,
-    server: Server,
-    callbacks: BotSetupCallbacks,
-  ): void {
+  public runSetupAutoplay(lobbyId: string, server: Server): void {
     if (this.setupTicks.has(lobbyId)) return;
-    if (!this.hasPendingSetupBotAction(lobbyId, callbacks)) return;
+    if (!this.hasPendingSetupBotAction(lobbyId)) return;
     const timer = setTimeout(() => {
       this.setupTicks.delete(lobbyId);
       try {
-        this.runOneSetupAction(lobbyId, server, callbacks);
+        this.executeSetupAction(lobbyId, server);
       } catch (error: unknown) {
         this.logAutoplayFailure(lobbyId, error);
+        this.scheduleSetupRetryIfStillPending(lobbyId, server);
       }
     }, BOT_ACTION_DELAY_MS);
     this.setupTicks.set(lobbyId, timer);
-  }
-
-  public getActiveTurnSeats(lobby: LobbyRuntime): PlayerSeat[] {
-    return getOccupiedSeatsClockwise(lobby);
   }
 
   public respondToTradePropose(
@@ -125,43 +86,85 @@ export class BotService implements OnModuleDestroy {
     }
   }
 
-  private hasPendingSetupBotAction(lobbyId: string, callbacks: BotSetupCallbacks): boolean {
-    const lobby = callbacks.getLobby(lobbyId);
-    if (!lobby) return false;
-    if (!this.isSetupPhase(lobby.fsm.getPhase())) return false;
-    const current = lobby.findPlayerBySeat(lobby.currentSeat);
-    return current !== undefined && this.management.isBotSessionToken(current.sessionToken);
-  }
-
-  private hasPendingMainGameBotAction(
-    lobbyId: string,
-    callbacks: BotMainGameCallbacks,
-  ): boolean {
-    const lobby = callbacks.getLobby(lobbyId);
-    if (!lobby) return false;
+  private executeMainGameAction(lobbyId: string, server: Server): void {
+    const lobby = this.lobbyService.getLobby(lobbyId);
+    if (!lobby) {
+      this.logger.warn(`bot tick: lobby ${lobbyId} not found`);
+      return;
+    }
     const phase = lobby.fsm.getPhase();
-    if (
-      phase === GamePhase.LobbyWaiting ||
-      phase === GamePhase.SetupForward ||
-      phase === GamePhase.SetupBackward ||
-      phase === GamePhase.Finished ||
-      phase === GamePhase.Summary
-    ) {
-      return false;
+    if (this.isInactivePhase(phase)) {
+      return;
     }
+
     if (phase === GamePhase.RobberDiscard) {
-      return this.firstBotNeedingRobberDiscard(lobby) !== undefined;
+      this.handleRobberDiscard(lobby, lobbyId, server);
+      return;
     }
+
     const current = lobby.findPlayerBySeat(lobby.currentSeat);
-    return current !== undefined && this.management.isBotSessionToken(current.sessionToken);
+    if (!current || !this.management.isBotSessionToken(current.sessionToken)) {
+      return;
+    }
+
+    const action = this.logic.decideMainGameAction(lobby, current);
+    this.logger.debug(`bot action: seat=${current.seat} phase=${phase} action=${action.type}`);
+    this.dispatchAction(action, lobbyId, current.sessionToken, server);
   }
 
-  private runOneSetupAction(
+  private dispatchAction(
+    action: BotAction,
     lobbyId: string,
+    sessionToken: string,
     server: Server,
-    callbacks: BotSetupCallbacks,
   ): void {
-    const lobby = callbacks.getLobby(lobbyId);
+    switch (action.type) {
+      case 'rollDice':
+        this.gameService.rollDice(lobbyId, sessionToken, server);
+        return;
+      case 'moveRobber':
+        this.gameService.moveRobber(lobbyId, sessionToken, action.q, action.r, action.victimSeat, server);
+        return;
+      case 'completeTrading':
+        this.gameService.finishTrading(lobbyId, sessionToken, server);
+        return;
+      case 'buildSettlement':
+        this.gameService.buildSettlement(lobbyId, sessionToken, action.vertexId, server);
+        return;
+      case 'buildCity':
+        this.gameService.buildCity(lobbyId, sessionToken, action.vertexId, server);
+        return;
+      case 'buildRoad':
+        this.gameService.buildRoad(lobbyId, sessionToken, action.edgeId, server);
+        return;
+      case 'buyDevCard':
+        this.gameService.buyDevCard(lobbyId, sessionToken, server);
+        return;
+      case 'endTurn':
+        this.gameService.endTurn(lobbyId, sessionToken, server);
+        return;
+      case 'discard':
+        this.gameService.submitRobberDiscard(lobbyId, sessionToken, action.resources, server);
+        return;
+      default:
+        this.logger.warn(`Bot has no action for lobby ${lobbyId}`);
+        return;
+    }
+  }
+
+  private handleRobberDiscard(lobby: LobbyRuntime, lobbyId: string, server: Server): void {
+    const bot = this.firstBotNeedingRobberDiscard(lobby);
+    if (bot === undefined) {
+      return;
+    }
+    const action = this.logic.pickRobberDiscard(lobby, bot);
+    if (action.type === 'discard') {
+      this.gameService.submitRobberDiscard(lobbyId, bot.sessionToken, action.resources, server);
+    }
+  }
+
+  private executeSetupAction(lobbyId: string, server: Server): void {
+    const lobby = this.lobbyService.getLobby(lobbyId);
     if (!lobby) return;
     if (!this.isSetupPhase(lobby.fsm.getPhase())) return;
     const current = lobby.findPlayerBySeat(lobby.currentSeat);
@@ -178,80 +181,62 @@ export class BotService implements OnModuleDestroy {
         lobby.pendingSetupRoadFromVertexId,
       );
       if (roadEdgeId === null) return;
-      callbacks.buildRoad(lobbyId, current.sessionToken, roadEdgeId, server);
+      this.gameService.buildRoad(lobbyId, current.sessionToken, roadEdgeId, server);
       return;
     }
     const settlementVertexId = this.logic.pickLegalSetupSettlementVertex(lobby, current);
     if (settlementVertexId === null) return;
-    callbacks.buildSettlement(lobbyId, current.sessionToken, settlementVertexId, server);
+    this.gameService.buildSettlement(lobbyId, current.sessionToken, settlementVertexId, server);
   }
 
-  private logAutoplayFailure(_lobbyId: string, _error: unknown): void {
-    this.logger.debug('Bot autoplay step skipped');
-  }
-
-  private tryOneMainGameAction(
-    lobbyId: string,
-    server: Server,
-    callbacks: BotMainGameCallbacks,
-  ): void {
-    const lobby = callbacks.getLobby(lobbyId);
-    if (!lobby) return;
+  private hasPendingMainGameBotAction(lobbyId: string): boolean {
+    const lobby = this.lobbyService.getLobby(lobbyId);
+    if (!lobby) return false;
     const phase = lobby.fsm.getPhase();
-    if (
-      phase === GamePhase.LobbyWaiting ||
-      phase === GamePhase.SetupForward ||
-      phase === GamePhase.SetupBackward ||
-      phase === GamePhase.Finished ||
-      phase === GamePhase.Summary
-    ) {
-      return;
+    if (this.isInactivePhase(phase)) {
+      return false;
     }
-
     if (phase === GamePhase.RobberDiscard) {
-      const bot = this.firstBotNeedingRobberDiscard(lobby);
-      if (bot === undefined) return;
-      const action = this.logic.pickRobberDiscard(lobby, bot);
-      if (action.type === 'discard') {
-        callbacks.submitRobberDiscard(lobbyId, bot.sessionToken, action.resources, server);
-      }
-      return;
+      return this.firstBotNeedingRobberDiscard(lobby) !== undefined;
     }
-
     const current = lobby.findPlayerBySeat(lobby.currentSeat);
-    if (!current || !this.management.isBotSessionToken(current.sessionToken)) {
-      return;
-    }
+    return current !== undefined && this.management.isBotSessionToken(current.sessionToken);
+  }
 
-    const action = this.logic.decideMainGameAction(lobby, current);
-    switch (action.type) {
-      case 'rollDice':
-        callbacks.rollDice(lobbyId, current.sessionToken, server);
-        return;
-      case 'moveRobber':
-        callbacks.moveRobber(lobbyId, current.sessionToken, action.q, action.r, action.victimSeat, server);
-        return;
-      case 'completeTrading':
-        callbacks.completeTradingPhaseAndExpireOffers(lobbyId, current.sessionToken, server);
-        return;
-      case 'buildCity':
-        callbacks.buildCity(lobbyId, current.sessionToken, action.vertexId, server);
-        return;
-      case 'buildSettlement':
-        callbacks.buildSettlement(lobbyId, current.sessionToken, action.vertexId, server);
-        return;
-      case 'buyDevCard':
-        callbacks.buyDevCard(lobbyId, current.sessionToken, server);
-        return;
-      case 'buildRoad':
-        callbacks.buildRoad(lobbyId, current.sessionToken, action.edgeId, server);
-        return;
-      case 'endTurn':
-        callbacks.endTurn(lobbyId, current.sessionToken, server);
-        return;
-      default:
-        return;
-    }
+  private hasPendingSetupBotAction(lobbyId: string): boolean {
+    const lobby = this.lobbyService.getLobby(lobbyId);
+    if (!lobby) return false;
+    if (!this.isSetupPhase(lobby.fsm.getPhase())) return false;
+    const current = lobby.findPlayerBySeat(lobby.currentSeat);
+    return current !== undefined && this.management.isBotSessionToken(current.sessionToken);
+  }
+
+  private scheduleRetryIfStillPending(lobbyId: string, server: Server): void {
+    if (this.mainGameTicks.has(lobbyId)) return;
+    if (!this.hasPendingMainGameBotAction(lobbyId)) return;
+    const retry = setTimeout(() => {
+      this.mainGameTicks.delete(lobbyId);
+      try {
+        this.executeMainGameAction(lobbyId, server);
+      } catch (error: unknown) {
+        this.logAutoplayFailure(lobbyId, error);
+      }
+    }, BOT_ACTION_DELAY_MS);
+    this.mainGameTicks.set(lobbyId, retry);
+  }
+
+  private scheduleSetupRetryIfStillPending(lobbyId: string, server: Server): void {
+    if (this.setupTicks.has(lobbyId)) return;
+    if (!this.hasPendingSetupBotAction(lobbyId)) return;
+    const retry = setTimeout(() => {
+      this.setupTicks.delete(lobbyId);
+      try {
+        this.executeSetupAction(lobbyId, server);
+      } catch (error: unknown) {
+        this.logAutoplayFailure(lobbyId, error);
+      }
+    }, BOT_ACTION_DELAY_MS);
+    this.setupTicks.set(lobbyId, retry);
   }
 
   private firstBotNeedingRobberDiscard(lobby: LobbyRuntime): LobbyPlayerSlot | undefined {
@@ -268,7 +253,22 @@ export class BotService implements OnModuleDestroy {
     return undefined;
   }
 
+  private isInactivePhase(phase: GamePhase): boolean {
+    return (
+      phase === GamePhase.LobbyWaiting ||
+      phase === GamePhase.SetupForward ||
+      phase === GamePhase.SetupBackward ||
+      phase === GamePhase.Finished ||
+      phase === GamePhase.Summary
+    );
+  }
+
   private isSetupPhase(phase: GamePhase): boolean {
     return phase === GamePhase.SetupForward || phase === GamePhase.SetupBackward;
+  }
+
+  private logAutoplayFailure(lobbyId: string, error: unknown): void {
+    const message = error instanceof Error ? error.message : String(error);
+    this.logger.warn(`Bot autoplay failed in lobby ${lobbyId}: ${message}`);
   }
 }

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BuildActionsModule } from './build/build-actions.module';
 import { BotModule } from './bot/bot.module';
+import { BotService } from './bot/bot.service';
 import { DevCardsModule } from './dev-cards/dev-cards.module';
 import { EconomyModule } from './economy/economy.module';
 import { GameActionValidationModule } from './validation/game-action-validation.module';
@@ -43,6 +44,7 @@ import { TurnFlowModule } from './turn/turn-flow.module';
   providers: [
     GameGateway,
     GameService,
+    BotService,
     SocketConnectionRegistry,
     TradeGatewayService,
     GameGatewayExceptionFilter,

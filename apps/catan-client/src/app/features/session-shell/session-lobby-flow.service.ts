@@ -1,88 +1,58 @@
 import { computed, DestroyRef, effect, inject, Injectable, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Router } from '@angular/router';
 import { marker } from '@colsen1991/ngx-translate-extract-marker';
 import { TranslateService } from '@ngx-translate/core';
-import { firstValueFrom } from 'rxjs';
-import {
-  ClientStorageKey,
-  GamePhase,
-  isLobbyCodeValid,
-  normalizeLobbyCode,
-} from '@catan/api-interfaces';
+import { GamePhase, isLobbyCodeValid } from '@catan/api-interfaces';
+import { ClientStorageKey } from '../../../shared/client-constants';
 import { GameStateResource } from '../../core/game/game-state.resource';
-import { LobbyHttpService } from '../../core/lobby/lobby-http.service';
 import { GameSocketService } from '../../core/socket/game-socket.service';
-import { PlayerSessionService } from '../../core/session/player-session.service';
-import { GameSettingsService } from '../game-settings/game-settings.service';
 import { LobbyLiveKitService } from '../webcam-head/lobby-livekit.service';
-import { LobbyUiStep, SessionUiState, UiFeedbackTone } from '../lobby-game-ui/lobby-ui-state';
+import { LobbyUiStep, UiFeedbackTone } from '../lobby-game-ui/lobby-ui-state';
 import { LobbyShellGameUiService } from '../lobby-game-ui/lobby-shell-game-ui.service';
 import { ShellFeedbackService } from '../shell-feedback/shell-feedback.service';
 import { SpectatorCameraService } from '../spectator-camera/spectator-camera.service';
 import {
   resolveUserFacingErrorMessage,
-  userFacingErrorMessageFromCode,
 } from '../shell-feedback/user-facing-error';
 
 @Injectable()
 export class SessionLobbyFlowService {
+  private readonly router = inject(Router);
   private readonly gameState = inject(GameStateResource);
   private readonly sockets = inject(GameSocketService);
   private readonly shellFeedback = inject(ShellFeedbackService);
-  private readonly playerSession = inject(PlayerSessionService);
   private readonly liveKit = inject(LobbyLiveKitService);
-  private readonly gameSettings = inject(GameSettingsService);
   private readonly spectatorCamService = inject(SpectatorCameraService);
   private readonly translate = inject(TranslateService);
   private readonly lobbyGameUi = inject(LobbyShellGameUiService);
-  private readonly lobbyHttp = inject(LobbyHttpService);
   private readonly destroyRef = inject(DestroyRef);
 
-  public readonly uiStep = signal<LobbyUiStep>(LobbyUiStep.SignIn);
-  public readonly sessionState = signal<SessionUiState | null>(null);
   public readonly joinInProgress = signal<boolean>(false);
   public readonly leaveLobbyPromptOpen = signal<boolean>(false);
-  public readonly lastLobbyCode = signal<string>(readStoredLastLobbyCode());
-  public readonly lastLobbyRejoinAvailable = signal<boolean>(false);
-  private lastLobbyRejoinProbeGeneration = 0;
 
   public readonly isJoinInProgress = computed<boolean>(() => this.joinInProgress());
+
+  public readonly uiStep = computed<LobbyUiStep>(() => {
+    const state = this.lobbyGameUi.lobbyUiState();
+    if (state === null) {
+      return LobbyUiStep.Lobby;
+    }
+    if (state.phase === GamePhase.LobbyWaiting) {
+      return LobbyUiStep.Lobby;
+    }
+    return LobbyUiStep.InGame;
+  });
 
   public readonly summaryScreenVisible = computed<boolean>(() => {
     return this.lobbyGameUi.lobbyUiState()?.phase === GamePhase.Summary;
   });
 
   public constructor() {
-    this.lobbyGameUi.attachUiStep(this.uiStep);
     effect(() => {
-      const state = this.lobbyGameUi.lobbyUiState();
-      if (state === null) {
-        return;
-      }
-      if (state.phase === GamePhase.LobbyWaiting) {
-        if (this.uiStep() === LobbyUiStep.InGame) {
-          this.uiStep.set(LobbyUiStep.Lobby);
-        }
-        return;
-      }
-      if (this.uiStep() !== LobbyUiStep.InGame) {
-        this.uiStep.set(LobbyUiStep.InGame);
-      }
-    });
-    effect(() => {
-      if (this.uiStep() === LobbyUiStep.SignIn) {
+      if (this.uiStep() === LobbyUiStep.Lobby) {
         this.spectatorCamService.reset();
       }
-    });
-    effect(() => {
-      const step = this.uiStep();
-      const lobbyCode = this.lastLobbyCode();
-      const session = this.sessionState();
-      if (step !== LobbyUiStep.JoinLobby || lobbyCode.length === 0 || session === null) {
-        this.lastLobbyRejoinAvailable.set(false);
-        return;
-      }
-      void this.refreshLastLobbyRejoinAvailability(lobbyCode);
     });
     this.sockets.lobbyTerminated$
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -95,6 +65,26 @@ export class SessionLobbyFlowService {
       });
   }
 
+  public connectToLobbyFromRoute(lobbyCode: string): void {
+    if (this.gameState.subscriptionParams() !== undefined) {
+      return;
+    }
+    const displayName = this.readDisplayName();
+    if (displayName.length === 0) {
+      void this.router.navigate(['/sign-in']);
+      return;
+    }
+    if (!isLobbyCodeValid(lobbyCode)) {
+      this.shellFeedback.setFeedback(
+        UiFeedbackTone.Error,
+        this.translate.instant(marker('shell.lobbyCodeTooShortRun')),
+      );
+      void this.router.navigate(['/join']);
+      return;
+    }
+    void this.runReconnectLobby(lobbyCode, displayName);
+  }
+
   public leaveCurrentLobby(): void {
     const phase = this.lobbyGameUi.lobbyUiState()?.phase;
     if (phase === GamePhase.LobbyWaiting) {
@@ -102,47 +92,8 @@ export class SessionLobbyFlowService {
       return;
     }
     if (phase !== undefined) {
-      // Mid-game / finished: the server's `LeaveLobby` handler ignores us here.
-      // Drop the socket so the existing disconnect → grace → cleanup pipeline runs.
       this.sockets.disconnect();
     }
-  }
-
-  public submitStartSession(normalizedDisplayName: string): void {
-    void this.runStartSession(normalizedDisplayName);
-  }
-
-  public submitJoinLobby(sessionState: SessionUiState | null, lobbyCodeInput: string): void {
-    void this.runJoinLobby(sessionState, lobbyCodeInput);
-  }
-
-  public submitCreateLobby(sessionState: SessionUiState | null, lobbyCodeInput: string): void {
-    void this.runCreateLobby(sessionState, lobbyCodeInput);
-  }
-
-  public submitRejoinLastLobby(): void {
-    const code = this.lastLobbyCode();
-    if (code.length === 0) {
-      return;
-    }
-    void this.runJoinLobby(this.sessionState(), code);
-  }
-
-  public forgetLastLobby(): void {
-    this.lastLobbyCode.set('');
-    this.lastLobbyRejoinAvailable.set(false);
-    clearStoredLastLobbyCode();
-  }
-
-  public backToSignIn(): void {
-    void this.liveKit.abandonPrimedLocalVideoCapture();
-    this.joinInProgress.set(false);
-    this.spectatorCamService.reset();
-    this.uiStep.set(LobbyUiStep.SignIn);
-    this.shellFeedback.setFeedback(
-      UiFeedbackTone.Info,
-      this.translate.instant(marker('shell.backToSignIn')),
-    );
   }
 
   public requestLeaveLobby(): void {
@@ -165,110 +116,30 @@ export class SessionLobbyFlowService {
     this.gameState.disconnectLobby();
     this.joinInProgress.set(false);
     this.spectatorCamService.reset();
-    this.forgetLastLobby();
-    this.uiStep.set(LobbyUiStep.JoinLobby);
     this.shellFeedback.setFeedback(
       UiFeedbackTone.Info,
       this.translate.instant(marker('shell.backToJoinLobby')),
     );
+    void this.router.navigate(['/join']);
   }
 
-  public resetSession(): void {
-    this.leaveCurrentLobby();
-    void this.liveKit.abandonPrimedLocalVideoCapture();
-    void this.liveKit.disconnect();
-    this.gameState.disconnectLobby();
-    this.playerSession.clear();
-    this.sessionState.set(null);
-    this.joinInProgress.set(false);
-    this.shellFeedback.clearFeedback();
-    this.spectatorCamService.reset();
-    this.forgetLastLobby();
-    this.uiStep.set(LobbyUiStep.SignIn);
-  }
-
-  public onWebcamEnabledChange(inputChecked: boolean): void {
-    this.gameSettings.setWebcamEnabled(inputChecked);
-    if (inputChecked) {
-      this.liveKit.tryPrime();
-    } else {
-      void this.liveKit.abandonPrimedLocalVideoCapture();
-    }
-  }
-
-  private async runStartSession(normalizedDisplayName: string): Promise<void> {
-    this.liveKit.tryPrime();
-    let sid = this.playerSession.sessionId();
-    if (sid.length === 0) {
-      await this.playerSession.ensureReady();
-      sid = this.playerSession.sessionId();
-    }
-    if (sid.length === 0) {
-      const failureCode = this.playerSession.failureCode();
-      const message =
-        failureCode !== null
-          ? userFacingErrorMessageFromCode(this.translate, failureCode)
-          : this.translate.instant(marker('shell.sessionStartFailed'));
-      this.shellFeedback.setFeedback(UiFeedbackTone.Error, message);
-      return;
-    }
-    this.sessionState.set({ displayName: normalizedDisplayName, sessionId: sid });
-    this.uiStep.set(LobbyUiStep.JoinLobby);
-    this.shellFeedback.setFeedback(
-      UiFeedbackTone.Success,
-      this.translate.instant(marker('shell.welcomeNamed'), {
-        userName: normalizedDisplayName,
-      }),
-    );
-  }
-
-  private async runJoinLobby(
-    session: SessionUiState | null,
-    lobbyCodeInput: string,
-  ): Promise<void> {
-    if (session === null) {
-      this.shellFeedback.setFeedback(
-        UiFeedbackTone.Error,
-        this.translate.instant(marker('shell.sessionMissing')),
-      );
-      this.uiStep.set(LobbyUiStep.SignIn);
-      return;
-    }
-    if (!isLobbyCodeValid(lobbyCodeInput)) {
-      this.shellFeedback.setFeedback(
-        UiFeedbackTone.Error,
-        this.translate.instant(marker('shell.lobbyCodeTooShortRun')),
-      );
-      return;
-    }
-    if (this.liveKit.canJoinWithWebcam() === 'insecureContext') {
-      this.shellFeedback.setFeedback(
-        UiFeedbackTone.Error,
-        this.translate.instant(marker('shell.webcamInsecureContext')),
-      );
-      return;
-    }
+  private async runReconnectLobby(lobbyCode: string, displayName: string): Promise<void> {
     this.joinInProgress.set(true);
     this.shellFeedback.setFeedback(
       UiFeedbackTone.Info,
-      this.translate.instant(marker('shell.joinConnecting'), {
-        lobbyCode: lobbyCodeInput,
-      }),
+      this.translate.instant(marker('shell.joinConnecting'), { lobbyCode }),
     );
     try {
-      const joined = await this.gameState.joinLobby(lobbyCodeInput, session.displayName);
-      this.uiStep.set(LobbyUiStep.Lobby);
+      const joined = await this.gameState.joinLobby(lobbyCode, displayName);
       this.joinInProgress.set(false);
-      this.rememberLastLobby(joined.lobbyCode);
-      const joinedKey =
-        joined.lobbyIdleRecycled === true
-          ? marker('shell.joinSuccessRecycledStaleLobby')
-          : marker('shell.joinSuccess');
       this.shellFeedback.setFeedback(
         UiFeedbackTone.Success,
-        this.translate.instant(joinedKey, {
-          lobbyCode: joined.lobbyCode,
-        }),
+        this.translate.instant(
+          joined.lobbyIdleRecycled === true
+            ? marker('shell.joinSuccessRecycledStaleLobby')
+            : marker('shell.joinSuccess'),
+          { lobbyCode: joined.lobbyCode },
+        ),
       );
       if (joined.liveKit !== undefined) {
         void this.liveKit.connect(joined.liveKit).catch(() => {
@@ -285,141 +156,22 @@ export class SessionLobbyFlowService {
       this.joinInProgress.set(false);
       this.shellFeedback.setFeedback(
         UiFeedbackTone.Error,
-        this.resolveLobbyFlowFailureMessage(error, marker('shell.joinFailed'), lobbyCodeInput),
+        resolveUserFacingErrorMessage(
+          this.translate,
+          error,
+          marker('shell.joinFailed'),
+          { lobbyCode },
+        ),
       );
+      void this.router.navigate(['/join']);
     }
   }
 
-  private async runCreateLobby(
-    session: SessionUiState | null,
-    lobbyCodeInput: string,
-  ): Promise<void> {
-    if (session === null) {
-      this.shellFeedback.setFeedback(
-        UiFeedbackTone.Error,
-        this.translate.instant(marker('shell.sessionMissing')),
-      );
-      this.uiStep.set(LobbyUiStep.SignIn);
-      return;
-    }
-    if (!isLobbyCodeValid(lobbyCodeInput)) {
-      this.shellFeedback.setFeedback(
-        UiFeedbackTone.Error,
-        this.translate.instant(marker('shell.lobbyCodeTooShortRun')),
-      );
-      return;
-    }
-    if (this.liveKit.canJoinWithWebcam() === 'insecureContext') {
-      this.shellFeedback.setFeedback(
-        UiFeedbackTone.Error,
-        this.translate.instant(marker('shell.webcamInsecureContext')),
-      );
-      return;
-    }
-    this.joinInProgress.set(true);
-    this.shellFeedback.setFeedback(
-      UiFeedbackTone.Info,
-      this.translate.instant(marker('shell.createConnecting'), {
-        lobbyCode: lobbyCodeInput,
-      }),
-    );
+  private readDisplayName(): string {
     try {
-      const joined = await this.gameState.createLobby(lobbyCodeInput, session.displayName);
-      this.uiStep.set(LobbyUiStep.Lobby);
-      this.joinInProgress.set(false);
-      this.rememberLastLobby(joined.lobbyCode);
-      this.shellFeedback.setFeedback(
-        UiFeedbackTone.Success,
-        this.translate.instant(marker('shell.createSuccess'), {
-          lobbyCode: joined.lobbyCode,
-        }),
-      );
-      if (joined.liveKit !== undefined) {
-        void this.liveKit.connect(joined.liveKit).catch(() => {
-          this.shellFeedback.setFeedback(
-            UiFeedbackTone.Info,
-            this.translate.instant(marker('shell.liveKitConnectFailed')),
-          );
-        });
-      }
-    } catch (error: unknown) {
-      void this.liveKit.abandonPrimedLocalVideoCapture();
-      void this.liveKit.disconnect();
-      this.gameState.disconnectLobby();
-      this.joinInProgress.set(false);
-      this.shellFeedback.setFeedback(
-        UiFeedbackTone.Error,
-        this.resolveLobbyFlowFailureMessage(error, marker('shell.createFailed'), lobbyCodeInput),
-      );
-    }
-  }
-
-  private resolveLobbyFlowFailureMessage(
-    error: unknown,
-    fallbackKey: string,
-    lobbyCode: string,
-  ): string {
-    return resolveUserFacingErrorMessage(this.translate, error, fallbackKey, { lobbyCode });
-  }
-
-  private rememberLastLobby(lobbyCode: string): void {
-    const normalized = normalizeLobbyCode(lobbyCode);
-    if (normalized.length === 0) {
-      return;
-    }
-    this.lastLobbyCode.set(normalized);
-    writeStoredLastLobbyCode(normalized);
-  }
-
-  private async refreshLastLobbyRejoinAvailability(lobbyCode: string): Promise<void> {
-    const generation = this.lastLobbyRejoinProbeGeneration + 1;
-    this.lastLobbyRejoinProbeGeneration = generation;
-    this.lastLobbyRejoinAvailable.set(false);
-    try {
-      await this.playerSession.ensureReady();
-      if (this.playerSession.sessionId().length === 0) {
-        return;
-      }
-      const result = await firstValueFrom(this.lobbyHttp.checkRejoinAvailable(lobbyCode));
-      if (generation !== this.lastLobbyRejoinProbeGeneration) {
-        return;
-      }
-      if (!result.available) {
-        this.forgetLastLobby();
-        return;
-      }
-      if (result.lobbyCode !== undefined && result.lobbyCode.length > 0) {
-        this.rememberLastLobby(result.lobbyCode);
-      }
-      this.lastLobbyRejoinAvailable.set(true);
+      return localStorage.getItem(ClientStorageKey.DisplayName) ?? '';
     } catch {
-      if (generation === this.lastLobbyRejoinProbeGeneration) {
-        this.lastLobbyRejoinAvailable.set(false);
-      }
+      return '';
     }
-  }
-}
-
-function readStoredLastLobbyCode(): string {
-  try {
-    return localStorage.getItem(ClientStorageKey.LastLobbyCode) ?? '';
-  } catch {
-    return '';
-  }
-}
-
-function writeStoredLastLobbyCode(lobbyCode: string): void {
-  try {
-    localStorage.setItem(ClientStorageKey.LastLobbyCode, lobbyCode);
-  } catch {
-    // localStorage may be unavailable (private mode / quota). Rejoin still works in-session via the signal.
-  }
-}
-
-function clearStoredLastLobbyCode(): void {
-  try {
-    localStorage.removeItem(ClientStorageKey.LastLobbyCode);
-  } catch {
-    // ignore
   }
 }

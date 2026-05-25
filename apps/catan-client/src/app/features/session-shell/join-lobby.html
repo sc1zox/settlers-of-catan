@@ -1,0 +1,63 @@
+<main class="shell">
+  <section class="ui-layer">
+    <article class="panel">
+      <header class="panel__header">
+        <h1>{{ 'shell.appTitle' | translate }}</h1>
+        <p>{{ 'shell.appSubtitle' | translate }}</p>
+      </header>
+
+      @if (feedback() !== null) {
+        <p
+          class="feedback"
+          [class.feedback--info]="feedback()?.tone === feedbackToneEnum.Info"
+          [class.feedback--success]="feedback()?.tone === feedbackToneEnum.Success"
+          [class.feedback--error]="feedback()?.tone === feedbackToneEnum.Error"
+          aria-live="polite"
+        >
+          {{ feedback()?.message }}
+        </p>
+      }
+
+      <form class="form-block" [formGroup]="lobbyForm" (ngSubmit)="joinLobby()">
+        <p class="session-pill">
+          {{ 'shell.sessionPill' | translate: { displayName: displayName() } }}
+        </p>
+        <label for="lobbyCode">{{ 'shell.labelLobbyCode' | translate }}</label>
+        <input id="lobbyCode" type="text" autocomplete="off" formControlName="lobbyCode" />
+        @if (lobbyForm.controls.lobbyCode.invalid && lobbyForm.controls.lobbyCode.touched) {
+          <p class="status">{{ 'shell.validationLobbyCode' | translate }}</p>
+        }
+        <div class="button-row">
+          <button
+            type="button"
+            class="button--ghost"
+            [disabled]="joinInProgress()"
+            (click)="backToSignIn()"
+          >
+            {{ 'shell.buttonChangeName' | translate }}
+          </button>
+          <button type="submit" [disabled]="joinInProgress()">
+            @if (joinInProgress()) {
+              <span class="button-spinner" aria-hidden="true"></span>
+              <span>{{ 'shell.buttonJoining' | translate }}</span>
+            } @else {
+              <span>{{ 'shell.buttonJoinGame' | translate }}</span>
+            }
+          </button>
+          <button
+            type="button"
+            [disabled]="joinInProgress()"
+            (click)="createLobby()"
+          >
+            @if (joinInProgress()) {
+              <span class="button-spinner" aria-hidden="true"></span>
+              <span>{{ 'shell.buttonCreating' | translate }}</span>
+            } @else {
+              <span>{{ 'shell.buttonCreateLobby' | translate }}</span>
+            }
+          </button>
+        </div>
+      </form>
+    </article>
+  </section>
+</main>

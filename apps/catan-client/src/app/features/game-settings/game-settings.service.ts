@@ -1,12 +1,12 @@
 import { Injectable, computed, signal } from '@angular/core';
 import {
-  ClientStorageKey,
   SCENE_DISPLAY_SCOPE,
   SceneDisplayScopeKey,
   WEBCAM_MEDIA_SCOPE,
   WebcamMediaScopeKey,
   WebcamQuality,
 } from '@catan/api-interfaces';
+import { ClientStorageKey } from '../../../shared/client-constants';
 import { parseSceneBrightness } from './scene-brightness.util';
 import { parseWebcamQuality } from '../webcam-head/webcam-quality-preset';
 import { PerformanceSnapshot } from '../../../game/engine';

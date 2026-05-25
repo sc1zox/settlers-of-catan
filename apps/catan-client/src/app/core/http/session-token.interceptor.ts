@@ -1,11 +1,7 @@
 import { HttpInterceptorFn, HttpRequest } from '@angular/common/http';
 import { inject } from '@angular/core';
-import {
-  formatBearerAuthorizationHeader,
-  HttpHeaderName,
-  SessionHttpAction,
-  SessionRestPath,
-} from '@catan/api-interfaces';
+import { formatBearerAuthorizationHeader, HttpHeaderName } from '@catan/api-interfaces';
+import { SessionHttpAction, SessionRestPath } from '../../../shared/client-constants';
 import { from, switchMap } from 'rxjs';
 import { PlayerSessionService } from '../session/player-session.service';
 

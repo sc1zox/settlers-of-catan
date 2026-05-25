@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { ActionRejectCode, GamePhase, PlayerSeat, ResourceType } from '@catan/api-interfaces';
+import {
+  ActionRejectCode,
+  GamePhase,
+  PieceBankLimit,
+  PlayerSeat,
+  ResourceType,
+} from '@catan/api-interfaces';
 import type { LobbyPlayerSlot, LobbyRuntime } from '../lobby/lobby-runtime';
 import {
   CITY_COST,
@@ -7,6 +13,11 @@ import {
   ROAD_COST,
   SETTLEMENT_COST,
 } from '../economy/build-resource-costs';
+import {
+  countCitiesForSeat,
+  countRoadsForSeat,
+  countSettlementsForSeat,
+} from '../utils/piece-bank.util';
 
 @Injectable()
 export class GameActionValidationService {
@@ -264,21 +275,30 @@ export class GameActionValidationService {
     }
 
     if (phase === GamePhase.Building) {
-      if (this.canAffordSettlementCost(player)) {
+      if (
+        this.canAffordSettlementCost(player) &&
+        countSettlementsForSeat(lobby, seat) < PieceBankLimit.SettlementsPerPlayer
+      ) {
         for (const vertexId of lobby.verticesById.keys()) {
           if (this.canPlaceSettlementAtVertex(lobby, player, vertexId, true)) {
             settlements.push(vertexId);
           }
         }
       }
-      if (this.canAffordRoadCost(player)) {
+      if (
+        this.canAffordRoadCost(player) &&
+        countRoadsForSeat(lobby, seat) < PieceBankLimit.RoadsPerPlayer
+      ) {
         for (const edgeId of lobby.edgesById.keys()) {
           if (this.canPlaceRoadAtEdge(lobby, player, edgeId)) {
             roads.push(edgeId);
           }
         }
       }
-      if (this.canAffordCityCost(player)) {
+      if (
+        this.canAffordCityCost(player) &&
+        countCitiesForSeat(lobby, seat) < PieceBankLimit.CitiesPerPlayer
+      ) {
         for (let i = 0; i < lobby.settlements.length; i += 1) {
           const settlement = lobby.settlements[i];
           if (settlement.seat === seat && !settlement.isCity) {
@@ -288,7 +308,10 @@ export class GameActionValidationService {
       }
     }
 
-    if (phase === GamePhase.Trading || phase === GamePhase.Building) {
+    if (
+      (phase === GamePhase.Trading || phase === GamePhase.Building) &&
+      countRoadsForSeat(lobby, seat) < PieceBankLimit.RoadsPerPlayer
+    ) {
       for (const edgeId of lobby.edgesById.keys()) {
         if (this.canPlaceRoadAtEdge(lobby, player, edgeId)) {
           roadBuilding.push(edgeId);

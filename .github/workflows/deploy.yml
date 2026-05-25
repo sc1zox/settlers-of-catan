@@ -5,8 +5,12 @@ on:
     branches:
       - master
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -16,6 +20,28 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Bump version and push tag
+        id: bump_version
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Increment version
+          NEW_VERSION=$(npm version patch -m "chore: bump version to %s [skip ci]")
+          echo "version=${NEW_VERSION#v}" >> $GITHUB_OUTPUT
+
+          # Push changes and tag
+          git push origin master --follow-tags
 
       - name: Lowercase GHCR image path
         run: |
@@ -35,6 +61,7 @@ jobs:
           images: ghcr.io/${{ env.GHCR_REPOSITORY }}
           tags: |
             type=raw,value=api
+            type=raw,value=api-${{ steps.bump_version.outputs.version }}
 
       - name: Build and push API image
         uses: docker/build-push-action@v7
@@ -53,6 +80,7 @@ jobs:
           images: ghcr.io/${{ env.GHCR_REPOSITORY }}
           tags: |
             type=raw,value=web
+            type=raw,value=web-${{ steps.bump_version.outputs.version }}
 
       - name: Build and push web image
         uses: docker/build-push-action@v7

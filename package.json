@@ -13,8 +13,7 @@
     "test:node": "vitest run --config tests/vitest.node.config.ts",
     "lint": "NX_DAEMON=false NX_WORKSPACE_DATA_DIRECTORY=node_modules/.cache/nx-workspace-data nx run-many -t lint --projects=catan-client,catan-api,shared-game-field,api-interfaces --parallel",
     "format": "prettier --write \"apps/**/*.{ts,html,scss,json}\" \"libs/**/*.{ts,html,scss,json}\"",
-    "format:check": "prettier --check \"apps/**/*.{ts,html,scss,json}\" \"libs/**/*.{ts,html,scss,json}\"",
-    "version": "node scripts/update-version.js && git add apps/catan-client/src/environments/environment.ts apps/catan-client/src/environments/environment.prod.ts"
+    "format:check": "prettier --check \"apps/**/*.{ts,html,scss,json}\" \"libs/**/*.{ts,html,scss,json}\""
   },
   "private": true,
   "packageManager": "npm@11.6.1",

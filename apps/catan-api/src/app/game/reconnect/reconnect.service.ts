@@ -12,7 +12,6 @@ import {
 } from '@catan/api-interfaces';
 import type { Server, Socket } from 'socket.io';
 import { RedisLobbyStoreService } from '../../infrastructure/redis/redis-lobby-store.service';
-import { BotService } from '../bot/bot.service';
 import { BotManagementService } from '../bot/bot-management.service';
 import { BOT_SESSION_TOKEN_PREFIX } from '../bot/bot.config';
 import {
@@ -52,7 +51,6 @@ export class ReconnectService {
     private readonly lobby: LobbyService,
     private readonly trades: TradeService,
     private readonly redisLobby: RedisLobbyStoreService,
-    private readonly demoBots: BotService,
     private readonly botManagement: BotManagementService,
   ) {}
 

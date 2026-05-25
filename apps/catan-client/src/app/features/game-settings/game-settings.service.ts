@@ -14,13 +14,38 @@ import {
   PerformanceBenchmarkSummary,
   computePerformanceBenchmarkSummary,
 } from './performance-benchmark';
+import {
+  PerformanceTier,
+  classifyPerformanceTier,
+  collectHardwareProbeSignals,
+  downgradeTier,
+  tierToShadowQuality,
+  tierToWebcamQuality,
+} from './hardware-profile';
 import { parseShadowQuality } from '../../../game/scene/shadow-quality-preset';
 import { ShadowQuality } from '../../../game/scene/shadow-quality.enum';
+
+const PROBE_SAMPLE_COUNT = 12;
+const PROBE_FPS_FLOOR = 30;
+
+function shadowQualityToTier(quality: ShadowQuality): PerformanceTier {
+  if (quality === ShadowQuality.High) {
+    return 'high';
+  }
+  if (quality === ShadowQuality.Medium) {
+    return 'medium';
+  }
+  return 'low';
+}
 
 @Injectable({
   providedIn: 'root',
 })
 export class GameSettingsService {
+  private readonly autoDetectedTier: PerformanceTier = classifyPerformanceTier(
+    collectHardwareProbeSignals(),
+  );
+  private shadowQualityWasAutoDetected = false;
   private readonly panelOpenSignal = signal<boolean>(false);
   private readonly shadowQualitySignal = signal<ShadowQuality>(this.loadShadowQuality());
   private readonly performanceOverlaySignal = signal<boolean>(this.loadPerformanceOverlay());
@@ -32,6 +57,11 @@ export class GameSettingsService {
   private readonly webcamEnabledSignal = signal<boolean>(this.loadWebcamEnabled());
   private readonly webcamQualitySignal = signal<WebcamQuality>(this.loadWebcamQuality());
   private readonly sceneBrightnessSignal = signal<number>(this.loadSceneBrightness());
+  private readonly probeActiveSignal = signal<boolean>(this.shadowQualityWasAutoDetected);
+  private probeSampleCount = 0;
+  private probeFpsSum = 0;
+  private readonly probeBaselineQuality: ShadowQuality = this.shadowQualitySignal();
+  private userTouchedShadowQuality = false;
 
   public readonly panelOpen = this.panelOpenSignal.asReadonly();
   public readonly webcamEnabled = this.webcamEnabledSignal.asReadonly();
@@ -46,7 +76,11 @@ export class GameSettingsService {
   public readonly benchmarkSummary = this.benchmarkSummarySignal.asReadonly();
 
   public readonly performanceSamplingEnabled = computed<boolean>(
-    () => this.panelOpenSignal() || this.performanceOverlaySignal() || this.benchmarkActiveSignal(),
+    () =>
+      this.panelOpenSignal() ||
+      this.performanceOverlaySignal() ||
+      this.benchmarkActiveSignal() ||
+      this.probeActiveSignal(),
   );
 
   public togglePanel(): void {
@@ -58,6 +92,7 @@ export class GameSettingsService {
   }
 
   public setShadowQuality(quality: ShadowQuality): void {
+    this.userTouchedShadowQuality = true;
     this.shadowQualitySignal.set(quality);
     localStorage.setItem(ClientStorageKey.ShadowQuality, quality);
   }
@@ -104,6 +139,9 @@ export class GameSettingsService {
     if (this.performanceSamplingEnabled()) {
       this.latestStatsSignal.set(stats);
     }
+    if (this.probeActiveSignal()) {
+      this.recordProbeSample(stats);
+    }
     if (!this.benchmarkActiveSignal()) {
       return;
     }
@@ -114,8 +152,39 @@ export class GameSettingsService {
     );
   }
 
+  private recordProbeSample(stats: PerformanceSnapshot): void {
+    this.probeFpsSum += stats.fps;
+    this.probeSampleCount += 1;
+    if (this.probeSampleCount < PROBE_SAMPLE_COUNT) {
+      return;
+    }
+    const avgFps = this.probeFpsSum / this.probeSampleCount;
+    this.probeActiveSignal.set(false);
+    if (this.userTouchedShadowQuality) {
+      return;
+    }
+    if (avgFps >= PROBE_FPS_FLOOR) {
+      return;
+    }
+    const downgraded = tierToShadowQuality(
+      downgradeTier(shadowQualityToTier(this.probeBaselineQuality)),
+    );
+    if (downgraded === this.probeBaselineQuality) {
+      return;
+    }
+    this.shadowQualitySignal.set(downgraded);
+    localStorage.setItem(ClientStorageKey.ShadowQuality, downgraded);
+  }
+
   private loadShadowQuality(): ShadowQuality {
-    return parseShadowQuality(localStorage.getItem(ClientStorageKey.ShadowQuality));
+    const raw = localStorage.getItem(ClientStorageKey.ShadowQuality);
+    if (raw !== null) {
+      return parseShadowQuality(raw);
+    }
+    this.shadowQualityWasAutoDetected = true;
+    const auto = tierToShadowQuality(this.autoDetectedTier);
+    localStorage.setItem(ClientStorageKey.ShadowQuality, auto);
+    return auto;
   }
 
   private loadPerformanceOverlay(): boolean {
@@ -127,7 +196,13 @@ export class GameSettingsService {
   }
 
   private loadWebcamQuality(): WebcamQuality {
-    return parseWebcamQuality(localStorage.getItem(ClientStorageKey.WebcamQuality));
+    const raw = localStorage.getItem(ClientStorageKey.WebcamQuality);
+    if (raw !== null) {
+      return parseWebcamQuality(raw);
+    }
+    const auto = tierToWebcamQuality(this.autoDetectedTier);
+    localStorage.setItem(ClientStorageKey.WebcamQuality, auto);
+    return auto;
   }
 
   private loadSceneBrightness(): number {

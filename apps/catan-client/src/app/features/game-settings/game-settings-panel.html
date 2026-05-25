@@ -15,10 +15,25 @@
     <h3>{{ 'settings.graphicsTitle' | translate }}</h3>
     <label class="settings-field">
       <span>{{ 'settings.shadowQuality' | translate }}</span>
-      <select [value]="settings.shadowQuality()" (change)="onShadowQualityChange($event)">
-        <option [value]="shadowQualityLow">{{ 'settings.shadowLow' | translate }}</option>
-        <option [value]="shadowQualityMedium">{{ 'settings.shadowMedium' | translate }}</option>
-        <option [value]="shadowQualityHigh">{{ 'settings.shadowHigh' | translate }}</option>
+      <select (change)="onShadowQualityChange($event)">
+        <option
+          [value]="shadowQualityLow"
+          [selected]="settings.shadowQuality() === shadowQualityLow"
+        >
+          {{ 'settings.shadowLow' | translate }}
+        </option>
+        <option
+          [value]="shadowQualityMedium"
+          [selected]="settings.shadowQuality() === shadowQualityMedium"
+        >
+          {{ 'settings.shadowMedium' | translate }}
+        </option>
+        <option
+          [value]="shadowQualityHigh"
+          [selected]="settings.shadowQuality() === shadowQualityHigh"
+        >
+          {{ 'settings.shadowHigh' | translate }}
+        </option>
       </select>
     </label>
     <label class="settings-field">
@@ -48,9 +63,19 @@
     </label>
     <label class="settings-field">
       <span>{{ 'settings.webcamQuality' | translate }}</span>
-      <select [value]="settings.webcamQuality()" (change)="onWebcamQualityChange($event)">
-        <option [value]="webcamQualityLow">{{ 'settings.webcamLow' | translate }}</option>
-        <option [value]="webcamQualityMedium">{{ 'settings.webcamMedium' | translate }}</option>
+      <select (change)="onWebcamQualityChange($event)">
+        <option
+          [value]="webcamQualityLow"
+          [selected]="settings.webcamQuality() === webcamQualityLow"
+        >
+          {{ 'settings.webcamLow' | translate }}
+        </option>
+        <option
+          [value]="webcamQualityMedium"
+          [selected]="settings.webcamQuality() === webcamQualityMedium"
+        >
+          {{ 'settings.webcamMedium' | translate }}
+        </option>
       </select>
     </label>
   </section>

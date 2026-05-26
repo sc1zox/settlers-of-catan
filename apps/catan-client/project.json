@@ -11,8 +11,15 @@
   "sourceRoot": "apps/catan-client/src",
   "prefix": "app",
   "targets": {
+    "sync-version": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/sync-client-version.js"
+      }
+    },
     "build": {
       "executor": "@angular/build:application",
+      "dependsOn": ["sync-version"],
       "options": {
         "browser": "apps/catan-client/src/main.ts",
         "index": "apps/catan-client/src/index.html",
@@ -62,6 +69,7 @@
     },
     "serve": {
       "executor": "@angular/build:dev-server",
+      "dependsOn": ["sync-version"],
       "configurations": {
         "production": {
           "buildTarget": "catan-client:build:production"

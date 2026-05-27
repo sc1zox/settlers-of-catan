@@ -110,6 +110,10 @@ export class GameSocketService implements OnDestroy {
     this.disconnect();
   }
 
+  public get isConnected(): boolean {
+    return this.socket?.connected === true;
+  }
+
   public disconnect(): void {
     if (this.socket === null) {
       return;

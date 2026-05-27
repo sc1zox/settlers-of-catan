@@ -4,10 +4,15 @@ import {
   TradeUpdateKind,
   type TradeUpdatedPayload,
 } from '@catan/api-interfaces';
+import { marker } from '@colsen1991/ngx-translate-extract-marker';
+import { TranslateService } from '@ngx-translate/core';
 import { LobbyGameUiStateService } from '../lobby-game-ui/lobby-game-ui-state.service';
 import { LobbyShellGameUiService } from '../lobby-game-ui/lobby-shell-game-ui.service';
 import { canPayResourceMap } from '../trading/trading-can-pay.util';
 import { TradeSessionService } from '../trading/trade-session.service';
+import { GameSocketService } from '../../core/socket/game-socket.service';
+import { ShellFeedbackService } from '../shell-feedback/shell-feedback.service';
+import { UiFeedbackTone } from '../lobby-game-ui/lobby-ui-state';
 import {
   TradePendingActionKind,
   type BankTradeRequest,
@@ -34,6 +39,9 @@ export class SessionTradingPanelService {
   private readonly tradeSession = inject(TradeSessionService);
   private readonly lobbyState = inject(LobbyGameUiStateService);
   private readonly lobbyGameUi = inject(LobbyShellGameUiService);
+  private readonly gameSocket = inject(GameSocketService);
+  private readonly shellFeedback = inject(ShellFeedbackService);
+  private readonly translate = inject(TranslateService);
 
   public readonly tradeOpen = signal<boolean>(false);
 
@@ -161,6 +169,13 @@ export class SessionTradingPanelService {
   }
 
   public onFinalizeTrade(request: FinalizeTradeRequest): void {
+    if (!this.gameSocket.isConnected) {
+      this.shellFeedback.setFeedback(
+        UiFeedbackTone.Error,
+        this.translate.instant(marker('reject.notConnected')),
+      );
+      return;
+    }
     this.markPending({ kind: TradePendingActionKind.Finalize, tradeId: request.tradeId });
     this.tradeSession.finalizeTrade(request.tradeId, request.recipientSeat);
   }

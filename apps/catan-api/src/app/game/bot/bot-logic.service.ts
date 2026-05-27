@@ -17,6 +17,23 @@ export type BotAction =
   | { type: 'completeTrading' }
   | { type: 'none' };
 
+export enum BotTradeDecisionKind {
+  Accept = 'accept',
+  Reject = 'reject',
+  Counter = 'counter',
+}
+
+export type BotTradeDecision =
+  | { kind: BotTradeDecisionKind.Accept }
+  | { kind: BotTradeDecisionKind.Reject }
+  | {
+      kind: BotTradeDecisionKind.Counter;
+      /** What the original sender (human) gives under the counter (sender perspective). */
+      offer: Partial<Record<ResourceType, number>>;
+      /** What the original sender (human) receives under the counter — bot must own this. */
+      request: Partial<Record<ResourceType, number>>;
+    };
+
 @Injectable()
 export class BotLogicService {
   public constructor(private readonly validation: GameActionValidationService) {}
@@ -222,4 +239,78 @@ export class BotLogicService {
     }
     return score;
   }
+
+  /**
+   * Decide how the bot should respond to an incoming trade proposal.
+   * Parameters are in sender perspective: tradeOffer = what sender gives (bot receives),
+   * tradeRequest = what sender wants (bot gives).
+   *
+   * Bot accepts only if it can pay AND receives at least one resource it needs (has < 2 of).
+   * Bot counters with a swap of the requested resource only when it can pay but receives
+   * something it does not need — giving the human a chance at a useful deal.
+   * In all other cases the bot rejects.
+   */
+  public evaluateIncomingTrade(
+    bot: LobbyPlayerSlot,
+    tradeOffer: Readonly<Partial<Record<ResourceType, number>>>,
+    tradeRequest: Readonly<Partial<Record<ResourceType, number>>>,
+  ): BotTradeDecision {
+    if (!this.canAffordResourceMap(bot, tradeRequest)) {
+      return { kind: BotTradeDecisionKind.Reject };
+    }
+
+    const offerKeys = Object.keys(tradeOffer) as ResourceType[];
+    const isReceivingNeeded = offerKeys.some(
+      (k) => (tradeOffer[k] ?? 0) > 0 && (bot.resources[k] ?? 0) < 2,
+    );
+
+    if (!isReceivingNeeded) {
+      return { kind: BotTradeDecisionKind.Reject };
+    }
+
+    // Bot needs what it would receive. If the human asks nothing in return, counter
+    // with a surplus resource so the exchange is fair.
+    const requestTotal = (Object.keys(tradeRequest) as ResourceType[]).reduce(
+      (sum, k) => sum + (tradeRequest[k] ?? 0),
+      0,
+    );
+    if (requestTotal === 0) {
+      const surplus = this.findSurplusResource(bot);
+      if (surplus !== null) {
+        return {
+          kind: BotTradeDecisionKind.Counter,
+          offer: { ...tradeOffer },
+          request: { [surplus]: 1 },
+        };
+      }
+    }
+
+    return { kind: BotTradeDecisionKind.Accept };
+  }
+
+  private findSurplusResource(bot: LobbyPlayerSlot): ResourceType | null {
+    const resources = Object.values(ResourceType);
+    for (let i = 0; i < resources.length; i += 1) {
+      if ((bot.resources[resources[i]] ?? 0) >= 2) {
+        return resources[i];
+      }
+    }
+    return null;
+  }
+
+  private canAffordResourceMap(
+    bot: LobbyPlayerSlot,
+    cost: Readonly<Partial<Record<ResourceType, number>>>,
+  ): boolean {
+    const keys = Object.keys(cost) as ResourceType[];
+    for (let i = 0; i < keys.length; i += 1) {
+      const k = keys[i];
+      const need = cost[k] ?? 0;
+      if (need > 0 && (bot.resources[k] ?? 0) < need) {
+        return false;
+      }
+    }
+    return true;
+  }
+
 }

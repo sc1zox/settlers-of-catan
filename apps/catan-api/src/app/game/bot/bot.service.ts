@@ -1,5 +1,5 @@
 import { forwardRef, Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import { GamePhase, PlayerSeat } from '@catan/api-interfaces';
+import { GamePhase, PlayerSeat, ResourceType, TradeOfferDto, TradeRecipientStatus } from '@catan/api-interfaces';
 import { Server } from 'socket.io';
 import {
   CLOCKWISE_SEATS,
@@ -7,10 +7,13 @@ import {
   LobbyRuntime,
 } from '../lobby/lobby-runtime';
 import { LobbyService } from '../lobby/lobby.service';
-import { BotLogicService, type BotAction } from './bot-logic.service';
+import { BotLogicService, BotTradeDecisionKind, type BotAction } from './bot-logic.service';
 import { BotManagementService } from './bot-management.service';
 import { BOT_ACTION_DELAY_MS } from './bot.config';
 import { GameService } from '../core/game.service';
+import { TradeActionsService, type TradeActionContext } from '../trade/trade-actions.service';
+import { TradeService } from '../trade/trade.service';
+import { emitTradeUpdatedToInvolvedSockets } from '../trade/trade-emit.util';
 
 @Injectable()
 export class BotService implements OnModuleDestroy {
@@ -24,6 +27,8 @@ export class BotService implements OnModuleDestroy {
     private readonly lobbyService: LobbyService,
     private readonly logic: BotLogicService,
     private readonly management: BotManagementService,
+    private readonly tradeActions: TradeActionsService,
+    private readonly tradeService: TradeService,
   ) {}
 
   public onModuleDestroy(): void {
@@ -67,23 +72,72 @@ export class BotService implements OnModuleDestroy {
     this.setupTicks.set(lobbyId, timer);
   }
 
-  public respondToTradePropose(
+  /**
+   * Called after a trade is proposed so bots that are recipients can respond.
+   * The callback receives the bot's session token and a decision ('accept' |
+   * 'reject' | 'counter'); for counter it also receives the counter offer/request
+   * in sender perspective (what sender gives, what sender receives).
+   */
+  public respondToTradeOffer(
     lobby: LobbyRuntime,
-    recipients: readonly { readonly seat: PlayerSeat }[],
-    tryAccept: (botSessionToken: string) => void,
-    fallbackReject: (botSessionToken: string) => void,
+    trade: TradeOfferDto,
+    respond: (
+      botSession: string,
+      decision: BotTradeDecisionKind,
+      counterOffer?: Readonly<Partial<Record<ResourceType, number>>>,
+      counterRequest?: Readonly<Partial<Record<ResourceType, number>>>,
+    ) => void,
   ): void {
-    for (let i = 0; i < recipients.length; i += 1) {
-      const botSession = this.management.resolveBotTradeAcceptorSessionToken(lobby, recipients[i].seat);
+    for (let i = 0; i < trade.recipients.length; i += 1) {
+      const botSession = this.management.resolveBotTradeAcceptorSessionToken(
+        lobby,
+        trade.recipients[i].seat,
+      );
       if (botSession === null) {
         continue;
       }
-      try {
-        tryAccept(botSession);
-      } catch {
-        fallbackReject(botSession);
+      const bot = lobby.findPlayerBySeat(trade.recipients[i].seat);
+      if (!bot) {
+        continue;
+      }
+      const decision = this.logic.evaluateIncomingTrade(bot, trade.offer, trade.request);
+      if (decision.kind === BotTradeDecisionKind.Counter) {
+        respond(botSession, decision.kind, decision.offer, decision.request);
+      } else {
+        respond(botSession, decision.kind);
       }
     }
+  }
+
+  /**
+   * Called after a TradeUpdated event so bots that proposed a trade can
+   * finalize once a recipient has accepted.
+   */
+  public afterTradeUpdated(lobbyId: string, trade: TradeOfferDto, server: Server): void {
+    const lobby = this.lobbyService.getLobby(lobbyId);
+    if (!lobby) {
+      return;
+    }
+    const sender = lobby.findPlayerBySeat(trade.fromSeat);
+    if (!sender || !this.management.isBotSessionToken(sender.sessionToken)) {
+      return;
+    }
+    if (lobby.fsm.getPhase() !== GamePhase.Trading) {
+      return;
+    }
+    if (this.mainGameTicks.has(lobbyId)) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      this.mainGameTicks.delete(lobbyId);
+      try {
+        this.executeMainGameAction(lobbyId, server);
+      } catch (error: unknown) {
+        this.logAutoplayFailure(lobbyId, error);
+        this.scheduleRetryIfStillPending(lobbyId, server);
+      }
+    }, BOT_ACTION_DELAY_MS);
+    this.mainGameTicks.set(lobbyId, timer);
   }
 
   private executeMainGameAction(lobbyId: string, server: Server): void {
@@ -107,9 +161,182 @@ export class BotService implements OnModuleDestroy {
       return;
     }
 
+    if (phase === GamePhase.Trading) {
+      this.executeTradingPhaseAction(lobby, current, lobbyId, server);
+      return;
+    }
+
     const action = this.logic.decideMainGameAction(lobby, current);
     this.logger.debug(`bot action: seat=${current.seat} phase=${phase} action=${action.type}`);
     this.dispatchAction(action, lobbyId, current.sessionToken, server);
+  }
+
+  private executeTradingPhaseAction(
+    lobby: LobbyRuntime,
+    bot: LobbyPlayerSlot,
+    lobbyId: string,
+    server: Server,
+  ): void {
+    const openTrades = this.tradeService.findOpenOffersForLobby(lobbyId);
+    const botTrade = openTrades.find((t) => t.fromSeat === bot.seat);
+
+    if (botTrade) {
+      const acceptedSlot = botTrade.recipients.find(
+        (r) => r.status === TradeRecipientStatus.Accepted,
+      );
+      if (acceptedSlot) {
+        this.logger.debug(`bot finalizing trade: lobby=${lobbyId} seat=${bot.seat} recipient=${acceptedSlot.seat}`);
+        this.dispatchBotTradeFinalize(botTrade.id, acceptedSlot.seat, bot.sessionToken, lobbyId, server);
+        return;
+      }
+
+      const counteredSlot = botTrade.recipients.find(
+        (r) => r.status === TradeRecipientStatus.Countered && r.counter !== undefined,
+      );
+      if (counteredSlot && counteredSlot.counter !== undefined) {
+        // counter stored in sender (bot) perspective: offer = bot gives, request = bot receives
+        const counterDecision = this.logic.evaluateIncomingTrade(
+          bot,
+          counteredSlot.counter.request,
+          counteredSlot.counter.offer,
+        );
+        if (counterDecision.kind === BotTradeDecisionKind.Accept) {
+          this.logger.debug(`bot finalizing counter: lobby=${lobbyId} seat=${bot.seat} recipient=${counteredSlot.seat}`);
+          this.dispatchBotTradeFinalize(botTrade.id, counteredSlot.seat, bot.sessionToken, lobbyId, server);
+          return;
+        }
+        this.logger.debug(`bot rejecting counter: lobby=${lobbyId} seat=${bot.seat}`);
+        this.gameService.finishTrading(lobbyId, bot.sessionToken, server);
+        return;
+      }
+
+      const allResolved = botTrade.recipients.every(
+        (r) =>
+          r.status === TradeRecipientStatus.Rejected ||
+          r.status === TradeRecipientStatus.Accepted,
+      );
+      if (!allResolved) {
+        // Still waiting for responses — do not complete trading yet.
+        return;
+      }
+    }
+
+    // No open trade from this bot or all recipients resolved without acceptance.
+    const proposal = this.buildBotTradeProposal(lobby, bot);
+    if (proposal !== null && botTrade === undefined) {
+      this.logger.debug(`bot proposing trade: lobby=${lobbyId} seat=${bot.seat}`);
+      this.dispatchBotTradePropose(proposal, lobbyId, bot.sessionToken, lobby, server);
+      return;
+    }
+
+    this.logger.debug(`bot completing trading: lobby=${lobbyId} seat=${bot.seat}`);
+    this.gameService.finishTrading(lobbyId, bot.sessionToken, server);
+  }
+
+  private dispatchBotTradeFinalize(
+    tradeId: string,
+    recipientSeat: PlayerSeat,
+    sessionToken: string,
+    lobbyId: string,
+    server: Server,
+  ): void {
+    const ctx = this.makeBotTradeContext(server);
+    const result = this.tradeActions.finalizeTrade(ctx, sessionToken, {
+      lobbyId,
+      tradeId,
+      recipientSeat,
+    });
+    const lobby = this.lobbyService.getLobby(lobbyId);
+    if (lobby) {
+      for (let i = 0; i < result.updates.length; i += 1) {
+        emitTradeUpdatedToInvolvedSockets(server, lobby, result.updates[i]);
+      }
+    }
+  }
+
+  private dispatchBotTradePropose(
+    proposal: {
+      recipients: PlayerSeat[];
+      offer: Partial<Record<ResourceType, number>>;
+      request: Partial<Record<ResourceType, number>>;
+    },
+    lobbyId: string,
+    sessionToken: string,
+    lobby: LobbyRuntime,
+    server: Server,
+  ): void {
+    const ctx = this.makeBotTradeContext(server);
+    const result = this.tradeActions.proposeTrade(ctx, sessionToken, {
+      lobbyId,
+      recipients: proposal.recipients,
+      offer: proposal.offer,
+      request: proposal.request,
+    });
+    for (let i = 0; i < result.cancelled.length; i += 1) {
+      emitTradeUpdatedToInvolvedSockets(server, lobby, result.cancelled[i]);
+    }
+    for (let i = 0; i < result.updates.length; i += 1) {
+      emitTradeUpdatedToInvolvedSockets(server, lobby, result.updates[i]);
+    }
+  }
+
+  private buildBotTradeProposal(
+    lobby: LobbyRuntime,
+    bot: LobbyPlayerSlot,
+  ): {
+    recipients: PlayerSeat[];
+    offer: Partial<Record<ResourceType, number>>;
+    request: Partial<Record<ResourceType, number>>;
+  } | null {
+    const resources = Object.values(ResourceType);
+    let surplusResource: ResourceType | null = null;
+    let neededResource: ResourceType | null = null;
+
+    for (let i = 0; i < resources.length; i += 1) {
+      const r = resources[i];
+      const count = bot.resources[r] ?? 0;
+      if (count >= 2 && surplusResource === null) {
+        surplusResource = r;
+      }
+      if (count === 0 && neededResource === null) {
+        neededResource = r;
+      }
+    }
+
+    if (surplusResource === null || neededResource === null) {
+      return null;
+    }
+
+    const recipients: PlayerSeat[] = [];
+    for (let i = 0; i < lobby.players.length; i += 1) {
+      const p = lobby.players[i];
+      if (p.seat === bot.seat) {
+        continue;
+      }
+      if (this.management.isBotSessionToken(p.sessionToken)) {
+        continue;
+      }
+      if ((p.resources[neededResource] ?? 0) > 0) {
+        recipients.push(p.seat);
+      }
+    }
+
+    if (recipients.length === 0) {
+      return null;
+    }
+
+    return {
+      recipients,
+      offer: { [surplusResource]: 1 },
+      request: { [neededResource]: 1 },
+    };
+  }
+
+  private makeBotTradeContext(server: Server): TradeActionContext {
+    return {
+      getLobby: (lobbyId: string) => this.lobbyService.getLobby(lobbyId),
+      broadcastLobby: (lobby: LobbyRuntime) => this.gameService.broadcastFullState(server, lobby),
+    };
   }
 
   private dispatchAction(

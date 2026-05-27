@@ -7,11 +7,13 @@ import {
   TradeFinalizePayload,
   TradeProposePayload,
   TradeRejectPayload,
+  TradeUpdateKind,
   TradeWithdrawCounterPayload,
 } from '@catan/api-interfaces';
 import { Server } from 'socket.io';
 import { GameService } from '../core/game.service';
 import { BotService } from '../bot/bot.service';
+import { BotTradeDecisionKind } from '../bot/bot-logic.service';
 import type { LobbyRuntime } from '../lobby/lobby-runtime';
 import { TradeActionsService, type TradeActionResult } from './trade-actions.service';
 import { emitTradeUpdatedToInvolvedSockets } from './trade-emit.util';
@@ -55,22 +57,35 @@ export class TradeGatewayService {
       return;
     }
     const ctx = this.tradeActionContext(server);
-    this.demoBots.respondToTradePropose(
+    this.demoBots.respondToTradeOffer(
       lobby,
-      tradeUpdate.trade.recipients,
-      (botSession) => {
-        const accepted = this.tradeActions.acceptTrade(ctx, botSession, {
-          lobbyId: payload.lobbyId,
-          tradeId: tradeUpdate.trade.id,
-        });
-        this.broadcastResult(server, accepted);
-      },
-      (botSession) => {
-        const rejected = this.tradeActions.rejectTrade(ctx, botSession, {
-          lobbyId: payload.lobbyId,
-          tradeId: tradeUpdate.trade.id,
-        });
-        this.broadcastResult(server, rejected);
+      tradeUpdate.trade,
+      (botSession, decision, counterOffer, counterRequest) => {
+        if (decision === BotTradeDecisionKind.Accept) {
+          const accepted = this.tradeActions.acceptTrade(ctx, botSession, {
+            lobbyId: payload.lobbyId,
+            tradeId: tradeUpdate.trade.id,
+          });
+          this.broadcastResult(server, accepted);
+        } else if (
+          decision === BotTradeDecisionKind.Counter &&
+          counterOffer !== undefined &&
+          counterRequest !== undefined
+        ) {
+          const countered = this.tradeActions.counterTrade(ctx, botSession, {
+            lobbyId: payload.lobbyId,
+            tradeId: tradeUpdate.trade.id,
+            offer: counterOffer,
+            request: counterRequest,
+          });
+          this.broadcastResult(server, countered);
+        } else {
+          const rejected = this.tradeActions.rejectTrade(ctx, botSession, {
+            lobbyId: payload.lobbyId,
+            tradeId: tradeUpdate.trade.id,
+          });
+          this.broadcastResult(server, rejected);
+        }
       },
     );
   }
@@ -141,6 +156,16 @@ export class TradeGatewayService {
     }
     for (let i = 0; i < result.updates.length; i += 1) {
       emitTradeUpdatedToInvolvedSockets(server, lobby, result.updates[i]);
+      // When any recipient responds to a bot-sent trade, trigger the bot to act
+      // (finalize on accept/counter, or complete trading when all rejected).
+      const update = result.updates[i];
+      if (
+        update.kind === TradeUpdateKind.RecipientAccepted ||
+        update.kind === TradeUpdateKind.RecipientCountered ||
+        update.kind === TradeUpdateKind.RecipientRejected
+      ) {
+        this.demoBots.afterTradeUpdated(result.lobbyId, update.trade, server);
+      }
     }
   }
 

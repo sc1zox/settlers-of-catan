@@ -9,6 +9,7 @@ import { applySway, SwayInstance } from '../animation/wind';
 import { createRng, scatterInHex } from '../animation/rng';
 import { HEX_SIZE } from '../board/hex';
 import { Lumberjack } from '../decorations/lumberjack';
+import { runtimeFlags } from '../engine-runtime/runtime-flags';
 import { Tile, TileInit, TILE_HEIGHT } from './tile';
 
 const TREE_COUNT = 14;
@@ -62,6 +63,10 @@ export class ForestTile extends Tile {
 
   override update(dt: number, t: number): void {
     super.update(dt, t);
+    if (!runtimeFlags.ambientAnimationsEnabled) {
+      this.lumberjack.group.visible = false;
+      return;
+    }
     const amplitude = this.settled ? 0.16 : 0.08;
     applySway(this.foliage, this.instances, t, { amplitude, frequency: 0.4 });
     applySway(this.trunks, this.instances, t, { amplitude: amplitude * 0.4, frequency: 0.4 });

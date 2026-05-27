@@ -48,6 +48,9 @@ import { Tile } from './tiles/tile';
 import { createHarbors, HarborSystem } from './world/harbors';
 import { World } from './world/world';
 import { legalIdsForKind } from './engine-runtime/build-flow';
+import { setAmbientAnimationsEnabled } from './engine-runtime/runtime-flags';
+import { CloudDensity } from './scene/cloud-density.enum';
+import { RenderPixelRatio, renderPixelRatioToValue } from './scene/render-pixel-ratio.enum';
 import {
   BOARD_OVERLAY_UPDATE_BOUNDS_RADIUS,
   DEV_CARD_TYPE_TO_KIND,
@@ -353,6 +356,35 @@ export class GameEngine {
 
   public setPerformanceStatsHandler(handler: PerformanceStatsHandler | null): void {
     this.perfAggregator.setHandler(handler);
+  }
+
+  public setRenderPixelRatio(ratio: RenderPixelRatio): void {
+    const value = renderPixelRatioToValue(ratio);
+    if (this.renderer.getPixelRatio() === value) {
+      return;
+    }
+    this.renderer.setPixelRatio(value);
+    const { clientWidth, clientHeight } = this.container;
+    if (clientWidth > 0 && clientHeight > 0) {
+      this.renderer.setSize(clientWidth, clientHeight, false);
+    }
+  }
+
+  public setCloudDensity(density: CloudDensity): void {
+    this.clouds.setDensity(density);
+  }
+
+  public setSunShaftsEnabled(enabled: boolean): void {
+    this.sunShafts.setEnabled(enabled);
+  }
+
+  public setWaterAnimationEnabled(enabled: boolean): void {
+    this.world.setWaterAnimationEnabled(enabled);
+  }
+
+  public setAmbientAnimationsEnabled(enabled: boolean): void {
+    setAmbientAnimationsEnabled(enabled);
+    this.clouds.setAnimationEnabled(enabled);
   }
 
   public setShadowQuality(quality: ShadowQuality): void {

@@ -154,6 +154,31 @@ export class GameCanvas implements AfterViewInit, OnDestroy {
     this.engine?.setSceneBrightness(brightness);
   });
 
+  private readonly renderPixelRatioSync = effect(() => {
+    const ratio = this.gameSettings.renderPixelRatio();
+    this.engine?.setRenderPixelRatio(ratio);
+  });
+
+  private readonly cloudDensitySync = effect(() => {
+    const density = this.gameSettings.cloudDensity();
+    this.engine?.setCloudDensity(density);
+  });
+
+  private readonly sunShaftsSync = effect(() => {
+    const enabled = this.gameSettings.sunShaftsEnabled();
+    this.engine?.setSunShaftsEnabled(enabled);
+  });
+
+  private readonly waterAnimationSync = effect(() => {
+    const enabled = this.gameSettings.waterAnimationEnabled();
+    this.engine?.setWaterAnimationEnabled(enabled);
+  });
+
+  private readonly ambientAnimationsSync = effect(() => {
+    const enabled = this.gameSettings.ambientAnimationsEnabled();
+    this.engine?.setAmbientAnimationsEnabled(enabled);
+  });
+
   private readonly headVideoGammaSync = effect(() => {
     if (!this.engine) {
       return;
@@ -249,6 +274,11 @@ export class GameCanvas implements AfterViewInit, OnDestroy {
   private seedEngineSettings(engine: GameEngine): void {
     engine.setShadowQuality(this.gameSettings.shadowQuality());
     engine.setSceneBrightness(this.gameSettings.sceneBrightness());
+    engine.setRenderPixelRatio(this.gameSettings.renderPixelRatio());
+    engine.setCloudDensity(this.gameSettings.cloudDensity());
+    engine.setSunShaftsEnabled(this.gameSettings.sunShaftsEnabled());
+    engine.setWaterAnimationEnabled(this.gameSettings.waterAnimationEnabled());
+    engine.setAmbientAnimationsEnabled(this.gameSettings.ambientAnimationsEnabled());
     engine.showBuildSpots(this.buildMode(), this.freeRoadMode());
     engine.setRobberMode(this.robberMode());
     engine.setSpectatorCameraMode(this.spectatorCam.mode());

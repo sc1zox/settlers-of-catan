@@ -1,4 +1,5 @@
 import { Group, IcosahedronGeometry, Mesh, MeshStandardMaterial } from 'three';
+import { CloudDensity } from './cloud-density.enum';
 
 /**
  * Moderate "sky" altitude band. The camera can't pitch above horizontal
@@ -64,6 +65,8 @@ export class CloudField {
   private readonly geometry: IcosahedronGeometry;
   private readonly material: MeshStandardMaterial;
   private readonly clouds: Cloud[] = [];
+  private density: CloudDensity = CloudDensity.Full;
+  private animationEnabled = true;
 
   constructor() {
     // detail 0 → 20 flat triangles: deliberately faceted, "polygon" look.
@@ -151,6 +154,9 @@ export class CloudField {
   }
 
   update(_dt: number, t: number): void {
+    if (this.density === CloudDensity.None || !this.animationEnabled) {
+      return;
+    }
     // Slow orbital drift of the whole field around the board.
     this.group.rotation.y = t * DRIFT_SPEED;
     for (let i = 0; i < this.clouds.length; i += 1) {
@@ -158,6 +164,28 @@ export class CloudField {
       cloud.group.position.y =
         cloud.baseY + Math.sin(t * cloud.bobSpeed + cloud.phase) * cloud.bobAmplitude;
     }
+  }
+
+  setDensity(density: CloudDensity): void {
+    if (this.density === density) {
+      return;
+    }
+    this.density = density;
+    if (density === CloudDensity.None) {
+      this.group.visible = false;
+      return;
+    }
+    this.group.visible = true;
+    // Sparse: hide the dense deck (last DECK_COLUMNS * DECK_ROWS = 20 clouds),
+    // keep the drifting ring. Full: show everything.
+    const ringCount = RING_CLOUD_COUNT;
+    for (let i = 0; i < this.clouds.length; i += 1) {
+      this.clouds[i].group.visible = density === CloudDensity.Full || i < ringCount;
+    }
+  }
+
+  setAnimationEnabled(enabled: boolean): void {
+    this.animationEnabled = enabled;
   }
 
   dispose(): void {

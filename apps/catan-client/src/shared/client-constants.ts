@@ -10,6 +10,11 @@ export enum ClientStorageKey {
   WebcamEnabled = 'catan.webcamEnabled',
   WebcamQuality = 'catan.webcamQuality',
   SceneBrightness = 'catan.sceneBrightness',
+  RenderPixelRatio = 'catan.renderPixelRatio',
+  CloudDensity = 'catan.cloudDensity',
+  SunShaftsEnabled = 'catan.sunShaftsEnabled',
+  WaterAnimationEnabled = 'catan.waterAnimationEnabled',
+  AmbientAnimationsEnabled = 'catan.ambientAnimationsEnabled',
   LastLobbyCode = 'catan.lastLobbyCode',
   DisplayName = 'catan.displayName',
 }

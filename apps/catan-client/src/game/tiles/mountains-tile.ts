@@ -2,6 +2,7 @@ import { ConeGeometry, IcosahedronGeometry, Mesh, MeshStandardMaterial } from 't
 import { createRng, scatterInHex } from '../animation/rng';
 import { HEX_SIZE } from '../board/hex';
 import { Mine } from '../decorations/mine';
+import { runtimeFlags } from '../engine-runtime/runtime-flags';
 import { Tile, TileInit, TILE_HEIGHT } from './tile';
 
 const PEAK_CLUSTER_COUNT = 3;
@@ -190,6 +191,10 @@ export class MountainsTile extends Tile {
 
   override update(dt: number, t: number): void {
     super.update(dt, t);
+    if (!runtimeFlags.ambientAnimationsEnabled) {
+      this.mine.group.visible = false;
+      return;
+    }
     this.mine.group.visible = this.settled;
     if (this.settled) this.mine.update(t);
   }

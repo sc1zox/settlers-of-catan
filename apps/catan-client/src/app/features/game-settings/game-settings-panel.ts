@@ -2,6 +2,8 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslatePipe } from '@ngx-translate/core';
 import { WebcamQuality } from '@catan/api-interfaces';
 import { APP_VERSION } from '../../../shared/app-version';
+import { CloudDensity } from '../../../game/scene/cloud-density.enum';
+import { RenderPixelRatio } from '../../../game/scene/render-pixel-ratio.enum';
 import { ShadowQuality } from '../../../game/scene/shadow-quality.enum';
 import { GameSettingsService } from './game-settings.service';
 import { LobbyShellGameUiService } from '../lobby-game-ui/lobby-shell-game-ui.service';
@@ -22,6 +24,12 @@ export class GameSettingsPanel {
   protected readonly shadowQualityLow = ShadowQuality.Low;
   protected readonly shadowQualityMedium = ShadowQuality.Medium;
   protected readonly shadowQualityHigh = ShadowQuality.High;
+  protected readonly renderPixelRatioLow = RenderPixelRatio.Low;
+  protected readonly renderPixelRatioMedium = RenderPixelRatio.Medium;
+  protected readonly renderPixelRatioHigh = RenderPixelRatio.High;
+  protected readonly cloudDensityNone = CloudDensity.None;
+  protected readonly cloudDensitySparse = CloudDensity.Sparse;
+  protected readonly cloudDensityFull = CloudDensity.Full;
   protected readonly webcamQualityLow = WebcamQuality.Low;
   protected readonly webcamQualityMedium = WebcamQuality.Medium;
   protected readonly appVersion = APP_VERSION;
@@ -38,6 +46,31 @@ export class GameSettingsPanel {
     const select = event.target as HTMLSelectElement;
     const value = select.value as ShadowQuality;
     this.settings.setShadowQuality(value);
+  }
+
+  public onRenderPixelRatioChange(event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    this.settings.setRenderPixelRatio(select.value as RenderPixelRatio);
+  }
+
+  public onCloudDensityChange(event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    this.settings.setCloudDensity(select.value as CloudDensity);
+  }
+
+  public onSunShaftsChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.settings.setSunShaftsEnabled(input.checked);
+  }
+
+  public onWaterAnimationChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.settings.setWaterAnimationEnabled(input.checked);
+  }
+
+  public onAmbientAnimationsChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.settings.setAmbientAnimationsEnabled(input.checked);
   }
 
   public onPerformanceOverlayChange(event: Event): void {

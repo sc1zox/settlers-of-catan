@@ -13,6 +13,7 @@ import { applySway, SwayInstance } from '../animation/wind';
 import { createRng } from '../animation/rng';
 import { HEX_SIZE } from '../board/hex';
 import { Windmill } from '../decorations/windmill';
+import { runtimeFlags } from '../engine-runtime/runtime-flags';
 import { Tile, TileInit, TILE_HEIGHT } from './tile';
 
 const STALK_HEIGHT = 0.55;
@@ -178,6 +179,9 @@ export class FieldsTile extends Tile {
 
   override update(dt: number, t: number): void {
     super.update(dt, t);
+    if (!runtimeFlags.ambientAnimationsEnabled) {
+      return;
+    }
     const amplitude = this.settled ? 0.28 : 0.14;
     applySway(this.stalksGold, this.goldInstances, t, { amplitude, frequency: 0.7 });
     applySway(this.stalksPale, this.paleInstances, t, {

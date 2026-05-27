@@ -1,6 +1,7 @@
 import { BoxGeometry, Group, Mesh, MeshStandardMaterial, SphereGeometry, Vector3 } from 'three';
 import { createRng, scatterInHex } from '../animation/rng';
 import { HEX_SIZE } from '../board/hex';
+import { runtimeFlags } from '../engine-runtime/runtime-flags';
 import { Tile, TileInit, TILE_HEIGHT } from './tile';
 
 const SHEEP_COUNT = 5;
@@ -50,6 +51,9 @@ export class PastureTile extends Tile {
 
   override update(dt: number, t: number): void {
     super.update(dt, t);
+    if (!runtimeFlags.ambientAnimationsEnabled) {
+      return;
+    }
     // Sheep amble slowly in tiny circles; more lively when settled.
     const speedScale = this.settled ? 1.6 : 1.0;
     for (const s of this.sheep) {

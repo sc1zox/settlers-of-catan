@@ -49,6 +49,76 @@
       />
       <span class="settings-range-value">{{ formatPercent(settings.sceneBrightness()) }}</span>
     </label>
+    <label class="settings-field">
+      <span>{{ 'settings.renderPixelRatio' | translate }}</span>
+      <select (change)="onRenderPixelRatioChange($event)">
+        <option
+          [value]="renderPixelRatioLow"
+          [selected]="settings.renderPixelRatio() === renderPixelRatioLow"
+        >
+          {{ 'settings.renderPixelRatioLow' | translate }}
+        </option>
+        <option
+          [value]="renderPixelRatioMedium"
+          [selected]="settings.renderPixelRatio() === renderPixelRatioMedium"
+        >
+          {{ 'settings.renderPixelRatioMedium' | translate }}
+        </option>
+        <option
+          [value]="renderPixelRatioHigh"
+          [selected]="settings.renderPixelRatio() === renderPixelRatioHigh"
+        >
+          {{ 'settings.renderPixelRatioHigh' | translate }}
+        </option>
+      </select>
+    </label>
+    <label class="settings-field">
+      <span>{{ 'settings.cloudDensity' | translate }}</span>
+      <select (change)="onCloudDensityChange($event)">
+        <option
+          [value]="cloudDensityNone"
+          [selected]="settings.cloudDensity() === cloudDensityNone"
+        >
+          {{ 'settings.cloudDensityNone' | translate }}
+        </option>
+        <option
+          [value]="cloudDensitySparse"
+          [selected]="settings.cloudDensity() === cloudDensitySparse"
+        >
+          {{ 'settings.cloudDensitySparse' | translate }}
+        </option>
+        <option
+          [value]="cloudDensityFull"
+          [selected]="settings.cloudDensity() === cloudDensityFull"
+        >
+          {{ 'settings.cloudDensityFull' | translate }}
+        </option>
+      </select>
+    </label>
+    <label class="settings-check">
+      <input
+        type="checkbox"
+        [checked]="settings.sunShaftsEnabled()"
+        (change)="onSunShaftsChange($event)"
+      />
+      <span>{{ 'settings.sunShafts' | translate }}</span>
+    </label>
+    <label class="settings-check">
+      <input
+        type="checkbox"
+        [checked]="settings.waterAnimationEnabled()"
+        (change)="onWaterAnimationChange($event)"
+      />
+      <span>{{ 'settings.waterAnimation' | translate }}</span>
+    </label>
+    <label class="settings-check">
+      <input
+        type="checkbox"
+        [checked]="settings.ambientAnimationsEnabled()"
+        (change)="onAmbientAnimationsChange($event)"
+      />
+      <span>{{ 'settings.ambientAnimations' | translate }}</span>
+    </label>
   </section>
 
   <section class="settings-section">

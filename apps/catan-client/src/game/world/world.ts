@@ -33,6 +33,10 @@ export class World {
     this.water.update(t);
   }
 
+  setWaterAnimationEnabled(enabled: boolean): void {
+    this.water.setAnimationEnabled(enabled);
+  }
+
   dispose(): void {
     this.water.dispose();
     this.cliffs.dispose();

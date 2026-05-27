@@ -1,7 +1,13 @@
 import { WebcamQuality } from '@catan/api-interfaces';
+import { CloudDensity } from '../../../game/scene/cloud-density.enum';
+import { RenderPixelRatio } from '../../../game/scene/render-pixel-ratio.enum';
 import { ShadowQuality } from '../../../game/scene/shadow-quality.enum';
 
-export type PerformanceTier = 'low' | 'medium' | 'high';
+export enum PerformanceTier {
+  Low = 'low',
+  Medium = 'medium',
+  High = 'high',
+}
 
 export interface HardwareProbeSignals {
   readonly hardwareConcurrency: number | null;
@@ -43,7 +49,7 @@ export function collectHardwareProbeSignals(): HardwareProbeSignals {
 
 export function classifyPerformanceTier(signals: HardwareProbeSignals): PerformanceTier {
   if (signals.prefersReducedMotion || signals.saveData) {
-    return 'low';
+    return PerformanceTier.Low;
   }
   let score = 0;
   const cores = signals.hardwareConcurrency ?? 4;
@@ -68,39 +74,64 @@ export function classifyPerformanceTier(signals: HardwareProbeSignals): Performa
   }
   score += gpuRendererScore(signals.gpuRenderer);
   if (score >= 3) {
-    return 'high';
+    return PerformanceTier.High;
   }
   if (score >= 0) {
-    return 'medium';
+    return PerformanceTier.Medium;
   }
-  return 'low';
+  return PerformanceTier.Low;
 }
 
 export function downgradeTier(tier: PerformanceTier): PerformanceTier {
-  if (tier === 'high') {
-    return 'medium';
+  if (tier === PerformanceTier.High) {
+    return PerformanceTier.Medium;
   }
-  if (tier === 'medium') {
-    return 'low';
-  }
-  return 'low';
+  return PerformanceTier.Low;
 }
 
-export function tierToShadowQuality(tier: PerformanceTier): ShadowQuality {
-  if (tier === 'high') {
-    return ShadowQuality.High;
-  }
-  if (tier === 'medium') {
-    return ShadowQuality.Medium;
-  }
-  return ShadowQuality.Low;
+export interface PerformanceProfile {
+  readonly shadowQuality: ShadowQuality;
+  readonly webcamQuality: WebcamQuality;
+  readonly renderPixelRatio: RenderPixelRatio;
+  readonly cloudDensity: CloudDensity;
+  readonly sunShaftsEnabled: boolean;
+  readonly waterAnimationEnabled: boolean;
+  readonly ambientAnimationsEnabled: boolean;
 }
 
-export function tierToWebcamQuality(tier: PerformanceTier): WebcamQuality {
-  if (tier === 'low') {
-    return WebcamQuality.Low;
+export function tierToProfile(tier: PerformanceTier): PerformanceProfile {
+  switch (tier) {
+    case PerformanceTier.High:
+      return {
+        shadowQuality: ShadowQuality.High,
+        webcamQuality: WebcamQuality.Medium,
+        renderPixelRatio: RenderPixelRatio.High,
+        cloudDensity: CloudDensity.Full,
+        sunShaftsEnabled: true,
+        waterAnimationEnabled: true,
+        ambientAnimationsEnabled: true,
+      };
+    case PerformanceTier.Medium:
+      return {
+        shadowQuality: ShadowQuality.Medium,
+        webcamQuality: WebcamQuality.Medium,
+        renderPixelRatio: RenderPixelRatio.Medium,
+        cloudDensity: CloudDensity.Sparse,
+        sunShaftsEnabled: false,
+        waterAnimationEnabled: true,
+        ambientAnimationsEnabled: true,
+      };
+    case PerformanceTier.Low:
+      return {
+        shadowQuality: ShadowQuality.Low,
+        webcamQuality: WebcamQuality.Low,
+        renderPixelRatio: RenderPixelRatio.Low,
+        cloudDensity: CloudDensity.None,
+        sunShaftsEnabled: false,
+        waterAnimationEnabled: false,
+        ambientAnimationsEnabled: false,
+      };
   }
-  return WebcamQuality.Medium;
 }
 
 function gpuRendererScore(renderer: string | null): number {
@@ -143,12 +174,18 @@ function readGpuRendererString(): string | null {
     if (gl === null) {
       return null;
     }
+    // `WEBGL_debug_renderer_info` is deprecated (Firefox emits a console warning).
+    // Use the standard `RENDERER` parameter; fall back to the extension only if
+    // it's not available.
+    const direct = gl.getParameter(gl.RENDERER) as string | null;
+    if (direct) {
+      return direct;
+    }
     const ext = gl.getExtension('WEBGL_debug_renderer_info');
     if (ext === null) {
       return null;
     }
-    const renderer: unknown = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
-    return typeof renderer === 'string' && renderer.length > 0 ? renderer : null;
+    return (gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) as string | null) ?? null;
   } catch {
     return null;
   } finally {

@@ -70,6 +70,8 @@ export class WaterSurface {
   readonly mesh: Mesh;
   private readonly disc: DiscGeometry;
   private normalFrame = 0;
+  private animationEnabled = true;
+  private hasFlattened = false;
 
   constructor(radius: number) {
     this.disc = buildDiscGeometry(radius, 14, 64);
@@ -86,6 +88,10 @@ export class WaterSurface {
   }
 
   update(t: number): void {
+    if (!this.animationEnabled) {
+      this.flattenOnce();
+      return;
+    }
     const pos = this.disc.positions.array as Float32Array;
     // Four overlapping wave fronts with bigger amplitudes so the surface
     // visibly ripples instead of looking like a flat blue disc.
@@ -105,6 +111,25 @@ export class WaterSurface {
     if (this.normalFrame === 0) {
       this.disc.geometry.computeVertexNormals();
     }
+    this.hasFlattened = false;
+  }
+
+  setAnimationEnabled(enabled: boolean): void {
+    this.animationEnabled = enabled;
+  }
+
+  /** Settles the surface back to a flat disc once when animation gets disabled. */
+  private flattenOnce(): void {
+    if (this.hasFlattened) {
+      return;
+    }
+    const pos = this.disc.positions.array as Float32Array;
+    for (let i = 1; i < pos.length; i += 3) {
+      pos[i] = 0;
+    }
+    this.disc.positions.needsUpdate = true;
+    this.disc.geometry.computeVertexNormals();
+    this.hasFlattened = true;
   }
 
   dispose(): void {

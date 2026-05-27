@@ -68,6 +68,7 @@ export class SunShafts {
   private readonly geometry: ConeGeometry;
   private readonly falloff: CanvasTexture;
   private readonly shafts: Shaft[] = [];
+  private enabled = true;
 
   constructor() {
     // Open cone: vanishingly thin tip at the sun, flaring base over the table.
@@ -109,11 +110,22 @@ export class SunShafts {
   }
 
   update(_dt: number, t: number): void {
+    if (!this.enabled) {
+      return;
+    }
     for (let i = 0; i < this.shafts.length; i += 1) {
       const shaft = this.shafts[i];
       const pulse = 0.8 + 0.2 * Math.sin(t * 0.35 + shaft.phase);
       shaft.material.opacity = BASE_OPACITY * pulse;
     }
+  }
+
+  setEnabled(enabled: boolean): void {
+    if (this.enabled === enabled) {
+      return;
+    }
+    this.enabled = enabled;
+    this.group.visible = enabled;
   }
 
   dispose(): void {

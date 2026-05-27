@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, forwardRef, Inject, Injectable } from '@nestjs/common';
 import {
   ActionRejectCode,
   asActionRejectCode,
@@ -51,6 +51,7 @@ export class GameService {
     private readonly economy: EconomyService,
     private readonly robber: RobberService,
     private readonly devCards: DevCardsService,
+    @Inject(forwardRef(() => BotService))
     private readonly demoBots: BotService,
   ) {}
 

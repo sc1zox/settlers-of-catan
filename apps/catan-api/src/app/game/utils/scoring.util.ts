@@ -1,6 +1,10 @@
 import { DevCardType, PlayerSeat } from '@catan/api-interfaces';
 import { LobbyPlayerSlot, LobbyRuntime } from '../lobby/lobby-runtime';
 
+export function getPublicVictoryPoints(player: LobbyPlayerSlot): number {
+  return player.visibleVictoryPoints + (player.hasLongestRoad ? 2 : 0) + (player.hasLargestArmy ? 2 : 0);
+}
+
 export function getTotalVictoryPoints(player: LobbyPlayerSlot): number {
   let hiddenVictoryCards = 0;
   for (let i = 0; i < player.devCards.length; i += 1) {

@@ -39,6 +39,10 @@ export interface LobbyPlayerPublicDto {
   readonly hasPlayedDevCardThisTurn: boolean;
   readonly playedKnights: number;
   readonly visibleVictoryPoints: number;
+  /**
+   * For `isSelf`: full VP total (settlements + cities + VP dev cards + Longest Road/Largest Army bonuses).
+   * For opponents: publicly visible total only (settlements + cities + known bonuses — VP dev cards excluded).
+   */
   readonly totalVictoryPoints: number;
   readonly longestRoadLength: number;
   readonly harborRates: PlayerHarborRatesDto;

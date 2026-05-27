@@ -7,7 +7,7 @@ import { GameStateResource } from '../../core/game/game-state.resource';
 interface PlayerStatsRow {
   readonly seat: PlayerSeat;
   readonly displayName: string;
-  readonly visibleVictoryPoints: number;
+  readonly victoryPoints: number;
   readonly playedKnights: number;
   readonly longestRoadLength: number;
   readonly hasLongestRoad: boolean;
@@ -41,7 +41,7 @@ export class PlayerStatsPanel {
       out.push({
         seat: p.seat,
         displayName: p.displayName,
-        visibleVictoryPoints: p.visibleVictoryPoints,
+        victoryPoints: p.totalVictoryPoints,
         playedKnights: p.playedKnights,
         longestRoadLength: p.longestRoadLength,
         hasLongestRoad: lobby.longestRoadSeat === p.seat,

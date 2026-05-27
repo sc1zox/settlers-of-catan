@@ -21,7 +21,7 @@ import {
   emptyPublicResourceRecord,
 } from '../utils/public-player-resources.util';
 import { computeHarborVertexSets, resolveHarborRates } from '../utils/harbor-rate.util';
-import { getTotalVictoryPoints } from '../utils/scoring.util';
+import { getPublicVictoryPoints, getTotalVictoryPoints } from '../utils/scoring.util';
 import {
   countRemainingCitiesForSeat,
   countRemainingRoadsForSeat,
@@ -135,7 +135,7 @@ export class LobbyService {
         hasPlayedDevCardThisTurn: p.hasPlayedDevCardThisTurn,
         playedKnights: p.playedKnights,
         visibleVictoryPoints: p.visibleVictoryPoints,
-        totalVictoryPoints: getTotalVictoryPoints(p),
+        totalVictoryPoints: isSelf ? getTotalVictoryPoints(p) : getPublicVictoryPoints(p),
         longestRoadLength: p.longestRoadLength,
         harborRates: resolveHarborRates(lobby, p.seat, harborSets),
         remainingPieces: {

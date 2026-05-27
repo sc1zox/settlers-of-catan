@@ -1,6 +1,6 @@
 {
   "name": "catan-client",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "scripts": {
     "ng": "ng",
     "start": "concurrently -k -n api,web \"NX_DAEMON=false NX_WORKSPACE_DATA_DIRECTORY=node_modules/.cache/nx-workspace-data nx serve catan-api\" \"NX_DAEMON=false NX_WORKSPACE_DATA_DIRECTORY=node_modules/.cache/nx-workspace-data nx serve catan-client\"",

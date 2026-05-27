@@ -456,9 +456,6 @@ export class GameEngine {
     if (seat === this.selfSeat && area.hasActivatedArsenalFigure(kind)) {
       return true;
     }
-    // Spectator path: any seated player's placement flies from their own
-    // arsenal so every viewer sees the figure leave the building player's
-    // pile, not just the one who clicked.
     return area.hasAvailableArsenalFigure(kind);
   }
 
@@ -510,6 +507,31 @@ export class GameEngine {
         cities: Math.max(0, PieceBankLimit.CitiesPerPlayer - remainingBySeat[s].cities),
         roads: Math.max(0, PieceBankLimit.RoadsPerPlayer - remainingBySeat[s].roads),
       });
+    }
+  }
+
+  private revealBoardPiecesNotPendingFlyIn(
+    state: LobbySceneState,
+    flyIns: readonly SpawnedBuildPiece[],
+  ): void {
+    const pendingIds = new Set<string>();
+    for (let i = 0; i < flyIns.length; i += 1) {
+      pendingIds.add(flyIns[i].id);
+    }
+    for (let i = 0; i < state.settlements.length; i += 1) {
+      const dto = state.settlements[i];
+      if (pendingIds.has(dto.vertexId)) {
+        continue;
+      }
+      const kind = dto.isCity ? BuildKind.City : BuildKind.Settlement;
+      this.buildings.ensurePieceRevealed(kind, dto.vertexId);
+    }
+    for (let i = 0; i < state.roads.length; i += 1) {
+      const dto = state.roads[i];
+      if (pendingIds.has(dto.edgeId)) {
+        continue;
+      }
+      this.buildings.ensurePieceRevealed(BuildKind.Road, dto.edgeId);
     }
   }
 
@@ -593,6 +615,26 @@ export class GameEngine {
       return null;
     }
     return info.devKind ?? null;
+  }
+
+  public focusedDevCardSlotIndex(): number | null {
+    const focused = this.focusFan.getFocusedGroup();
+    if (focused.length === 0) {
+      return null;
+    }
+    const groupKey = focused[0].getGroupKey();
+    if (groupKey === null || !groupKey.startsWith('dev-')) {
+      return null;
+    }
+    const parts = groupKey.split('-');
+    if (parts.length < 3) {
+      return null;
+    }
+    const slotIndex = Number(parts[2]);
+    if (!Number.isFinite(slotIndex) || slotIndex < 0) {
+      return null;
+    }
+    return slotIndex;
   }
 
   /**
@@ -738,6 +780,7 @@ export class GameEngine {
       ? undefined
       : (kind: BuildKind, seat: PlayerSeat) => this.canFlyInArsenalFigure(kind, seat);
     const flyIns = this.buildings.syncToState(state.settlements, state.roads, shouldFlyIn);
+    this.revealBoardPiecesNotPendingFlyIn(state, flyIns);
     for (let i = 0; i < flyIns.length; i += 1) {
       this.startArsenalFlyIn(flyIns[i]);
     }

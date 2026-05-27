@@ -48,6 +48,15 @@ export class LobbyLiveKitService implements OnDestroy {
     this.beginLocalVideoCaptureFromUserGesture();
   }
 
+  public handleWebcamToggleUserGesture(): void {
+    const enabled = !this.gameSettings.webcamEnabled();
+    this.gameSettings.setWebcamEnabled(enabled);
+    if (enabled) {
+      this.beginLocalVideoCaptureFromUserGesture();
+    }
+    void this.reconcileActiveRoomWebcam(enabled);
+  }
+
   public canJoinWithWebcam(): 'ok' | 'insecureContext' {
     if (!this.gameSettings.webcamEnabled()) {
       return 'ok';
@@ -195,6 +204,41 @@ export class LobbyLiveKitService implements OnDestroy {
     }
     room.removeAllListeners();
     await room.disconnect();
+  }
+
+  private async reconcileActiveRoomWebcam(enabled: boolean): Promise<void> {
+    if (!enabled) {
+      await this.unpublishLocalCamera();
+      return;
+    }
+    const room = this.room;
+    if (room === null || room.state !== ConnectionState.Connected) {
+      return;
+    }
+    const cameraPublication = room.localParticipant.getTrackPublication(Track.Source.Camera);
+    if (cameraPublication?.track !== undefined) {
+      return;
+    }
+    const preset = webcamQualityPreset(this.gameSettings.webcamQuality());
+    try {
+      await this.publishCameraTrack(room, preset.width, preset.height, preset.frameRate);
+    } catch {
+      await this.abandonPrimedLocalVideoCapture();
+      this.localVideoElement.set(null);
+    }
+  }
+
+  private async unpublishLocalCamera(): Promise<void> {
+    const room = this.room;
+    if (room !== null && room.state === ConnectionState.Connected) {
+      const publication = room.localParticipant.getTrackPublication(Track.Source.Camera);
+      const track = publication?.track;
+      if (track !== undefined) {
+        await room.localParticipant.unpublishTrack(track, true);
+      }
+    }
+    await this.abandonPrimedLocalVideoCapture();
+    this.localVideoElement.set(null);
   }
 
   private subscribeExistingRemoteVideo(room: Room): void {

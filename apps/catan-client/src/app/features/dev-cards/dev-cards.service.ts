@@ -45,6 +45,21 @@ export class DevCardsService {
     if (self.hasPlayedDevCardThisTurn) {
       return false;
     }
-    return self.devCardsInHand - self.devCardsBoughtThisTurn > 0;
+    return this.ripenedDevCardsInHand() > 0;
   });
+
+  public readonly ripenedDevCardsInHand = computed<number>(() => {
+    const self = this.lobbyUi.selfPlayer();
+    if (self === undefined) {
+      return 0;
+    }
+    return Math.max(0, self.devCardsInHand - self.devCardsBoughtThisTurn);
+  });
+
+  public canPlayFocusedDevCardAt(slotIndex: number): boolean {
+    if (!this.canPlayDevCard()) {
+      return false;
+    }
+    return slotIndex >= 0 && slotIndex < this.ripenedDevCardsInHand();
+  }
 }

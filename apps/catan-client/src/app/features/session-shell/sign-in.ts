@@ -53,14 +53,9 @@ export class SignIn {
     void this.runStartSession(this.sessionForm.controls.displayName.value.trim());
   }
 
-  public onWebcamEnabledChange(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    this.gameSettings.setWebcamEnabled(input.checked);
-    if (input.checked) {
-      this.liveKit.tryPrime();
-    } else {
-      void this.liveKit.abandonPrimedLocalVideoCapture();
-    }
+  public onWebcamToggleClick(event: Event): void {
+    event.preventDefault();
+    this.liveKit.handleWebcamToggleUserGesture();
   }
 
   private async runStartSession(displayName: string): Promise<void> {

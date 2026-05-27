@@ -78,16 +78,9 @@ export class GameSettingsPanel {
     this.settings.setPerformanceOverlayEnabled(input.checked);
   }
 
-  public onWebcamEnabledChange(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    this.settings.setWebcamEnabled(input.checked);
-    if (input.checked) {
-      if (typeof globalThis.isSecureContext === 'boolean' && globalThis.isSecureContext) {
-        this.liveKit.beginLocalVideoCaptureFromUserGesture();
-      }
-    } else {
-      void this.liveKit.abandonPrimedLocalVideoCapture();
-    }
+  public onWebcamToggleClick(event: Event): void {
+    event.preventDefault();
+    this.liveKit.handleWebcamToggleUserGesture();
   }
 
   public onWebcamQualityChange(event: Event): void {

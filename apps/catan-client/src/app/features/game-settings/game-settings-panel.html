@@ -127,7 +127,7 @@
       <input
         type="checkbox"
         [checked]="settings.webcamEnabled()"
-        (change)="onWebcamEnabledChange($event)"
+        (click)="onWebcamToggleClick($event)"
       />
       <span>{{ 'settings.webcamEnable' | translate }}</span>
     </label>

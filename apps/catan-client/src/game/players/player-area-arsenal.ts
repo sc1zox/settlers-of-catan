@@ -173,7 +173,7 @@ export class PlayerAreaArsenal {
 
   private pickAvailableArsenalFigure(kind: BuildKind): Object3D | null {
     const figures = this.figuresByKind[kind];
-    for (let i = 0; i < figures.length; i += 1) {
+    for (let i = figures.length - 1; i >= 0; i -= 1) {
       const figure = figures[i];
       if (figure === this.flyingFigure) continue;
       if (figure === this.activatedFigure) continue;
@@ -190,6 +190,9 @@ export class PlayerAreaArsenal {
     worldScale: Vector3,
     onArrive: () => void,
   ): void {
+    if (this.flying) {
+      this.completeFlightNow();
+    }
     this.flyingFigure = figure;
     figure.visible = true;
 
@@ -236,16 +239,24 @@ export class PlayerAreaArsenal {
     figure.scale.lerpVectors(this.flightStartScale, this.flightTargetScale, eased);
 
     if (t >= 1) {
-      figure.position.copy(this.flightRestPos);
-      figure.quaternion.copy(this.flightRestQuat);
-      figure.scale.copy(this.flightRestScale);
-      figure.visible = false;
-      this.flying = false;
-      this.flyingFigure = null;
-      const onArrive = this.flightOnArrive;
-      this.flightOnArrive = null;
-      onArrive?.();
+      this.completeFlightNow();
     }
+  }
+
+  private completeFlightNow(): void {
+    const figure = this.flyingFigure;
+    if (!this.flying || figure === null) {
+      return;
+    }
+    figure.position.copy(this.flightRestPos);
+    figure.quaternion.copy(this.flightRestQuat);
+    figure.scale.copy(this.flightRestScale);
+    figure.visible = false;
+    this.flying = false;
+    this.flyingFigure = null;
+    const onArrive = this.flightOnArrive;
+    this.flightOnArrive = null;
+    onArrive?.();
   }
 
   private restoreActivatedFigure(): void {

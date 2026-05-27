@@ -19,6 +19,7 @@ import { GameEngine } from '../../game/engine';
 import { DEV_KIND_TO_CARD_TYPE } from '../../game/engine-runtime/constants';
 import { DevKind } from '../../game/cards/textures';
 import { setGameTranslateFn } from '../../game/i18n-bridge';
+import { DevCardsService } from '../features/dev-cards/dev-cards.service';
 import { GameStateResource } from '../core/game/game-state.resource';
 import { GameSettingsService } from '../features/game-settings/game-settings.service';
 import { HeadVideoSyncService } from '../features/webcam-head/head-video-sync.service';
@@ -46,10 +47,15 @@ export interface RobberTilePick {
   imports: [TranslatePipe, DiceOverlay, HarborTooltip, CardTooltip],
   templateUrl: './game-canvas.html',
   styleUrl: './game-canvas.scss',
+  host: {
+    class: 'game-canvas-host',
+    '[class.card-focus-active]': 'cardFocused()',
+  },
 })
 export class GameCanvas implements AfterViewInit, OnDestroy {
   @ViewChild('host', { static: true }) private hostRef!: ElementRef<HTMLDivElement>;
   private readonly gameState = inject(GameStateResource);
+  private readonly devCards = inject(DevCardsService);
   private readonly gameSettings = inject(GameSettingsService);
   private readonly headVideoSync = inject(HeadVideoSyncService);
   private readonly spectatorCam = inject(SpectatorCameraService);
@@ -62,7 +68,6 @@ export class GameCanvas implements AfterViewInit, OnDestroy {
   readonly freeRoadMode = input<boolean>(false);
   readonly robberMode = input<boolean>(false);
   readonly diceRollClickEnabled = input<boolean>(false);
-  readonly devCardPlayable = input<boolean>(false);
   readonly uiChromeHidden = input<boolean>(false);
 
   readonly arsenalBuild = output<BuildKind>();
@@ -77,7 +82,17 @@ export class GameCanvas implements AfterViewInit, OnDestroy {
   readonly diceOverlay = signal<DiceOverlayModel | null>(null);
   readonly cardFocused = signal<boolean>(false);
   readonly focusedDevCardType = signal<DevCardType | null>(null);
+  readonly focusedDevCardSlotIndex = signal<number | null>(null);
   protected readonly devCardTypeEnum = DevCardType;
+
+  protected readonly canShowPlayFocusedDevCard = computed<boolean>(() => {
+    const type = this.focusedDevCardType();
+    const slotIndex = this.focusedDevCardSlotIndex();
+    if (type === null || type === DevCardType.VictoryPoint || slotIndex === null) {
+      return false;
+    }
+    return this.devCards.canPlayFocusedDevCardAt(slotIndex);
+  });
 
   private readonly currentSceneState = computed<LobbySceneState | null>(() => {
     const state = this.gameState.lobby.value();
@@ -252,6 +267,9 @@ export class GameCanvas implements AfterViewInit, OnDestroy {
       this.cardFocused.set(focused);
       const devKind: DevKind | null = focused ? (this.engine?.focusedDevKind() ?? null) : null;
       this.focusedDevCardType.set(devKind === null ? null : DEV_KIND_TO_CARD_TYPE[devKind]);
+      this.focusedDevCardSlotIndex.set(
+        focused ? (this.engine?.focusedDevCardSlotIndex() ?? null) : null,
+      );
     });
     this.engine.setArsenalBuildHandler((kind) => this.arsenalBuild.emit(kind));
     this.engine.setBuildSpotPickHandler((kind, id, x, y) => {
@@ -304,6 +322,7 @@ export class GameCanvas implements AfterViewInit, OnDestroy {
   public dismissFocusedCard(): void {
     this.engine?.clearFocusedCard();
     this.focusedDevCardType.set(null);
+    this.focusedDevCardSlotIndex.set(null);
   }
 
   public confirmPlayFocusedDevCard(): void {
@@ -315,6 +334,7 @@ export class GameCanvas implements AfterViewInit, OnDestroy {
     // next click (the tile pick for Knight, the edge pick for RoadBuilding).
     this.engine?.clearFocusedCard();
     this.focusedDevCardType.set(null);
+    this.focusedDevCardSlotIndex.set(null);
     this.playDevCard.emit(type);
   }
 

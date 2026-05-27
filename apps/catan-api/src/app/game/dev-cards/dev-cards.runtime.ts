@@ -13,12 +13,18 @@ export function consumeRipenedDevCard(player: LobbyPlayerSlot, card: DevCardType
   if (ownedCount === 0) {
     throw new Error(ActionRejectCode.DevCardNotOwned);
   }
-  const freshCount = countOf(player.devCardsBoughtThisTurn, card);
-  if (ownedCount - freshCount <= 0) {
+  const ripeCutoff = player.devCards.length - player.devCardsBoughtThisTurn.length;
+  let removeIndex = -1;
+  for (let i = 0; i < ripeCutoff; i += 1) {
+    if (player.devCards[i] === card) {
+      removeIndex = i;
+      break;
+    }
+  }
+  if (removeIndex < 0) {
     throw new Error(ActionRejectCode.DevCardBoughtThisTurn);
   }
-  const idx = player.devCards.indexOf(card);
-  player.devCards.splice(idx, 1);
+  player.devCards.splice(removeIndex, 1);
 }
 
 /** Real-Catan rule: at most one non-VP dev card per turn. */

@@ -153,6 +153,22 @@ export class BoardBuildings {
    * Make a piece spawned hidden by `syncToState` visible, playing the standard
    * construction pop-in (and dust) as it appears.
    */
+  public ensurePieceRevealed(kind: BuildKind, id: string): void {
+    if (kind === BuildKind.Road) {
+      const placed = this.roads.get(id);
+      if (placed === undefined || placed.visibleIntent) {
+        return;
+      }
+      this.revealPiece(kind, id);
+      return;
+    }
+    const placed = this.settlements.get(id);
+    if (placed === undefined || placed.visibleIntent) {
+      return;
+    }
+    this.revealPiece(kind, id);
+  }
+
   revealPiece(kind: BuildKind, id: string): void {
     if (kind === BuildKind.Road) {
       const placed = this.roads.get(id);

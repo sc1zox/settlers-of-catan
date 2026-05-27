@@ -10,11 +10,7 @@
     [attr.aria-label]="'gameCanvas.closeCardAria' | translate"
     (click)="dismissFocusedCard()"
   ></button>
-  @if (
-    focusedDevCardType() !== null &&
-    focusedDevCardType() !== devCardTypeEnum.VictoryPoint &&
-    devCardPlayable()
-  ) {
+  @if (canShowPlayFocusedDevCard()) {
     <button type="button" class="card-action" (click)="confirmPlayFocusedDevCard()">
       {{ 'gameCanvas.playDevCardForType.' + focusedDevCardType() | translate }}
     </button>

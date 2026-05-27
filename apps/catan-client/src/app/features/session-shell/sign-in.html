@@ -45,7 +45,7 @@
               type="checkbox"
               class="webcam-option__input"
               [checked]="gameSettings.webcamEnabled()"
-              (change)="onWebcamEnabledChange($event)"
+              (click)="onWebcamToggleClick($event)"
             />
             <span class="webcam-option__track" aria-hidden="true">
               <span class="webcam-option__thumb"></span>
